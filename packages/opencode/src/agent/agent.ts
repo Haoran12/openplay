@@ -12,6 +12,7 @@ import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SCOUT from "./prompt/scout.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import PROMPT_DIRECTOR from "./prompt/director.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
@@ -45,6 +46,21 @@ export const Info = Schema.Struct({
   prompt: Schema.optional(Schema.String),
   options: Schema.Record(Schema.String, Schema.Unknown),
   steps: Schema.optional(Schema.Finite),
+  persona: Schema.optional(Schema.String).annotate({
+    description: "Character persona description for roleplay agents",
+  }),
+  senses: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
+    description: "Sensory capability map for roleplay agents, e.g. { vision: 'Master', hearing: 'Adept' }",
+  }),
+  knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+    description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
+  }),
+  statePath: Schema.optional(Schema.String).annotate({
+    description: "Relative path to the character state YAML file",
+  }),
+  isDirector: Schema.optional(Schema.Boolean).annotate({
+    description: "Mark this agent as the Director agent for roleplay mode",
+  }),
 }).annotate({ identifier: "Agent" })
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -275,6 +291,35 @@ export const layer = Layer.effect(
             ),
             prompt: PROMPT_SUMMARY,
           },
+          ...(ctx.world
+            ? {
+                director: {
+                  name: "director",
+                  description: "The Director agent for roleplay mode. Oversees the narrative, controls NPCs, and manages world state.",
+                  options: {},
+                  permission: Permission.merge(
+                    defaults,
+                    Permission.fromConfig({
+                      "*": "deny",
+                      read: "allow",
+                      glob: "allow",
+                      grep: "allow",
+                      calc: "allow",
+                      dice_roll: "allow",
+                      embody: "allow",
+                      narrate: "allow",
+                      scene_update: "allow",
+                      question: "allow",
+                    }),
+                    user,
+                  ),
+                  mode: "primary",
+                  native: true,
+                  prompt: PROMPT_DIRECTOR,
+                  isDirector: true,
+                } satisfies Info,
+              }
+            : {}),
         }
 
         for (const [key, value] of Object.entries(cfg.agent ?? {})) {
@@ -302,6 +347,11 @@ export const layer = Layer.effect(
           item.hidden = value.hidden ?? item.hidden
           item.name = value.name ?? item.name
           item.steps = value.steps ?? item.steps
+          item.isDirector = value.isDirector ?? item.isDirector
+          item.persona = value.persona ?? item.persona
+          item.senses = value.senses ?? item.senses
+          item.knowledgeAccess = value.knowledgeAccess ?? item.knowledgeAccess
+          item.statePath = value.statePath ?? item.statePath
           item.options = mergeDeep(item.options, value.options ?? {})
           item.permission = Permission.merge(item.permission, Permission.fromConfig(value.permission ?? {}))
         }
@@ -346,6 +396,9 @@ export const layer = Layer.effect(
             if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
             if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
             return agent
+          }
+          if (ctx.world && agents["director"]) {
+            return agents["director"]
           }
           const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
           if (!visible) throw new Error("no primary visible agent found")

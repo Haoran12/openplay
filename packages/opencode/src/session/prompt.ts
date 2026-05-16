@@ -19,6 +19,9 @@ import { Plugin } from "../plugin"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
 import MAX_STEPS from "../session/prompt/max-steps.txt"
+import PROMPT_DIRECTOR from "../session/prompt/director.txt"
+import PROMPT_CHARACTER from "../session/prompt/character.txt"
+import type * as Roleplay from "./roleplay"
 import { ToolRegistry } from "@/tool/registry"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { MCP } from "../mcp"
@@ -2068,6 +2071,15 @@ export const PromptInput = Schema.Struct({
   format: Schema.optional(MessageV2.Format),
   system: Schema.optional(Schema.String),
   variant: Schema.optional(Schema.String),
+  roleplay: Schema.optional(
+    Schema.Struct({
+      environmentOverride: Schema.optional(Schema.String),
+      instructionOverride: Schema.optional(Schema.String),
+      skillsOverride: Schema.optional(Schema.String),
+    }),
+  ).annotate({
+    description: "Roleplay context overrides for subagent isolation. When set, environment/instructions/skills are replaced per the override values.",
+  }),
   parts: Schema.Array(
     Schema.Union([
       MessageV2.TextPartInput,

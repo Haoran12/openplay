@@ -47,6 +47,8 @@ export const SessionTable = sqliteTable(
       providerID: string
       variant?: string
     }>(),
+    world_id: text("world_id"),
+    world_path: text("world_path"),
     ...Timestamps,
     time_compacting: integer(),
     time_archived: integer(),

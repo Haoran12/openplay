@@ -36,6 +36,7 @@ import { ConfigPermission } from "./permission"
 import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigReference } from "./reference"
+import { ConfigRoleplay } from "./roleplay"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
@@ -204,6 +205,9 @@ export const Info = Schema.Struct({
   ).annotate({ description: "Agent configuration, see https://opencode.ai/docs/agents" }),
   provider: Schema.optional(Schema.Record(Schema.String, ConfigProvider.Info)).annotate({
     description: "Custom provider configurations and model overrides",
+  }),
+  roleplay: Schema.optional(ConfigRoleplay.Info).annotate({
+    description: "Roleplay configuration for OpenPlay mode, see https://opencode.ai/docs/roleplay",
   }),
   mcp: Schema.optional(
     Schema.Record(
@@ -417,6 +421,8 @@ export const layer = Layer.effect(
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "config.json")))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.json")))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.jsonc")))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "openplay.json")))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "openplay.jsonc")))
 
       const legacy = path.join(Global.Path.config, "config")
       if (existsSync(legacy)) {
@@ -564,6 +570,9 @@ export const layer = Layer.effect(
           for (const file of yield* ConfigPaths.files("opencode", ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
             yield* merge(file, yield* loadFile(file), "local")
           }
+          for (const file of yield* ConfigPaths.files("openplay", ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
+            yield* merge(file, yield* loadFile(file), "local")
+          }
         }
 
         result.agent = result.agent || {}
@@ -579,8 +588,9 @@ export const layer = Layer.effect(
         const deps: Fiber.Fiber<void, never>[] = []
 
         for (const dir of directories) {
-          if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR) {
-            for (const file of ["opencode.json", "opencode.jsonc"]) {
+          if (dir.endsWith(".opencode") || dir.endsWith(".openplay") || dir === Flag.OPENCODE_CONFIG_DIR) {
+            const configName = dir.endsWith(".openplay") ? "openplay" : "opencode"
+            for (const file of [`${configName}.json`, `${configName}.jsonc`]) {
               const source = path.join(dir, file)
               log.debug(`loading config from ${source}`)
               yield* merge(source, yield* loadFile(source))

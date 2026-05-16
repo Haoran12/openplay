@@ -1,0 +1,1 @@
+export { filterGodOnly } from "./embody"

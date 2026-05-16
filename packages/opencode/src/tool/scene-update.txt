@@ -1,0 +1,15 @@
+Update scene and world state files in the roleplay world directory.
+
+Use this tool to persist narrative changes, event records, and state updates to YAML (or other text) files in the world directory.
+
+## Parameters
+
+- `path`: File path relative to the world root directory (e.g. "runtime.yaml", "records/session-001.yaml").
+- `content`: The complete file content to write.
+- `create` (optional, default true): Whether to create the file if it doesn't exist.
+
+## Important
+
+- Always write the complete file content — this tool overwrites the existing file.
+- The path is resolved relative to the world root directory (where openplay.json is located).
+- Use this for updating runtime.yaml, writing event records, saving character state changes, etc.

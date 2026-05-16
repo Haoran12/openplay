@@ -1,0 +1,27 @@
+Perform deterministic calculations for roleplay world simulation.
+
+## Operations
+
+### date
+Calculate the difference between two dates.
+- `from`: Start date (format: YYYY-MM-DD or YYYY-MM-DD BC)
+- `to`: End date (format: YYYY-MM-DD or YYYY-MM-DD BC)
+- Returns: human-readable time span between dates.
+
+### tier
+Classify a numeric value into a named power tier.
+- `value`: The numeric value to classify.
+- `tiers` (optional): Custom tier table as `[[threshold, name], ...]`. Defaults to standard cultivation tiers (Mortal → Legendary).
+- Returns: Tier name, progress to next tier.
+
+### delta
+Compare two numeric values and describe the significance of the gap.
+- `a`: First value.
+- `b`: Second value.
+- Returns: Absolute difference, ratio, and qualitative description of the gap.
+
+### age
+Calculate a character's age given birth date and current date.
+- `birthDate`: Birth date (format: YYYY-MM-DD or YYYY-MM-DD BC)
+- `currentDate`: Current in-game date (format: YYYY-MM-DD or YYYY-MM-DD BC)
+- Returns: Age in years.

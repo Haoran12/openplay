@@ -13,6 +13,7 @@ import PROMPT_CODEX from "./prompt/codex.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
 import type { Provider } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
+import type * as Roleplay from "./roleplay"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
@@ -33,8 +34,8 @@ export function provider(model: Provider.Model) {
 }
 
 export interface Interface {
-  readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
-  readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly environment: (model: Provider.Model, roleplay?: Roleplay.Context) => Effect.Effect<string[]>
+  readonly skills: (agent: Agent.Info, roleplay?: Roleplay.Context) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -45,7 +46,12 @@ export const layer = Layer.effect(
     const skill = yield* Skill.Service
 
     return Service.of({
-      environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
+      environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model, roleplay?: Roleplay.Context) {
+        if (roleplay) {
+          const override = roleplay.environmentOverride
+          if (override === "") return []
+          if (override !== undefined) return [override]
+        }
         const ctx = yield* InstanceState.context
         return [
           [
@@ -62,7 +68,12 @@ export const layer = Layer.effect(
         ]
       }),
 
-      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
+      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, roleplay?: Roleplay.Context) {
+        if (roleplay) {
+          const override = roleplay.skillsOverride
+          if (override === "") return undefined
+          if (override !== undefined) return override
+        }
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
         const list = yield* skill.available(agent)
@@ -70,8 +81,6 @@ export const layer = Layer.effect(
         return [
           "Skills provide specialized instructions and workflows for specific tasks.",
           "Use the skill tool to load a skill when a task matches its description.",
-          // the agents seem to ingest the information about skills a bit better if we present a more verbose
-          // version of them here and a less verbose version in tool description, rather than vice versa.
           Skill.fmt(list, { verbose: true }),
         ].join("\n")
       }),

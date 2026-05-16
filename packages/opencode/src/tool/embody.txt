@@ -1,0 +1,21 @@
+Dispatch a character subagent to respond in character based on a filtered L2 view.
+
+The Director calls this tool to have a character act within the narrative. You (the Director) must:
+
+1. **Construct the L2 view**: Filter what this character can perceive based on access tags:
+   - `Public` / `public` → include for everyone
+   - `God Only` / `god-only` → NEVER include (the system will also strip it)
+   - `Condition: X` → include only if the character satisfies condition X
+   - `self` → include only for the character themselves
+   - `participant` → include only if the character was involved in the event
+   - `List: A, B` → include only if the character is in the named list
+
+2. **Translate numbers into sensory descriptions**: Don't write "power level 2500" — write "you sense formidable spiritual pressure."
+
+3. **Pass the situation**: Describe what is happening right now from this character's vantage point.
+
+## Important
+
+- Never paraphrase or hint at God Only information in the L2 view.
+- The system will programmatically strip any remaining God Only content as a safety net.
+- This tool returns the character's response — you then continue directing the scene.

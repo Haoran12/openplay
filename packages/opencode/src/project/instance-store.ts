@@ -7,6 +7,7 @@ import { Context, Deferred, Duration, Effect, Exit, Layer, Scope } from "effect"
 import { type InstanceContext } from "./instance-context"
 import { InstanceBootstrap } from "./bootstrap-service"
 import * as Project from "./project"
+import * as World from "@/world/world"
 
 export interface LoadInput {
   directory: string
@@ -28,30 +29,35 @@ interface Entry {
   readonly deferred: Deferred.Deferred<InstanceContext>
 }
 
-export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootstrap.Service> = Layer.effect(
+export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootstrap.Service | World.Service> = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const project = yield* Project.Service
+    const projectSvc = yield* Project.Service
     const bootstrap = yield* InstanceBootstrap.Service
+    const worldSvc = yield* World.Service
     const scope = yield* Scope.Scope
     const cache = new Map<string, Entry>()
 
     const boot = (input: LoadInput & { directory: string }) =>
       Effect.gen(function* () {
-        const ctx: InstanceContext =
+        const baseCtx: InstanceContext =
           input.project && input.worktree
             ? {
                 directory: input.directory,
                 worktree: input.worktree,
                 project: input.project,
               }
-            : yield* project.fromDirectory(input.directory).pipe(
+            : yield* projectSvc.fromDirectory(input.directory).pipe(
                 Effect.map((result) => ({
                   directory: input.directory,
                   worktree: result.sandbox,
                   project: result.project,
                 })),
               )
+        const world = yield* worldSvc.fromDirectory(baseCtx.directory, baseCtx.worktree).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        )
+        const ctx: InstanceContext = { ...baseCtx, world }
         yield* bootstrap.run.pipe(Effect.provideService(InstanceRef, ctx))
         return ctx
       }).pipe(Effect.withSpan("InstanceStore.boot"))
@@ -188,6 +194,9 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(Project.defaultLayer))
+export const defaultLayer = layer.pipe(
+  Layer.provide(World.defaultLayer),
+  Layer.provide(Project.defaultLayer),
+)
 
 export * as InstanceStore from "./instance-store"

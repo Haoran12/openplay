@@ -46,6 +46,21 @@ const AgentSchema = Schema.StructWithRest(
     }),
     maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use 'steps' field instead." }),
     permission: Schema.optional(ConfigPermission.Info),
+    persona: Schema.optional(Schema.String).annotate({
+      description: "Character persona description for roleplay agents",
+    }),
+    senses: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
+      description: "Sensory capability map for roleplay agents, e.g. { vision: 'Master', hearing: 'Adept' }",
+    }),
+    knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+      description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
+    }),
+    statePath: Schema.optional(Schema.String).annotate({
+      description: "Relative path to the character state YAML file",
+    }),
+    isDirector: Schema.optional(Schema.Boolean).annotate({
+      description: "Mark this agent as the Director agent for roleplay mode",
+    }),
   }),
   [Schema.Record(Schema.String, Schema.Any)],
 )
@@ -67,6 +82,11 @@ const KNOWN_KEYS = new Set([
   "permission",
   "disable",
   "tools",
+  "persona",
+  "senses",
+  "knowledgeAccess",
+  "statePath",
+  "isDirector",
 ])
 
 // Post-parse normalisation:

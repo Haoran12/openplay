@@ -1,0 +1,13 @@
+Roll dice for probability-based decisions in the roleplay world.
+
+## Parameters
+
+- `sides` (optional, default 6): Number of sides on the die. Common values: 4, 6, 8, 10, 12, 20, 100.
+- `count` (optional, default 1): Number of dice to roll. Results are summed.
+- `modifier` (optional, default 0): Modifier to add to the total. Use negative numbers for penalties.
+
+## Examples
+
+- Simple d20: `dice_roll({ sides: 20 })`
+- 3d6 + 2: `dice_roll({ sides: 6, count: 3, modifier: 2 })`
+- d100 percentile: `dice_roll({ sides: 100 })`

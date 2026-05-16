@@ -101,6 +101,8 @@ export function fromRow(row: SessionRow): Info {
     share,
     revert,
     permission: row.permission ?? undefined,
+    worldID: row.world_id ?? undefined,
+    worldPath: row.world_path ?? undefined,
     time: {
       created: row.time_created,
       updated: row.time_updated,
@@ -136,6 +138,8 @@ export function toRow(info: Info) {
     tokens_cache_write: (info.tokens ?? EmptyTokens).cache.write,
     revert: info.revert ?? null,
     permission: info.permission,
+    world_id: info.worldID ?? null,
+    world_path: info.worldPath ?? null,
     time_created: info.time.created,
     time_updated: info.time.updated,
     time_compacting: info.time.compacting,
@@ -223,6 +227,8 @@ export const Info = Schema.Struct({
   time: Time,
   permission: optionalOmitUndefined(Permission.Ruleset),
   revert: optionalOmitUndefined(Revert),
+  worldID: optionalOmitUndefined(Schema.String),
+  worldPath: optionalOmitUndefined(Schema.String),
 }).annotate({ identifier: "Session" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -550,6 +556,8 @@ export const layer: Layer.Layer<
           created: Date.now(),
           updated: Date.now(),
         },
+        worldID: ctx.world?.id,
+        worldPath: ctx.world?.rootPath,
       }
       log.info("created", result)
 

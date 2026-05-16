@@ -13,6 +13,11 @@ import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
+import { CalcTool } from "./calc"
+import { DiceRollTool } from "./dice-roll"
+import { NarrateTool } from "./narrate"
+import { SceneUpdateTool } from "./scene-update"
+import { EmbodyTool } from "./embody"
 import * as Tool from "./tool"
 import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
@@ -55,6 +60,20 @@ import { SessionStatus } from "@/session/status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 
 const log = Log.create({ service: "tool.registry" })
+
+const ROLEPLAY_TOOL_IDS = new Set([
+  "invalid",
+  "question",
+  "read",
+  "glob",
+  "grep",
+  "calc",
+  "dice_roll",
+  "embody",
+  "narrate",
+  "scene_update",
+  "todo",
+])
 
 export function webSearchEnabled(providerID: ProviderID, flags = { exa: false, parallel: false }) {
   return providerID === ProviderID.opencode || flags.exa || flags.parallel
@@ -133,6 +152,11 @@ export const layer: Layer.Layer<
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const calc = yield* CalcTool
+    const diceroll = yield* DiceRollTool
+    const narrate = yield* NarrateTool
+    const sceneupdate = yield* SceneUpdateTool
+    const embody = yield* EmbodyTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -237,6 +261,11 @@ export const layer: Layer.Layer<
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          calc: Tool.init(calc),
+          dice_roll: Tool.init(diceroll),
+          narrate: Tool.init(narrate),
+          scene_update: Tool.init(sceneupdate),
+          embody: Tool.init(embody),
         })
 
         return {
@@ -260,6 +289,11 @@ export const layer: Layer.Layer<
             tool.patch,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+            tool.calc,
+            tool.dice_roll,
+            tool.narrate,
+            tool.scene_update,
+            tool.embody,
           ],
           task: tool.task,
           read: tool.read,
@@ -311,7 +345,17 @@ export const layer: Layer.Layer<
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      let roleplayMode = false
+      if (input.agent.isDirector) {
+        const ctx = yield* InstanceState.context
+        roleplayMode = !!ctx.world
+      }
+
       const filtered = (yield* all()).filter((tool) => {
+        if (roleplayMode && !ROLEPLAY_TOOL_IDS.has(tool.id)) {
+          return false
+        }
+
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }

@@ -1,0 +1,16 @@
+Generate narrative text for the roleplay world.
+
+This tool is used by the Director to produce narrative descriptions, scene transitions, atmospheric passages, and character voice lines. It marks the output as formal narrative content, distinguishing it from tool calls and meta-discussion.
+
+## Parameters
+
+- `content`: The narrative text to produce.
+- `style` (optional): A style hint such as "suspenseful", "lyrical", "terse", "dramatic".
+- `perspective` (optional): Narrative perspective: "third-person", "first-person", "omniscient".
+
+## When to use
+
+- Describing a new scene or location
+- Narrating character actions or dialogue
+- Creating atmospheric transitions between scenes
+- Producing internal monologue or sensory descriptions
