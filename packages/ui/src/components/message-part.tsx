@@ -305,13 +305,29 @@ function tone(name: string) {
   return agentPalette[hash % agentPalette.length]
 }
 
+function agentDisplayName(name: string | undefined, agents?: readonly { name: string; persona?: string; isDirector?: boolean }[]): string {
+  if (!name) return ""
+  const agent = agents?.find((a) => a.name === name)
+  if (agent?.isDirector) return "Director"
+  if (agent?.persona) {
+    const firstLine = agent.persona.split("\n")[0]?.trim()
+    if (firstLine) return firstLine
+  }
+  return name[0]?.toUpperCase() + name.slice(1)
+}
+
 function taskAgent(
   raw: unknown,
-  list?: readonly { name: string; color?: string }[],
+  list?: readonly { name: string; color?: string; persona?: string; isDirector?: boolean }[],
 ): { name?: string; color?: string } {
   if (typeof raw !== "string" || !raw) return {}
   const key = raw.toLowerCase()
   const item = list?.find((entry) => entry.name === raw || entry.name.toLowerCase() === key)
+  if (item?.isDirector) return { name: "Director", color: item.color ?? agentTones[key] ?? tone(key) }
+  if (item?.persona) {
+    const firstLine = item.persona.split("\n")[0]?.trim()
+    if (firstLine) return { name: firstLine, color: item.color ?? agentTones[key] ?? tone(key) }
+  }
   return {
     name: item?.name ?? `${raw[0]!.toUpperCase()}${raw.slice(1)}`,
     color: item?.color ?? agentTones[key] ?? tone(key),
@@ -1043,8 +1059,10 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   })
 
   const metaHead = createMemo(() => {
-    const agent = props.message.agent
-    const items = [agent ? agent[0]?.toUpperCase() + agent.slice(1) : "", model()]
+    const agentName = props.message.agent
+    const agents = data.store.agent
+    const display = agentDisplayName(agentName, agents)
+    const items = [display, model()]
     return items.filter((x) => !!x).join("\u00A0\u00B7\u00A0")
   })
 
@@ -1450,8 +1468,10 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
   const meta = createMemo(() => {
     if (props.message.role !== "assistant") return ""
     const agent = (props.message as AssistantMessage).agent
+    const agents = data.store.agent
+    const display = agentDisplayName(agent, agents)
     const items = [
-      agent ? agent[0]?.toUpperCase() + agent.slice(1) : "",
+      display,
       model(),
       duration(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
@@ -2331,5 +2351,148 @@ ToolRegistry.register({
     )
 
     return <BasicTool icon="brain" status={props.status} trigger={trigger()} hideDetails />
+  },
+})
+
+ToolRegistry.register({
+  name: "embody",
+  render(props) {
+    const i18n = useI18n()
+    const character = createMemo(() => {
+      const val = props.input.character
+      return typeof val === "string" ? val : ""
+    })
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+
+    return (
+      <BasicTool
+        {...props}
+        icon="user"
+        trigger={{
+          title: `Embody: ${character()}`,
+          subtitle: running() ? undefined : character(),
+        }}
+      >
+        <Show when={props.output}>
+          <div data-component="tool-output" data-scrollable>
+            <Markdown text={props.output!} />
+          </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "narrate",
+  render(props) {
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    const perspective = createMemo(() => {
+      const val = props.input.perspective
+      return typeof val === "string" ? val : undefined
+    })
+    const style = createMemo(() => {
+      const val = props.input.style
+      return typeof val === "string" ? val : undefined
+    })
+    const badges = createMemo(() => {
+      const parts: string[] = []
+      if (perspective()) parts.push(perspective()!)
+      if (style()) parts.push(style()!)
+      return parts.length > 0 ? `(${parts.join(", ")})` : undefined
+    })
+
+    return (
+      <BasicTool
+        {...props}
+        defaultOpen={true}
+        icon="quill"
+        trigger={{
+          title: "Narrate",
+          subtitle: badges(),
+        }}
+      >
+        <Show when={props.output}>
+          <div data-component="tool-output narrative-output">
+            <Markdown text={props.output!} />
+          </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "dice_roll",
+  render(props) {
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    return (
+      <BasicTool
+        {...props}
+        icon="dice"
+        trigger={{
+          title: running() ? "Rolling dice..." : (props.metadata?.title as string) || "Dice Roll",
+        }}
+      >
+        <Show when={props.output}>
+          <div data-component="tool-output">
+            <Markdown text={props.output!} />
+          </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "calc",
+  render(props) {
+    const type = createMemo(() => {
+      const val = props.metadata?.type
+      return typeof val === "string" ? val : ""
+    })
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    return (
+      <BasicTool
+        {...props}
+        icon="calculator"
+        trigger={{
+          title: running() ? `Calculating ${type()}...` : `Calc: ${type()}`,
+        }}
+      >
+        <Show when={props.output}>
+          <div data-component="tool-output">
+            <Markdown text={props.output!} />
+          </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "scene_update",
+  render(props) {
+    const path = createMemo(() => {
+      const val = props.input.path
+      return typeof val === "string" ? val : ""
+    })
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    return (
+      <BasicTool
+        {...props}
+        icon="file-edit"
+        trigger={{
+          title: running() ? "Updating scene..." : `Scene: ${path()}`,
+          subtitle: running() ? undefined : getFilename(path()),
+        }}
+      >
+        <Show when={props.output}>
+          <div data-component="tool-output">
+            <Markdown text={props.output!} />
+          </div>
+        </Show>
+      </BasicTool>
+    )
   },
 })

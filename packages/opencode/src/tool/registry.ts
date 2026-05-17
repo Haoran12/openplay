@@ -18,6 +18,7 @@ import { DiceRollTool } from "./dice-roll"
 import { NarrateTool } from "./narrate"
 import { SceneUpdateTool } from "./scene-update"
 import { EmbodyTool } from "./embody"
+import { GodOnlyFilter } from "./god-only-filter"
 import * as Tool from "./tool"
 import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
@@ -123,6 +124,7 @@ export const layer: Layer.Layer<
   | Format.Service
   | Truncate.Service
   | RuntimeFlags.Service
+  | GodOnlyFilter.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -434,6 +436,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
     )
+    .pipe(Layer.provide(GodOnlyFilter.defaultLayer))
     .pipe(Layer.provide(RuntimeFlags.defaultLayer)),
 )
 

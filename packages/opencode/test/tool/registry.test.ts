@@ -27,6 +27,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 import { Format } from "@/format"
 import { Ripgrep } from "@/file/ripgrep"
 import * as Truncate from "@/tool/truncate"
+import { GodOnlyFilter } from "@/tool/god-only-filter"
 import { InstanceState } from "@/effect/instance-state"
 import { Reference } from "@/reference/reference"
 import { ProviderID, ModelID } from "@/provider/schema"
@@ -63,6 +64,7 @@ const registryLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
     )
+    .pipe(Layer.provide(GodOnlyFilter.defaultLayer))
     .pipe(Layer.provide(RuntimeFlags.layer(flags)))
 
 const it = testEffect(Layer.mergeAll(registryLayer(), node, Agent.defaultLayer))

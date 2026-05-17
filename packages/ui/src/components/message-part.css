@@ -337,6 +337,42 @@
     padding: 0;
     background: none;
   }
+}
+
+[data-component="tool-output"].narrative-output,
+[data-component="narrative-output"] {
+  white-space: normal;
+  padding: 16px;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  background: var(--surface-weak);
+  border: 1px solid var(--border-weak-base);
+  font-style: italic;
+  line-height: var(--line-height-large);
+
+  [data-component="markdown"] {
+    width: 100%;
+    min-width: 0;
+
+    p {
+      margin: 0.5em 0;
+    }
+
+    pre {
+      margin: 0;
+      padding: 0;
+      background-color: transparent !important;
+      border: none !important;
+    }
+  }
+}
+  }
+
+  pre {
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
 
   &[data-scrollable] {
     height: auto;

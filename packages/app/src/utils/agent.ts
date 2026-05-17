@@ -1,8 +1,11 @@
+import type { Agent } from "@opencode-ai/sdk/v2/client"
+
 const defaults: Record<string, string> = {
   ask: "var(--icon-agent-ask-base)",
   build: "var(--icon-agent-build-base)",
   docs: "var(--icon-agent-docs-base)",
   plan: "var(--icon-agent-plan-base)",
+  director: "var(--icon-agent-ask-base)",
 }
 
 const palette = [
@@ -41,4 +44,14 @@ export function messageAgentColor(
     if (item.role !== "user" || !item.agent) continue
     return agentColor(item.agent, agents.find((agent) => agent.name === item.agent)?.color)
   }
+}
+
+export function agentDisplayName(name: string, agents: readonly Agent[]): string {
+  const agent = agents.find((a) => a.name === name)
+  if (agent?.persona) {
+    const firstLine = agent.persona.split("\n")[0]?.trim()
+    if (firstLine) return firstLine
+  }
+  if (agent?.isDirector) return "Director"
+  return name[0]?.toUpperCase() + name.slice(1)
 }

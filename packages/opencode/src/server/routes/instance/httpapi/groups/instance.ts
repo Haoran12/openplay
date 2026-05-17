@@ -15,12 +15,19 @@ import {
 } from "../middleware/workspace-routing"
 import { described } from "./metadata"
 
+const WorldInfo = Schema.Struct({
+  id: Schema.String,
+  rootPath: Schema.String,
+  configPath: Schema.String,
+}).annotate({ identifier: "WorldInfo" })
+
 const PathInfo = Schema.Struct({
   home: Schema.String,
   state: Schema.String,
   config: Schema.String,
   worktree: Schema.String,
   directory: Schema.String,
+  world: Schema.optional(WorldInfo),
 }).annotate({ identifier: "Path" })
 
 export const VcsDiffQuery = Schema.Struct({

@@ -1558,12 +1558,19 @@ export type File = {
   status: "added" | "deleted" | "modified"
 }
 
+export type WorldInfo = {
+  id: string
+  rootPath: string
+  configPath: string
+}
+
 export type Path = {
   home: string
   state: string
   config: string
   worktree: string
   directory: string
+  world?: WorldInfo
 }
 
 export type VcsInfo = {
@@ -1625,6 +1632,13 @@ export type Agent = {
     [key: string]: unknown
   }
   steps?: number
+  persona?: string
+  isDirector?: boolean
+  senses?: {
+    [key: string]: string
+  }
+  knowledgeAccess?: string[]
+  statePath?: string
 }
 
 export type LspStatus = {
