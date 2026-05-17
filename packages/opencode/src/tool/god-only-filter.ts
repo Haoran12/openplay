@@ -2,10 +2,10 @@ export * as GodOnlyFilter from "./god-only-filter"
 
 import { Effect, Context, Layer, Ref } from "effect"
 import { parse } from "yaml"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import * as Log from "@opencode-ai/core/util/log"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
+import * as Log from "@openplay-ai/core/util/log"
 import * as crypto from "crypto"
-import { Glob } from "@opencode-ai/core/util/glob"
+import { Glob } from "@openplay-ai/core/util/glob"
 
 const log = Log.create({ service: "god-only-filter" })
 

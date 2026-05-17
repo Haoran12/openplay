@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "opencode",
+  "name": "openplay",
   "description": "AI-powered development tool",
   "private": true,
   "type": "module",
@@ -102,9 +102,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.933.0",
-    "@opencode-ai/plugin": "workspace:*",
-    "@opencode-ai/script": "workspace:*",
-    "@opencode-ai/sdk": "workspace:*",
+    "@openplay-ai/plugin": "workspace:*",
+    "@openplay-ai/script": "workspace:*",
+    "@openplay-ai/sdk": "workspace:*",
     "heap-snapshot-toolkit": "1.1.3",
     "typescript": "catalog:"
   },

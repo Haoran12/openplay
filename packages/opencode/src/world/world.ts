@@ -1,7 +1,7 @@
 export * as World from "./world"
 
 import { Effect, Layer, Context, Schema, Types } from "effect"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { serviceUse } from "@/effect/service-use"
 import { WorldID } from "./schema"
 

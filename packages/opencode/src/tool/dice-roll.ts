@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { PositiveInt } from "@opencode-ai/core/schema"
+import { PositiveInt } from "@openplay-ai/core/schema"
 import * as Tool from "./tool"
 import DESCRIPTION from "./dice-roll.txt"
 

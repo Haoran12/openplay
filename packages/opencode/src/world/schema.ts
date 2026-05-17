@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { withStatics } from "@opencode-ai/core/schema"
+import { withStatics } from "@openplay-ai/core/schema"
 
 const worldIdSchema = Schema.String.pipe(
   Schema.check(Schema.isStartsWith("wld_")),

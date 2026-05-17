@@ -1,6 +1,6 @@
-import { Global } from "@opencode-ai/core/global"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { Flag } from "@opencode-ai/core/flag/flag"
+import { Global } from "@openplay-ai/core/global"
+import { InstallationVersion } from "@openplay-ai/core/installation/version"
+import { Flag } from "@openplay-ai/core/flag/flag"
 import os from "os"
 import { Duration, Effect } from "effect"
 import { Config } from "@/config/config"
@@ -58,7 +58,7 @@ const InfoCommand = effectCmd({
       : undefined
     const terminal = [termProgram, process.env.TERM].filter((item): item is string => Boolean(item)).join(" / ")
 
-    console.log(`opencode version: ${InstallationVersion}`)
+    console.log(`openplay version: ${InstallationVersion}`)
     console.log(`os: ${os.type()} ${os.release()} ${os.arch()}`)
     console.log(`terminal: ${terminal || "unknown"}`)
     console.log("plugins:")

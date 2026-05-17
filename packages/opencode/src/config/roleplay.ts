@@ -1,7 +1,7 @@
 export * as ConfigRoleplay from "./roleplay"
 
 import { Schema } from "effect"
-import { PositiveInt } from "@opencode-ai/core/schema"
+import { PositiveInt } from "@openplay-ai/core/schema"
 
 const NarrativeStyle = Schema.Struct({
   language: Schema.optional(Schema.String).annotate({

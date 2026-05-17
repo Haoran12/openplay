@@ -1,8 +1,8 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
-import { PluginV2 } from "@opencode-ai/core/plugin"
-import { ProviderPlugins } from "@opencode-ai/core/plugin/provider"
-import { LLMGatewayPlugin } from "@opencode-ai/core/plugin/provider/llmgateway"
+import { PluginV2 } from "@openplay-ai/core/plugin"
+import { ProviderPlugins } from "@openplay-ai/core/plugin/provider"
+import { LLMGatewayPlugin } from "@openplay-ai/core/plugin/provider/llmgateway"
 import { expectPluginRegistered, it, provider } from "./provider-helper"
 
 describe("LLMGatewayPlugin", () => {

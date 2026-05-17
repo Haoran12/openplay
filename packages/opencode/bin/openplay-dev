@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun is required to run openplay from this checkout." >&2
+  exit 1
+fi
+export OPENPLAY_LAUNCH_CWD="${PWD}"
+exec bun --cwd '/home/refzhu/app/openplay/packages/opencode' --conditions=browser '/home/refzhu/app/openplay/packages/opencode/src/index.ts' "$@"

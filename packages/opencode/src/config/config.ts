@@ -1,26 +1,26 @@
-import * as Log from "@opencode-ai/core/util/log"
+import * as Log from "@openplay-ai/core/util/log"
 import path from "path"
 import { pathToFileURL } from "url"
 import os from "os"
 import { mergeDeep } from "remeda"
-import { Global } from "@opencode-ai/core/global"
+import { Global } from "@openplay-ai/core/global"
 import fsNode from "fs/promises"
-import { NamedError } from "@opencode-ai/core/util/error"
-import { Flag } from "@opencode-ai/core/flag/flag"
+import { NamedError } from "@openplay-ai/core/util/error"
+import { Flag } from "@openplay-ai/core/flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
 import { applyEdits, modify } from "jsonc-parser"
-import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationLocal, InstallationVersion } from "@openplay-ai/core/installation/version"
 import { existsSync } from "fs"
 import { Account } from "@/account/account"
 import { isRecord } from "@/util/record"
 import type { ConsoleState } from "./console-state"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
 import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
-import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
+import { EffectFlock } from "@openplay-ai/core/util/effect-flock"
 import { containsPath, type InstanceContext } from "../project/instance-context"
-import { NonNegativeInt, PositiveInt, type DeepMutable } from "@opencode-ai/core/schema"
+import { NonNegativeInt, PositiveInt, type DeepMutable } from "@openplay-ai/core/schema"
 import { ConfigAgent } from "./agent"
 import { ConfigAttachment } from "./attachment"
 import { ConfigCommand } from "./command"
@@ -40,7 +40,7 @@ import { ConfigRoleplay } from "./roleplay"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
-import { Npm } from "@opencode-ai/core/npm"
+import { Npm } from "@openplay-ai/core/npm"
 
 const log = Log.create({ service: "config" })
 
@@ -294,7 +294,7 @@ export const Info = Schema.Struct({
   ),
 }).annotate({ identifier: "Config" })
 
-// Uses the shared `DeepMutable` from `@opencode-ai/core/schema`. See the definition
+// Uses the shared `DeepMutable` from `@openplay-ai/core/schema`. See the definition
 // there for why the local variant is needed over `Types.DeepMutable` from
 // effect-smol (the upstream version collapses `unknown` to `{}`).
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>> & {
@@ -606,7 +606,7 @@ export const layer = Layer.effect(
             .install(dir, {
               add: [
                 {
-                  name: "@opencode-ai/plugin",
+                  name: "@openplay-ai/plugin",
                   version: InstallationLocal ? undefined : InstallationVersion,
                 },
               ],

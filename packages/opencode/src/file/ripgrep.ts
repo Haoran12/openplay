@@ -1,17 +1,17 @@
 import path from "path"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { Cause, Context, Effect, Fiber, Layer, Queue, Schema, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { Global } from "@opencode-ai/core/global"
-import * as Log from "@opencode-ai/core/util/log"
-import { sanitizedProcessEnv } from "@opencode-ai/core/util/opencode-process"
+import { CrossSpawnSpawner } from "@openplay-ai/core/cross-spawn-spawner"
+import { Global } from "@openplay-ai/core/global"
+import * as Log from "@openplay-ai/core/util/log"
+import { sanitizedProcessEnv } from "@openplay-ai/core/util/opencode-process"
 import { which } from "@/util/which"
-import { NonNegativeInt } from "@opencode-ai/core/schema"
+import { NonNegativeInt } from "@openplay-ai/core/schema"
 
 const log = Log.create({ service: "ripgrep" })
 const VERSION = "15.1.0"

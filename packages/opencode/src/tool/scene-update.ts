@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
 import * as Tool from "./tool"
 import DESCRIPTION from "./scene-update.txt"

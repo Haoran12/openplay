@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { Effect, Layer } from "effect"
 import path from "path"
 import { pathToFileURL } from "url"

@@ -1,4 +1,4 @@
-import type { Agent } from "@opencode-ai/sdk/v2/client"
+import type { Agent } from "@openplay-ai/sdk/v2/client"
 
 const defaults: Record<string, string> = {
   ask: "var(--icon-agent-ask-base)",

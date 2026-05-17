@@ -1,9 +1,9 @@
 export * as ConfigCommand from "./command"
 
-import * as Log from "@opencode-ai/core/util/log"
+import * as Log from "@openplay-ai/core/util/log"
 import { Cause, Exit, Schema } from "effect"
-import { NamedError } from "@opencode-ai/core/util/error"
-import { Glob } from "@opencode-ai/core/util/glob"
+import { NamedError } from "@openplay-ai/core/util/error"
+import { Glob } from "@openplay-ai/core/util/glob"
 import { Bus } from "@/bus"
 import { configEntryNameFromPath } from "./entry-name"
 import { InvalidError } from "./error"

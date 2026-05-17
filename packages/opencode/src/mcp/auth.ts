@@ -1,7 +1,7 @@
 import path from "path"
-import { Global } from "@opencode-ai/core/global"
+import { Global } from "@openplay-ai/core/global"
 import { Effect, Layer, Context, Option, Schema } from "effect"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 
 export const Tokens = Schema.Struct({
   accessToken: Schema.mutableKey(Schema.String),

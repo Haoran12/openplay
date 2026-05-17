@@ -81,7 +81,7 @@
 - [x] P1-2: 形态切换支持
 - [x] P1-3: `openplay init` 命令
 - [x] P2-1: God Only 过滤 + Subagent 派发
-- [ ] P3: 品牌重命名
+- [x] P3: 品牌重命名
 
 ---
 
@@ -101,7 +101,7 @@
 | 2026-05-17 | P0-10 | 默认 Agent 选择逻辑：修改 agent.ts (当 ctx.world 存在时 defaultInfo 返回 director agent) |
 | 2026-05-17 | P1-2 | 形态切换支持：新增 docs/openplay/runtime-yaml-schema.md (runtime.yaml 字段说明，含 form 形态字段) |
 | 2026-05-17 | P1-3 | `openplay init` 命令：新增 cli/cmd/init.ts (交互式世界初始化，检查并创建 openplay.json/runtime.yaml 及目录结构) |
-| 2026-05-17 | P2-1 | God Only 过滤 + Subagent 派发：重构 tool/god-only-filter.ts (使用 yaml 库解析，大小写不敏感匹配，文件级/字段级 god-only 提取，缓存机制), 重构 tool/embody.ts (调用 GodOnlyFilter 服务，派发受限 Subagent Session，仅 question 工具，roleplay 覆盖), 添加 yaml 依赖, 更新 registry.ts 和测试文件 |
+| 2026-05-17 | P3 | 品牌重命名：修改 package.json (opencode → openplay, @opencode-ai → @openplay-ai)，重命名 bin/opencode → bin/openplay，更新 CLI 帮助文本和错误消息，npm link 创建全局 openplay 命令 |
 
 ## P2-1: God Only 过滤 + Subagent 派发
 

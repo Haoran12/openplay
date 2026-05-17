@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-ai/enterprise",
+  "name": "@openplay-ai/enterprise",
   "version": "1.15.3",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "shell-prod": "sst shell --target Teams --stage production"
   },
   "dependencies": {
-    "@opencode-ai/core": "workspace:*",
-    "@opencode-ai/ui": "workspace:*",
+    "@openplay-ai/core": "workspace:*",
+    "@openplay-ai/ui": "workspace:*",
     "aws4fetch": "^1.0.20",
     "@pierre/diffs": "catalog:",
     "@solidjs/router": "catalog:",

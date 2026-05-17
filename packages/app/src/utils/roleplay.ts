@@ -1,4 +1,4 @@
-import type { Agent, WorldInfo } from "@opencode-ai/sdk/v2/client"
+import type { Agent, WorldInfo } from "@openplay-ai/sdk/v2/client"
 
 export function isRoleplayMode(world: WorldInfo | undefined): boolean {
   return world !== undefined && world !== null

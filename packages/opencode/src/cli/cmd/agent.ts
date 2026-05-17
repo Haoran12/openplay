@@ -1,7 +1,7 @@
 import { cmd } from "./cmd"
 import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
-import { Global } from "@opencode-ai/core/global"
+import { Global } from "@openplay-ai/core/global"
 import { Agent } from "../../agent/agent"
 import { Provider } from "@/provider/provider"
 import path from "path"
@@ -108,7 +108,7 @@ const AgentCreateCommand = effectCmd({
           if (prompts.isCancel(scopeResult)) throw new UI.CancelledError()
           scope = scopeResult
         }
-        targetPath = path.join(scope === "global" ? Global.Path.config : path.join(ctx.worktree, ".opencode"), "agents")
+        targetPath = path.join(scope === "global" ? Global.Path.config : path.join(ctx.worktree, ".openplay"), "agents")
       }
 
       // Get description

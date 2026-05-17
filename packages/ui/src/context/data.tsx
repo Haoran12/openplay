@@ -1,4 +1,4 @@
-import type { Message, Session, Part, SnapshotFileDiff, SessionStatus, ProviderListResponse, Agent } from "@opencode-ai/sdk/v2"
+import type { Message, Session, Part, SnapshotFileDiff, SessionStatus, ProviderListResponse, Agent } from "@openplay-ai/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
 
