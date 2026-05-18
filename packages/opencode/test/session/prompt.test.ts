@@ -2272,59 +2272,75 @@ it.instance(
 // Agent / command resolution errors
 
 it.instance(
-  "unknown agent throws typed error",
+  "unknown agent falls back to a default agent for basic prompting",
   () =>
     Effect.gen(function* () {
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
       const session = yield* sessions.create({})
-      const exit = yield* prompt
+      const message = yield* prompt
         .prompt({
           sessionID: session.id,
           agent: "nonexistent-agent-xyz",
           noReply: true,
           parts: [{ type: "text", text: "hello" }],
         })
-        .pipe(Effect.exit)
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const err = Cause.squash(exit.cause)
-        expect(err).not.toBeInstanceOf(TypeError)
-        expect(NamedError.Unknown.isInstance(err)).toBe(true)
-        if (NamedError.Unknown.isInstance(err)) {
-          expect(err.data.message).toContain('Agent not found: "nonexistent-agent-xyz"')
-        }
-      }
+      expect(message.info.role).toBe("user")
+      expect(message.info.agent).toBe("build")
     }),
   { git: true },
   30_000,
 )
 
 it.instance(
-  "unknown agent error includes available agent names",
+  "unknown agent fallback still preserves the prompt text",
   () =>
     Effect.gen(function* () {
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
       const session = yield* sessions.create({})
-      const exit = yield* prompt
+      const message = yield* prompt
         .prompt({
           sessionID: session.id,
           agent: "nonexistent-agent-xyz",
           noReply: true,
           parts: [{ type: "text", text: "hello" }],
         })
-        .pipe(Effect.exit)
+      const textPart = message.parts.find((part) => part.type === "text")
+      expect(textPart?.type).toBe("text")
+      if (textPart?.type === "text") expect(textPart.text).toBe("hello")
+    }),
+  { git: true },
+  30_000,
+)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) {
-        const err = Cause.squash(exit.cause)
-        expect(NamedError.Unknown.isInstance(err)).toBe(true)
-        if (NamedError.Unknown.isInstance(err)) {
-          expect(err.data.message).toContain("build")
-        }
-      }
+it.instance(
+  "prompt persists roleplay overrides on the user message",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const message = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        system: "Character system prompt",
+        roleplay: {
+          environmentOverride: "character env",
+          instructionOverride: "",
+          skillsOverride: "",
+        },
+        parts: [{ type: "text", text: "hello in character" }],
+      })
+      expect(message.info.role).toBe("user")
+      if (message.info.role !== "user") throw new Error("expected user message")
+      expect(message.info.system).toBe("Character system prompt")
+      expect(message.info.roleplay).toEqual({
+        environmentOverride: "character env",
+        instructionOverride: "",
+        skillsOverride: "",
+      })
     }),
   { git: true },
   30_000,

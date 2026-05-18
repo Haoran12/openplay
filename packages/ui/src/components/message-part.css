@@ -337,6 +337,22 @@
     padding: 0;
     background: none;
   }
+
+  &[data-scrollable] {
+    height: auto;
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    [data-component="markdown"] {
+      overflow: visible;
+    }
+  }
 }
 
 [data-component="tool-output"].narrative-output,
@@ -363,30 +379,6 @@
       padding: 0;
       background-color: transparent !important;
       border: none !important;
-    }
-  }
-}
-  }
-
-  pre {
-    margin: 0;
-    padding: 0;
-    background: none;
-  }
-
-  &[data-scrollable] {
-    height: auto;
-    max-height: 240px;
-    overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    [data-component="markdown"] {
-      overflow: visible;
     }
   }
 }

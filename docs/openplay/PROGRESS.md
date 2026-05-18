@@ -102,6 +102,12 @@
 | 2026-05-17 | P1-2 | 形态切换支持：新增 docs/openplay/runtime-yaml-schema.md (runtime.yaml 字段说明，含 form 形态字段) |
 | 2026-05-17 | P1-3 | `openplay init` 命令：新增 cli/cmd/init.ts (交互式世界初始化，检查并创建 openplay.json/runtime.yaml 及目录结构) |
 | 2026-05-17 | P3 | 品牌重命名：修改 package.json (opencode → openplay, @opencode-ai → @openplay-ai)，重命名 bin/opencode → bin/openplay，更新 CLI 帮助文本和错误消息，npm link 创建全局 openplay 命令 |
+| 2026-05-17 | Fix | 数据库迁移问题修复：修改 drizzle.config.ts (使用 process.env.HOME 替代硬编码路径)，运行 drizzle-kit push 应用 world_id/world_path 列迁移 |
+| 2026-05-17 | Fix | OpenPlay 会话创建修复：修改 storage/db.ts，在启动时自动修复 `session` 表缺失的 `world_id/world_path` 列；新增 storage/session-world-columns-repair.test.ts 回归测试，修复 roleplay 世界无法创建会话、无法进入 Director Agent 的问题 |
+| 2026-05-17 | Fix | 基本对话降级修复：修改 agent/agent.ts 与 session/prompt.ts，当 `default_agent` 配置失效、Director 不可用或请求的 agent 不存在时自动回退到可用主 agent，避免 OpenPlay/配置异常阻塞基础会话与首条消息发送 |
+| 2026-05-17 | Fix | Roleplay 运行态隔离修复：修改 world/world.ts 使 `runtime.yaml` 成为世界检测第一信号，`openplay.json` 仅作补充配置；修改 session/instruction.ts 与 session/prompt.ts，使 Director 主会话进入 roleplay 模式时不再继承项目开发态 `AGENTS.md`/`CLAUDE.md`/`config.instructions`；新增 instruction/world 回归测试 |
+| 2026-05-17 | Fix | Character Subagent 启用修复：新增隐藏 `character` subagent 并绑定 `character.txt`，修改 embody 派发逻辑固定调用该 subagent 而非角色名；在 message-v2.ts / session/prompt.ts 持久化并消费 roleplay overrides，确保角色子代理沿整条会话链路继承隔离环境/指令/skills；新增 agent/prompt 回归测试 |
+| 2026-05-18 | Fix | Character limited-view 补强：修改 `tool/embody.ts`，在 `l2View` 之外为子代理注入程序化 `Core Self-Knowledge`（从角色配置与状态 YAML 抽取姓名/性别/种族/身份/修为/阵营/形态/状态等自知基础信息），并对该层同样执行 God Only 剥离；更新 `embody.txt`、`director.txt`、`character.txt` 明确区分“自我认知”与“当前感知”；新增 `test/tool/embody.test.ts` 回归测试，覆盖 self/condition/apparent_content/god-only 过滤场景 |
 
 ## P2-1: God Only 过滤 + Subagent 派发
 

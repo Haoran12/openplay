@@ -19,6 +19,8 @@ const WorldInfo = Schema.Struct({
   id: Schema.String,
   rootPath: Schema.String,
   configPath: Schema.String,
+  currentScene: Schema.optional(Schema.String),
+  presentCharacters: Schema.optional(Schema.Array(Schema.String)),
 }).annotate({ identifier: "WorldInfo" })
 
 const PathInfo = Schema.Struct({

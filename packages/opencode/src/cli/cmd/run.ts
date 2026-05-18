@@ -132,7 +132,10 @@ export const RunCommand = effectCmd({
   instance: (args) => !args.attach,
   // For --dir without --attach, load instance for the resolved target dir.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
-  directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
+  directory: (args) => {
+    const cwd = process.env.OPENPLAY_LAUNCH_CWD || process.cwd()
+    return args.dir && !args.attach ? path.resolve(cwd, args.dir) : cwd
+  },
   builder: (yargs: Argv) =>
     yargs
       .positional("message", {
@@ -281,7 +284,7 @@ export const RunCommand = effectCmd({
         }
       }
 
-      const root = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const root = Filesystem.resolve(process.env.PWD ?? process.env.OPENPLAY_LAUNCH_CWD ?? process.cwd())
       const directory = (() => {
         if (!args.dir) return args.attach ? undefined : root
         if (args.attach) return args.dir

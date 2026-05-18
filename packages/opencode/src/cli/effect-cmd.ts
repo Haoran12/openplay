@@ -81,7 +81,7 @@ export const effectCmd = <Args, A>(opts: EffectCmdOpts<Args, A>) =>
         await AppRuntime.runPromise(opts.handler(args))
         return
       }
-      const directory = opts.directory?.(args) ?? process.cwd()
+      const directory = opts.directory?.(args) ?? (process.env.OPENPLAY_LAUNCH_CWD || process.cwd())
       const { store, ctx } = await AppRuntime.runPromise(
         InstanceStore.Service.use((store) => store.load({ directory }).pipe(Effect.map((ctx) => ({ store, ctx })))),
       )

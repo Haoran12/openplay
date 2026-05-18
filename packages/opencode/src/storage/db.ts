@@ -49,11 +49,32 @@ type Client = ReturnType<typeof init>
 
 type Journal = { sql: string; timestamp: number; name: string }[]
 
+type TableColumn = {
+  name: string
+}
+
 // Drizzle's migrate overloads trigger expensive variance checks here; narrow to the journal overload we actually use.
 const migrateFromJournal = migrate as unknown as (db: SQLiteBunDatabase, entries: Journal) => void
 
 function applyMigrations(db: SQLiteBunDatabase, entries: Journal) {
   migrateFromJournal(db, entries)
+}
+
+function tableColumns(db: SQLiteBunDatabase, table: string): string[] {
+  return db.$client
+    .query(`PRAGMA table_info(${table})`)
+    .all()
+    .map((row) => (row as TableColumn).name)
+}
+
+export function ensureSessionWorldColumns(db: SQLiteBunDatabase) {
+  const columns = new Set(tableColumns(db, "session"))
+  const missing = ["world_id", "world_path"].filter((column) => !columns.has(column))
+  if (missing.length === 0) return
+
+  log.warn("repairing session schema drift", { missing })
+  if (missing.includes("world_id")) db.$client.run("ALTER TABLE session ADD COLUMN world_id TEXT")
+  if (missing.includes("world_path")) db.$client.run("ALTER TABLE session ADD COLUMN world_path TEXT")
 }
 
 function time(tag: string) {
@@ -125,6 +146,7 @@ export const Client = Object.assign(
       }
       applyMigrations(db, entries)
     }
+    ensureSessionWorldColumns(db)
 
     client = db
     loaded = true

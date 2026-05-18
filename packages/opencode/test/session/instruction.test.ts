@@ -235,6 +235,30 @@ describe("Instruction.system", () => {
       )
     }),
   )
+
+  it.live("can exclude project and config instructions for roleplay director sessions", () =>
+    Effect.gen(function* () {
+      const globalTmp = yield* tmpWithFiles({ "AGENTS.md": "# Global Instructions" })
+      const projectTmp = yield* tmpdirScoped({
+        config: {
+          instructions: ["docs/director.md"],
+        },
+      })
+      yield* writeFiles(projectTmp, {
+        "AGENTS.md": "# Project Instructions",
+        "docs/director.md": "# Project Config Instruction",
+      })
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const rules = yield* svc.system({
+          includeProject: false,
+          includeConfigInstructions: false,
+        })
+        expect(rules).toEqual([`Instructions from: ${path.join(globalTmp, "AGENTS.md")}\n# Global Instructions`])
+      }).pipe(provideInstance(projectTmp), provideInstruction({ home: globalTmp, config: globalTmp }))
+    }),
+  )
 })
 
 describe("Instruction.systemPaths global config", () => {

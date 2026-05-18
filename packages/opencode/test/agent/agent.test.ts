@@ -1,6 +1,7 @@
 import { afterEach, expect } from "bun:test"
-import { Cause, Effect, Exit, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import path from "path"
+import { promises as fs } from "fs"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { Agent } from "../../src/agent/agent"
@@ -36,12 +37,6 @@ function evalPerm(agent: Agent.Info | undefined, permission: string): Permission
 function load<A>(fn: (svc: Agent.Interface) => Effect.Effect<A>) {
   return Agent.Service.use(fn)
 }
-
-const expectDefaultAgentError = Effect.fn("AgentTest.expectDefaultAgentError")(function* (message: string) {
-  const exit = yield* load((svc) => svc.defaultAgent()).pipe(Effect.exit)
-  expect(Exit.isFailure(exit)).toBe(true)
-  if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toContain(message)
-})
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -163,6 +158,30 @@ it.instance("general agent denies todo tools", () =>
     expect(general?.mode).toBe("subagent")
     expect(general?.hidden).toBeUndefined()
     expect(evalPerm(general, "todowrite")).toBe("deny")
+  }),
+)
+
+it.instance("roleplay worlds expose a hidden character subagent with question-only permissions", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* Effect.promise(() =>
+      fs.writeFile(path.join(test.directory, "runtime.yaml"), "scene: {}\n"),
+    )
+    yield* Effect.promise(() =>
+      fs.writeFile(path.join(test.directory, "openplay.json"), JSON.stringify({ id: "wld_test_character" })),
+    )
+
+    const character = yield* load((svc) => svc.get("character"))
+    expect(character).toBeDefined()
+    expect(character?.mode).toBe("subagent")
+    expect(character?.hidden).toBe(true)
+    expect(evalPerm(character, "question")).toBe("allow")
+    expect(evalPerm(character, "read")).toBe("deny")
+    expect(evalPerm(character, "glob")).toBe("deny")
+    expect(evalPerm(character, "grep")).toBe("deny")
+    expect(evalPerm(character, "edit")).toBe("deny")
+    expect(evalPerm(character, "write")).toBe("deny")
+    expect(evalPerm(character, "task")).toBe("deny")
   }),
 )
 
@@ -672,8 +691,12 @@ it.instance(
 )
 
 it.instance(
-  "defaultAgent throws when default_agent points to subagent",
-  () => expectDefaultAgentError('default agent "explore" is a subagent'),
+  "defaultAgent falls back when default_agent points to subagent",
+  () =>
+    Effect.gen(function* () {
+      const agent = yield* load((svc) => svc.defaultAgent())
+      expect(agent).toBe("build")
+    }),
   {
     config: {
       default_agent: "explore",
@@ -682,8 +705,12 @@ it.instance(
 )
 
 it.instance(
-  "defaultAgent throws when default_agent points to hidden agent",
-  () => expectDefaultAgentError('default agent "compaction" is hidden'),
+  "defaultAgent falls back when default_agent points to hidden agent",
+  () =>
+    Effect.gen(function* () {
+      const agent = yield* load((svc) => svc.defaultAgent())
+      expect(agent).toBe("build")
+    }),
   {
     config: {
       default_agent: "compaction",
@@ -692,8 +719,12 @@ it.instance(
 )
 
 it.instance(
-  "defaultAgent throws when default_agent points to non-existent agent",
-  () => expectDefaultAgentError('default agent "does_not_exist" not found'),
+  "defaultAgent falls back when default_agent points to non-existent agent",
+  () =>
+    Effect.gen(function* () {
+      const agent = yield* load((svc) => svc.defaultAgent())
+      expect(agent).toBe("build")
+    }),
   {
     config: {
       default_agent: "does_not_exist",

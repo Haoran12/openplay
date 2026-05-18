@@ -386,6 +386,12 @@ export type OutputFormatJsonSchema = {
 
 export type OutputFormat = OutputFormatText | OutputFormatJsonSchema
 
+export type RoleplayContext = {
+  environmentOverride?: string
+  instructionOverride?: string
+  skillsOverride?: string
+}
+
 export type UserMessage = {
   id: string
   sessionID: string
@@ -406,6 +412,7 @@ export type UserMessage = {
     variant?: string
   }
   system?: string
+  roleplay?: RoleplayContext
   tools?: {
     [key: string]: boolean
   }
@@ -776,6 +783,8 @@ export type Session = {
     snapshot?: string
     diff?: string
   }
+  worldID?: string
+  worldPath?: string
 }
 
 export type Prompt = {
@@ -988,6 +997,13 @@ export type AgentConfig = {
   steps?: number
   maxSteps?: number
   permission?: PermissionConfig
+  persona?: string
+  senses?: {
+    [key: string]: string
+  }
+  knowledgeAccess?: Array<string>
+  statePath?: string
+  isDirector?: boolean
   [key: string]:
     | unknown
     | string
@@ -1012,6 +1028,10 @@ export type AgentConfig = {
     | "info"
     | number
     | PermissionConfig
+    | {
+        [key: string]: string
+      }
+    | Array<string>
     | undefined
 }
 
@@ -1094,6 +1114,18 @@ export type ProviderConfig = {
       }
     }
   }
+}
+
+export type ConfigRoleplay = {
+  worldPath?: string
+  currentDate?: string
+  narrativeStyle?: {
+    language?: string
+    rhetoric?: string
+    psychology?: string
+    pacing?: string
+  }
+  recordThreshold?: number
 }
 
 export type McpLocalConfig = {
@@ -1218,6 +1250,7 @@ export type Config = {
   provider?: {
     [key: string]: ProviderConfig
   }
+  roleplay?: ConfigRoleplay
   mcp?: {
     [key: string]:
       | McpLocalConfig
@@ -1501,6 +1534,8 @@ export type GlobalSession = {
     snapshot?: string
     diff?: string
   }
+  worldID?: string
+  worldPath?: string
   project: ProjectSummary | null
 }
 
@@ -1562,6 +1597,8 @@ export type WorldInfo = {
   id: string
   rootPath: string
   configPath: string
+  currentScene?: string
+  presentCharacters?: Array<string>
 }
 
 export type Path = {
@@ -1633,12 +1670,12 @@ export type Agent = {
   }
   steps?: number
   persona?: string
-  isDirector?: boolean
   senses?: {
     [key: string]: string
   }
-  knowledgeAccess?: string[]
+  knowledgeAccess?: Array<string>
   statePath?: string
+  isDirector?: boolean
 }
 
 export type LspStatus = {
@@ -5855,6 +5892,11 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    roleplay?: {
+      environmentOverride?: string
+      instructionOverride?: string
+      skillsOverride?: string
+    }
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -6190,6 +6232,11 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    roleplay?: {
+      environmentOverride?: string
+      instructionOverride?: string
+      skillsOverride?: string
+    }
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {

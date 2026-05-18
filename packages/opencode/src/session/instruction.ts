@@ -37,7 +37,7 @@ function extract(messages: MessageV2.WithParts[]) {
 export interface Interface {
   readonly clear: (messageID: MessageID) => Effect.Effect<void>
   readonly systemPaths: () => Effect.Effect<Set<string>, AppFileSystem.Error>
-  readonly system: () => Effect.Effect<string[], AppFileSystem.Error>
+  readonly system: (options?: { includeProject?: boolean; includeConfigInstructions?: boolean }) => Effect.Effect<string[], AppFileSystem.Error>
   readonly find: (dir: string) => Effect.Effect<string | undefined, AppFileSystem.Error>
   readonly resolve: (
     messages: MessageV2.WithParts[],
@@ -151,18 +151,51 @@ export const layer: Layer.Layer<
       return paths
     })
 
-    const system = Effect.fn("Instruction.system")(function* () {
+    const system = Effect.fn("Instruction.system")(function* (
+      options?: { includeProject?: boolean; includeConfigInstructions?: boolean },
+    ) {
       const config = yield* cfg.get()
-      const paths = yield* systemPaths()
-      const urls = (config.instructions ?? []).filter(
-        (item) => item.startsWith("https://") || item.startsWith("http://"),
-      )
+      const includeProject = options?.includeProject ?? true
+      const includeConfigInstructions = options?.includeConfigInstructions ?? true
+      const allPaths = yield* systemPaths()
+      const filteredPaths = new Set<string>()
 
-      const files = yield* Effect.forEach(Array.from(paths), read, { concurrency: 8 })
+      for (const item of allPaths) {
+        const isGlobal = globalFiles.some((file) => path.resolve(file) === item)
+        if (isGlobal || includeProject) filteredPaths.add(item)
+      }
+
+      const urls = includeConfigInstructions
+        ? (config.instructions ?? []).filter((item) => item.startsWith("https://") || item.startsWith("http://"))
+        : []
+
+      const configInstructionPaths = new Set<string>()
+      if (includeConfigInstructions && config.instructions) {
+        for (const raw of config.instructions) {
+          if (raw.startsWith("https://") || raw.startsWith("http://")) continue
+          const instruction = raw.startsWith("~/") ? path.join(global.home, raw.slice(2)) : raw
+          const matches = yield* (
+            path.isAbsolute(instruction)
+              ? fs.glob(path.basename(instruction), {
+                  cwd: path.dirname(instruction),
+                  absolute: true,
+                  include: "file",
+                })
+              : relative(instruction)
+          ).pipe(Effect.catch(() => Effect.succeed([] as string[])))
+          matches.forEach((item) => configInstructionPaths.add(path.resolve(item)))
+        }
+      }
+
+      for (const item of configInstructionPaths) {
+        filteredPaths.add(item)
+      }
+
+      const files = yield* Effect.forEach(Array.from(filteredPaths), read, { concurrency: 8 })
       const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
       return [
-        ...Array.from(paths).flatMap((item, i) => (files[i] ? [`Instructions from: ${item}\n${files[i]}`] : [])),
+        ...Array.from(filteredPaths).flatMap((item, i) => (files[i] ? [`Instructions from: ${item}\n${files[i]}`] : [])),
         ...urls.flatMap((item, i) => (remote[i] ? [`Instructions from: ${item}\n${remote[i]}`] : [])),
       ]
     })

@@ -28,6 +28,13 @@ import { MessageError } from "./message-error"
 import { AuthError, OutputLengthError } from "./message-error"
 export { AuthError, OutputLengthError } from "./message-error"
 
+const RoleplayContext = Schema.Struct({
+  environmentOverride: Schema.optional(Schema.String),
+  instructionOverride: Schema.optional(Schema.String),
+  skillsOverride: Schema.optional(Schema.String),
+}).annotate({ identifier: "RoleplayContext" })
+export type RoleplayContext = Types.DeepMutable<Schema.Schema.Type<typeof RoleplayContext>>
+
 /** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
 interface FetchDecompressionError extends Error {
   code: "ZlibError"
@@ -345,6 +352,7 @@ export const User = Schema.Struct({
     variant: Schema.optional(Schema.String),
   }),
   system: Schema.optional(Schema.String),
+  roleplay: Schema.optional(RoleplayContext),
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
 }).annotate({ identifier: "UserMessage" })
 export type User = Types.DeepMutable<Schema.Schema.Type<typeof User>>

@@ -13,6 +13,7 @@ import PROMPT_SCOUT from "./prompt/scout.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_DIRECTOR from "./prompt/director.txt"
+import PROMPT_CHARACTER from "../session/prompt/character.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@openplay-ai/core/global"
@@ -69,6 +70,10 @@ const GeneratedAgent = Schema.Struct({
   whenToUse: Schema.String,
   systemPrompt: Schema.String,
 })
+
+function firstVisiblePrimary(agents: Record<string, Info>) {
+  return Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
+}
 
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>
@@ -192,6 +197,28 @@ export const layer = Layer.effect(
             mode: "subagent",
             native: true,
           },
+          ...(ctx.world
+            ? {
+                character: {
+                  name: "character",
+                  description:
+                    "Roleplay character subagent. Strictly stays in character using only the filtered scene view provided by the Director.",
+                  permission: Permission.merge(
+                    defaults,
+                    Permission.fromConfig({
+                      "*": "deny",
+                      question: "allow",
+                    }),
+                    user,
+                  ),
+                  options: {},
+                  mode: "subagent" as const,
+                  native: true,
+                  hidden: true,
+                  prompt: PROMPT_CHARACTER,
+                } satisfies Info,
+              }
+            : {}),
           explore: {
             name: "explore",
             permission: Permission.merge(
@@ -392,15 +419,23 @@ export const layer = Layer.effect(
           const c = yield* config.get()
           if (c.default_agent) {
             const agent = agents[c.default_agent]
-            if (!agent) throw new Error(`default agent "${c.default_agent}" not found`)
-            if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
-            if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
-            return agent
+            if (agent && agent.mode !== "subagent" && agent.hidden !== true) return agent
+
+            const fallback = firstVisiblePrimary(agents)
+            if (!fallback) throw new Error("no primary visible agent found")
+            yield* Effect.logWarning("configured default agent is unavailable, falling back").pipe(
+              Effect.annotateLogs({
+                configured: c.default_agent,
+                reason: !agent ? "not_found" : agent.mode === "subagent" ? "subagent" : "hidden",
+                fallback: fallback.name,
+              }),
+            )
+            return fallback
           }
           if (ctx.world && agents["director"]) {
             return agents["director"]
           }
-          const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
+          const visible = firstVisiblePrimary(agents)
           if (!visible) throw new Error("no primary visible agent found")
           return visible
         })

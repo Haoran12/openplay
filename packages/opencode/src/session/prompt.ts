@@ -22,6 +22,7 @@ import MAX_STEPS from "../session/prompt/max-steps.txt"
 import PROMPT_DIRECTOR from "../session/prompt/director.txt"
 import PROMPT_CHARACTER from "../session/prompt/character.txt"
 import type * as Roleplay from "./roleplay"
+import { applyEnvironmentOverride, applyInstructionOverride, applySkillsOverride } from "./roleplay"
 import { ToolRegistry } from "@/tool/registry"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { MCP } from "../mcp"
@@ -1092,16 +1093,34 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return yield* provider.defaultModel()
     })
 
+    const resolveAgent = Effect.fn("SessionPrompt.resolveAgent")(function* (input: {
+      requested?: string
+      sessionID: SessionID
+      context: string
+    }) {
+      if (!input.requested) return yield* agents.defaultInfo()
+
+      const agent = yield* agents.get(input.requested)
+      if (agent) return agent
+
+      const fallback = yield* agents.defaultInfo()
+      yield* Effect.logWarning("requested agent unavailable, falling back").pipe(
+        Effect.annotateLogs({
+          requested: input.requested,
+          fallback: fallback.name,
+          sessionID: input.sessionID,
+          context: input.context,
+        }),
+      )
+      return fallback
+    })
+
     const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(function* (input: PromptInput) {
-      const agentName = input.agent
-      const ag = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
-      if (!ag) {
-        const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-        const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
-        yield* bus.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
-        throw error
-      }
+      const ag = yield* resolveAgent({
+        requested: input.agent,
+        sessionID: input.sessionID,
+        context: "prompt.createUserMessage",
+      })
 
       const current = Database.use((db) =>
         db
@@ -1133,6 +1152,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           variant,
         },
         system: input.system,
+        roleplay: input.roleplay,
         format: input.format,
       }
 
@@ -1769,6 +1789,23 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const outcome: "break" | "continue" = yield* Effect.gen(function* () {
             const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
             const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
+            const roleplay =
+              lastUser.roleplay ??
+              (ctx.world && agent.isDirector
+                ? ({
+                    environmentOverride: [
+                      "You are the Director of a roleplay world.",
+                      "Operate only on the roleplay world and player-facing narrative state.",
+                      "<env>",
+                      `  World root: ${ctx.world.rootPath}`,
+                      `  Runtime file: ${ctx.world.rootPath}/runtime.yaml`,
+                      `  Today's date: ${new Date().toDateString()}`,
+                      "</env>",
+                    ].join("\n"),
+                    instructionOverride: "",
+                    skillsOverride: "",
+                  } satisfies Roleplay.Context)
+                : undefined)
 
             const tools = yield* resolveTools({
               agent,
@@ -1813,12 +1850,25 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
             const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-              sys.skills(agent),
-              sys.environment(model),
-              instruction.system().pipe(Effect.orDie),
+              sys.skills(agent, roleplay),
+              sys.environment(model, roleplay),
+              instruction
+                .system(
+                  roleplay
+                    ? {
+                        includeProject: false,
+                        includeConfigInstructions: false,
+                      }
+                    : undefined,
+                )
+                .pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+            const system = [
+              ...applyEnvironmentOverride(env, roleplay),
+              ...applyInstructionOverride(instructions, roleplay),
+              ...applySkillsOverride(skills, roleplay),
+            ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1953,14 +2003,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
-      const agent = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
-      if (!agent) {
-        const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-        const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
-        yield* bus.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
-        throw error
-      }
+      const agent = yield* resolveAgent({
+        requested: agentName,
+        sessionID: input.sessionID,
+        context: "prompt.command",
+      })
 
       const templateParts = yield* resolvePromptParts(template)
       const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true

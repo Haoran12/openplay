@@ -35,7 +35,13 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
         worktree: ctx.worktree,
         directory: ctx.directory,
         world: ctx.world
-          ? { id: ctx.world.id, rootPath: ctx.world.rootPath, configPath: ctx.world.configPath }
+          ? {
+              id: ctx.world.id,
+              rootPath: ctx.world.rootPath,
+              configPath: ctx.world.configPath,
+              currentScene: ctx.world.currentScene,
+              presentCharacters: ctx.world.presentCharacters,
+            }
           : undefined,
       }
     })
