@@ -32,6 +32,7 @@ import { trimSessions } from "./global-sync/session-trim"
 import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 import { formatServerError } from "@/utils/server-errors"
+import { isRuntimeYamlWatcherUpdate } from "./file/watcher"
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/solid-query"
 import { createRefreshQueue } from "./global-sync/queue"
 import { directoryKey } from "./global-sync/utils"
@@ -369,6 +370,15 @@ function createGlobalSync() {
     if (!existing) return
     children.mark(key)
     const [store, setStore] = existing
+
+    if (isRuntimeYamlWatcherUpdate(event)) {
+      void queryClient
+        .fetchQuery(queryOptionsApi.path(key))
+        .then((path) => {
+          setStore("path", reconcile(path))
+        })
+    }
+
     applyDirectoryEvent({
       event,
       directory,

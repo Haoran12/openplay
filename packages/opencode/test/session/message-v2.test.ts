@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError } from "ai"
 import { MessageV2 } from "../../src/session/message-v2"
+import { isRoleplayDirectorTurnComplete } from "../../src/session/prompt"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "../../src/provider/schema"
@@ -1652,5 +1653,114 @@ describe("session.message-v2.latest", () => {
     expect(state.user?.id).toBe(NEW_COMPACTION_USER)
     expect(state.tasks).toHaveLength(1)
     expect(state.tasks[0]).toMatchObject({ type: "compaction", auto: true })
+  })
+
+  test("roleplay director turn is incomplete when embody ran without narrate or question", () => {
+    const parts: MessageV2.Part[] = [
+      {
+      ...basePart("msg_assistant_roleplay_1", "prt_embody_1"),
+      type: "tool" as const,
+      callID: "call_embody_1",
+      tool: "embody",
+      state: {
+        status: "completed" as const,
+        input: { character: "孟缘" },
+        output: "{}",
+        title: "Embody: 孟缘",
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+      },
+    ]
+
+    expect(
+      isRoleplayDirectorTurnComplete({
+        world: { rootPath: "/tmp/world" },
+        agent: { isDirector: true },
+        parts,
+      }),
+    ).toBe(false)
+  })
+
+  test("roleplay director turn is complete when narrate follows embody", () => {
+    const parts: MessageV2.Part[] = [
+      {
+        ...basePart("msg_assistant_roleplay_2", "prt_embody_2"),
+        type: "tool",
+        callID: "call_embody_2",
+        tool: "embody",
+        state: {
+          status: "completed",
+          input: { character: "孟缘" },
+          output: "{}",
+          title: "Embody: 孟缘",
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      },
+      {
+        ...basePart("msg_assistant_roleplay_2", "prt_narrate_2"),
+        type: "tool",
+        callID: "call_narrate_2",
+        tool: "narrate",
+        state: {
+          status: "completed",
+          input: { content: "夜风过竹，门内门外都静了一瞬。" },
+          output: "夜风过竹，门内门外都静了一瞬。",
+          title: "Narrate",
+          metadata: {},
+          time: { start: 3, end: 4 },
+        },
+      },
+    ]
+
+    expect(
+      isRoleplayDirectorTurnComplete({
+        world: { rootPath: "/tmp/world" },
+        agent: { isDirector: true },
+        parts,
+      }),
+    ).toBe(true)
+  })
+
+  test("roleplay director turn is complete when a player-facing question follows embody", () => {
+    const parts: MessageV2.Part[] = [
+      {
+        ...basePart("msg_assistant_roleplay_3", "prt_embody_3"),
+        type: "tool",
+        callID: "call_embody_3",
+        tool: "embody",
+        state: {
+          status: "completed",
+          input: { character: "孟缘" },
+          output: "{}",
+          title: "Embody: 孟缘",
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      },
+      {
+        ...basePart("msg_assistant_roleplay_3", "prt_question_3"),
+        type: "tool",
+        callID: "call_question_3",
+        tool: "question",
+        state: {
+          status: "completed",
+          input: { questions: [{ question: "你要推门而入，还是先在门外应声？" }] },
+          output: "User has answered your questions: ...",
+          title: "Asked 1 question",
+          metadata: {},
+          time: { start: 3, end: 4 },
+        },
+      },
+    ]
+
+    expect(
+      isRoleplayDirectorTurnComplete({
+        world: { rootPath: "/tmp/world" },
+        agent: { isDirector: true },
+        parts,
+      }),
+    ).toBe(true)
   })
 })

@@ -17,6 +17,8 @@ import { CalcTool } from "./calc"
 import { DiceRollTool } from "./dice-roll"
 import { NarrateTool } from "./narrate"
 import { SceneUpdateTool } from "./scene-update"
+import { MemoryUpdateTool } from "./memory-update"
+import { MemoryReflectTool } from "./memory-reflect"
 import { EmbodyTool } from "./embody"
 import { GodOnlyFilter } from "./god-only-filter"
 import * as Tool from "./tool"
@@ -73,6 +75,8 @@ const ROLEPLAY_TOOL_IDS = new Set([
   "embody",
   "narrate",
   "scene_update",
+  "memory_reflect",
+  "memory_update",
   "todo",
 ])
 
@@ -158,6 +162,8 @@ export const layer: Layer.Layer<
     const diceroll = yield* DiceRollTool
     const narrate = yield* NarrateTool
     const sceneupdate = yield* SceneUpdateTool
+    const memoryreflect = yield* MemoryReflectTool
+    const memoryupdate = yield* MemoryUpdateTool
     const embody = yield* EmbodyTool
     const agent = yield* Agent.Service
 
@@ -267,6 +273,8 @@ export const layer: Layer.Layer<
           dice_roll: Tool.init(diceroll),
           narrate: Tool.init(narrate),
           scene_update: Tool.init(sceneupdate),
+          memory_reflect: Tool.init(memoryreflect),
+          memory_update: Tool.init(memoryupdate),
           embody: Tool.init(embody),
         })
 
@@ -295,6 +303,8 @@ export const layer: Layer.Layer<
             tool.dice_roll,
             tool.narrate,
             tool.scene_update,
+            tool.memory_reflect,
+            tool.memory_update,
             tool.embody,
           ],
           task: tool.task,

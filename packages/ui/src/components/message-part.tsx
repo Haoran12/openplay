@@ -2357,7 +2357,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "embody",
   render(props) {
-    const i18n = useI18n()
     const character = createMemo(() => {
       const val = props.input.character
       return typeof val === "string" ? val : ""
@@ -2367,18 +2366,13 @@ ToolRegistry.register({
     return (
       <BasicTool
         {...props}
+        hideDetails
         icon="user"
         trigger={{
           title: `Embody: ${character()}`,
-          subtitle: running() ? undefined : character(),
+          subtitle: running() ? undefined : `${character()} sample captured`,
         }}
-      >
-        <Show when={props.output}>
-          <div data-component="tool-output" data-scrollable>
-            <Markdown text={props.output!} />
-          </div>
-        </Show>
-      </BasicTool>
+      />
     )
   },
 })
@@ -2386,6 +2380,7 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "narrate",
   render(props) {
+    const i18n = useI18n()
     const running = createMemo(() => props.status === "pending" || props.status === "running")
     const perspective = createMemo(() => {
       const val = props.input.perspective
@@ -2399,25 +2394,29 @@ ToolRegistry.register({
       const parts: string[] = []
       if (perspective()) parts.push(perspective()!)
       if (style()) parts.push(style()!)
-      return parts.length > 0 ? `(${parts.join(", ")})` : undefined
+      return parts.length > 0 ? parts.join(" · ") : undefined
+    })
+    const meta = createMemo(() => {
+      if (running()) return "Narrating..."
+      return badges() ? `Narrate · ${badges()}` : "Narrate"
     })
 
     return (
-      <BasicTool
-        {...props}
-        defaultOpen={true}
-        icon="quill"
-        trigger={{
-          title: "Narrate",
-          subtitle: badges(),
-        }}
-      >
+      <div data-component="narrative-part">
+        <div data-slot="narrative-part-meta" class="text-12-regular text-text-weak cursor-default">
+          {meta()}
+        </div>
         <Show when={props.output}>
-          <div data-component="tool-output narrative-output">
+          <div data-component="narrative-output">
             <Markdown text={props.output!} />
           </div>
         </Show>
-      </BasicTool>
+        <Show when={running() && !props.output}>
+          <div data-component="narrative-output" data-pending="true">
+            <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} active />
+          </div>
+        </Show>
+      </div>
     )
   },
 })

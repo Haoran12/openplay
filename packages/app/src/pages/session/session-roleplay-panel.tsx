@@ -1,9 +1,9 @@
-import { type Component, For, Show, createSignal } from "solid-js"
+import { type Component, For, Show, createMemo, createSignal } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useSync } from "@/context/sync"
 import { agentDisplayName } from "@/utils/roleplay"
 import { agentColor } from "@/utils/agent"
-import type { Agent } from "@openplay-ai/sdk/v2/client"
+import type { Agent, WorldInfo } from "@openplay-ai/sdk/v2/client"
 
 const CharacterCard: Component<{ agent: Agent }> = (props) => {
   const [expanded, setExpanded] = createSignal(false)
@@ -85,14 +85,28 @@ export const SessionRoleplayPanel: Component = () => {
   const sync = useSync()
 
   const world = () => sync.data.path.world
+  const scene = () => world()?.scene
   const currentScene = () => world()?.currentScene
   const presentCharacters = () => world()?.presentCharacters ?? []
 
-  const agents = (): Agent[] => {
-    const all = sync.data.agent ?? []
-    const charIds = new Set(presentCharacters())
-    return all.filter((a) => charIds.has(a.name))
-  }
+  const allAgents = () => sync.data.agent ?? []
+  const agentsByName = createMemo(() => new Map(allAgents().map((agent) => [agent.name, agent] as const)))
+
+  const sceneRows = createMemo(() => {
+    const info = scene()
+    return [
+      { label: "Date", value: info?.date },
+      { label: "Location", value: info?.location ?? currentScene() },
+      { label: "Impression", value: info?.impression },
+    ].filter((row) => !!row.value)
+  })
+
+  const characters = createMemo(() =>
+    presentCharacters().map((character) => ({
+      runtime: character,
+      agent: agentsByName().get(character.name),
+    })),
+  )
 
   return (
     <aside class="h-full flex flex-col bg-background-base border-l border-border-weaker-base overflow-hidden">
@@ -102,14 +116,23 @@ export const SessionRoleplayPanel: Component = () => {
             {language.t("roleplay.panel.scene")}
           </h3>
           <Show
-            when={currentScene()}
+            when={sceneRows().length > 0}
             fallback={
               <p class="text-14-regular text-text-weak italic">
                 {language.t("roleplay.panel.noScene")}
               </p>
             }
           >
-            <p class="text-14-regular text-text-strong">{currentScene()}</p>
+            <div class="flex flex-col gap-2">
+              <For each={sceneRows()}>
+                {(row) => (
+                  <div>
+                    <div class="text-12-medium text-text-weak mb-0.5">{row.label}</div>
+                    <p class="text-14-regular text-text-strong whitespace-pre-wrap">{row.value}</p>
+                  </div>
+                )}
+              </For>
+            </div>
           </Show>
         </div>
 
@@ -118,21 +141,77 @@ export const SessionRoleplayPanel: Component = () => {
             {language.t("roleplay.panel.characters")}
           </h3>
           <Show
-            when={agents().length > 0}
+            when={characters().length > 0}
             fallback={
               <p class="text-14-regular text-text-weak italic">
                 {language.t("roleplay.panel.noCharacters")}
               </p>
             }
           >
-            <div class="-mx-3 -mt-1">
-              <For each={agents()}>
-                {(agent) => <CharacterCard agent={agent} />}
+            <div class="flex flex-col gap-3">
+              <For each={characters()}>
+                {(item) => (
+                  <div class="rounded-lg border border-border-weaker-base px-3 py-3">
+                    <Show when={item.agent} fallback={<RuntimeCharacterCard character={item.runtime} />}>
+                      {(agent) => <CharacterWithRuntimeCard agent={agent()} character={item.runtime} />}
+                    </Show>
+                  </div>
+                )}
               </For>
             </div>
           </Show>
         </div>
       </div>
     </aside>
+  )
+}
+
+type RuntimeCharacter = NonNullable<WorldInfo["presentCharacters"]>[number]
+
+const CharacterFacts: Component<{ character: RuntimeCharacter }> = (props) => {
+  const rows = () =>
+    [
+      { label: "Age", value: props.character.age },
+      { label: "Appearance", value: props.character.appearance },
+      { label: "Activity", value: props.character.activity },
+      { label: "State", value: props.character.state },
+      { label: "Knowledge", value: props.character.knowledge },
+      { label: "Commitment", value: props.character.commitment },
+      { label: "Note", value: props.character.note },
+    ].filter((row) => !!row.value)
+
+  return (
+    <Show when={rows().length > 0}>
+      <div class="mt-2 flex flex-col gap-2">
+        <For each={rows()}>
+          {(row) => (
+            <div>
+              <div class="text-12-medium text-text-weak mb-0.5">{row.label}</div>
+              <p class="text-13-regular text-text-base whitespace-pre-wrap">{row.value}</p>
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+}
+
+const RuntimeCharacterCard: Component<{ character: RuntimeCharacter }> = (props) => {
+  return (
+    <div>
+      <div class="text-14-medium text-text-strong">{props.character.name}</div>
+      <CharacterFacts character={props.character} />
+    </div>
+  )
+}
+
+const CharacterWithRuntimeCard: Component<{ agent: Agent; character: RuntimeCharacter }> = (props) => {
+  return (
+    <div>
+      <CharacterCard agent={props.agent} />
+      <div class="px-3 pb-1">
+        <CharacterFacts character={props.character} />
+      </div>
+    </div>
   )
 }

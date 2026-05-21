@@ -39,6 +39,7 @@ export const PRUNE_PROTECT = 40_000
 const TOOL_OUTPUT_MAX_CHARS = 2_000
 const PRUNE_PROTECTED_TOOLS = ["skill"]
 const DEFAULT_TAIL_TURNS = 2
+const ROLEPLAY_DIRECTOR_MAX_RECENT_TOKENS = 64_000
 const MIN_PRESERVE_RECENT_TOKENS = 2_000
 const MAX_PRESERVE_RECENT_TOKENS = 8_000
 const SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. Do not include the <template> tags in your response.
@@ -76,6 +77,43 @@ Rules:
 - Keep every section, even when empty.
 - Use terse bullets, not prose paragraphs.
 - Preserve exact file paths, commands, error strings, and identifiers when known.
+- Do not mention the summary process or that context was compacted.`
+const ROLEPLAY_DIRECTOR_SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. Do not include the <template> tags in your response.
+<template>
+## Scene State
+- [current scene date, location, atmosphere, immediate situation, or "(none)"]
+
+## Present Characters
+- [character: current visible state, motive, stance, or "(none)"]
+
+## Recent Outcomes
+- [important outcomes that already happened on-screen, or "(none)"]
+
+## Open Narrative Threads
+- [unresolved tensions, promises, clues, risks, or "(none)"]
+
+## Runtime Authority
+- [what must remain reflected in runtime.yaml, or "(none)"]
+
+## Records Strategy
+- [details that may be re-read from records/ on demand instead of staying in active context, or "(none)"]
+
+## Access & Knowledge Boundaries
+- [critical perception limits, God Only boundaries, or character-knowledge constraints, or "(none)"]
+
+## Critical World Facts
+- [stable world facts still needed to continue the scene, or "(none)"]
+
+## Relevant Files
+- [file or directory path: why it matters, especially runtime.yaml or records/, or "(none)"]
+</template>
+
+Rules:
+- Keep every section, even when empty.
+- Use terse bullets, not prose paragraphs.
+- Prefer current scene state over archival detail.
+- Keep detailed past events out of active context when they can be re-read from records/.
+- Preserve exact character names, locations, dates, file paths, and identifiers when known.
 - Do not mention the summary process or that context was compacted.`
 type Turn = {
   start: number
@@ -122,7 +160,7 @@ function completedCompactions(messages: MessageV2.WithParts[]) {
   })
 }
 
-function buildPrompt(input: { previousSummary?: string; context: string[] }) {
+function buildPrompt(input: { previousSummary?: string; context: string[]; roleplayDirector: boolean }) {
   const anchor = input.previousSummary
     ? [
         "Update the anchored summary below using the conversation history above.",
@@ -132,10 +170,20 @@ function buildPrompt(input: { previousSummary?: string; context: string[] }) {
         "</previous-summary>",
       ].join("\n")
     : "Create a new anchored summary from the conversation history above."
-  return [anchor, SUMMARY_TEMPLATE, ...input.context].join("\n\n")
+  return [
+    anchor,
+    input.roleplayDirector ? ROLEPLAY_DIRECTOR_SUMMARY_TEMPLATE : SUMMARY_TEMPLATE,
+    ...input.context,
+  ].join("\n\n")
 }
 
-function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }) {
+function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model; roleplayDirector: boolean }) {
+  if (input.roleplayDirector) {
+    if (input.cfg.compaction?.preserve_recent_tokens !== undefined) {
+      return input.cfg.compaction.preserve_recent_tokens
+    }
+    return Math.min(ROLEPLAY_DIRECTOR_MAX_RECENT_TOKENS, usable(input))
+  }
   return (
     input.cfg.compaction?.preserve_recent_tokens ??
     Math.min(MAX_PRESERVE_RECENT_TOKENS, Math.max(MIN_PRESERVE_RECENT_TOKENS, Math.floor(usable(input) * 0.25)))
@@ -248,10 +296,15 @@ export const layer = Layer.effect(
       messages: MessageV2.WithParts[]
       cfg: Config.Info
       model: Provider.Model
+      roleplayDirector: boolean
     }) {
       const limit = input.cfg.compaction?.tail_turns ?? DEFAULT_TAIL_TURNS
       if (limit <= 0) return { head: input.messages, tail_start_id: undefined }
-      const budget = preserveRecentBudget({ cfg: input.cfg, model: input.model })
+      const budget = preserveRecentBudget({
+        cfg: input.cfg,
+        model: input.model,
+        roleplayDirector: input.roleplayDirector,
+      })
       const all = turns(input.messages)
       if (!all.length) return { head: input.messages, tail_start_id: undefined }
       const recent = all.slice(-limit)
@@ -387,6 +440,9 @@ export const layer = Layer.effect(
         ? yield* provider.getModel(agent.model.providerID, agent.model.modelID).pipe(Effect.orDie)
         : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID).pipe(Effect.orDie)
       const cfg = yield* config.get()
+      const sessionInfo = yield* session.get(input.sessionID).pipe(Effect.orDie)
+      const parentAgent = yield* agents.get(userMessage.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+      const roleplayDirector = Boolean(sessionInfo.worldPath && parentAgent?.isDirector)
       const history = compactionPart && messages.at(-1)?.info.id === input.parentID ? messages.slice(0, -1) : messages
       const prior = completedCompactions(history)
       const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
@@ -395,6 +451,7 @@ export const layer = Layer.effect(
         messages: history.filter((_, index) => !hidden.has(index)),
         cfg,
         model,
+        roleplayDirector,
       })
       // Allow plugins to inject context or replace compaction prompt.
       const compacting = yield* plugin.trigger(
@@ -402,7 +459,13 @@ export const layer = Layer.effect(
         { sessionID: input.sessionID },
         { context: [], prompt: undefined },
       )
-      const nextPrompt = compacting.prompt ?? buildPrompt({ previousSummary, context: compacting.context })
+      const nextPrompt =
+        compacting.prompt ??
+        buildPrompt({
+          previousSummary,
+          context: compacting.context,
+          roleplayDirector,
+        })
       const msgs = structuredClone(selected.head)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
       const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {

@@ -1,136 +1,67 @@
 # OpenPlay Transformation Progress
 
-## Status Legend
+## 已完成阶段（归档）
 
-- [ ] Not started
-- [~] In progress
-- [x] Completed
-- [-] Blocked / Skipped
+### P0 全部完成（2026-05-17）
 
----
+P0-1 至 P0-10 全部完成，包括：World 检测、配置 Schema 扩展、Agent 系统扩展、提示词隔离、工具注册模式切换、embody+god-only-filter、calc/dice/narrate/scene_update 工具、Session 世界关联、默认 Agent 选择逻辑。
 
-## P0-1: World 检测与配置发现
+### P1 全部完成（2026-05-17 ~ 2026-05-20）
 
-- [x] `packages/opencode/src/world/schema.ts` — WorldID 品牌, WorldInfo 类型
-- [x] `packages/opencode/src/world/world.ts` — World.Service.fromDirectory
-- [x] `packages/opencode/src/project/instance-context.ts` — 新增 `world?: World.Info`
-- [x] `packages/opencode/src/project/instance-store.ts` — 纳入 World 检测
+- P1-1: 前端 UI 适配（角色名显示、叙事面板、工具渲染器）
+- P1-2: 形态切换支持（runtime.yaml form 字段）
+- P1-3: `openplay init` 命令
+- P1-4: 结构化 memory schema + 分层压缩策略
 
-## P0-2: 配置 Schema 扩展
+### P2-1 完成（2026-05-20）
 
-- [x] `packages/opencode/src/config/config.ts` — Config.Info 新增 `roleplay` 字段
-- [x] `packages/opencode/src/config/agent.ts` — ConfigAgent.Info 新增角色相关字段
-- [x] 配置搜索路径新增 openplay.json 优先
+God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感匹配，文件级/字段级 god-only 提取，缓存机制。
 
-## P0-3: Agent 系统扩展
+### P3 完成（2026-05-17）
 
-- [x] `packages/opencode/src/agent/agent.ts` — Agent.Info 新增字段（persona, senses, knowledgeAccess, statePath, isDirector）
-- [x] `packages/opencode/src/agent/agent.ts` — director 内置 Agent 定义（条件性加入，仅 roleplay 模式）
-
-## P0-4: 提示词隔离机制
-
-- [x] `packages/opencode/src/session/roleplay.ts` — RoleplayContext 类型 + override 工具函数
-- [x] `packages/opencode/src/session/prompt.ts` — PromptInput 新增 `roleplay` 字段
-- [x] `packages/opencode/src/session/system.ts` — environment/skills 支持 roleplay 参数
-- [x] `packages/opencode/src/session/prompt/director.txt` — 导演系统提示词
-- [x] `packages/opencode/src/session/prompt/character.txt` — 角色系统提示词模板
-- [x] `packages/opencode/src/agent/prompt/director.txt` — Agent 层导演提示词拷贝
-
-## P0-5: 工具注册模式切换
-
-- [x] `packages/opencode/src/tool/registry.ts` — 根据 `ctx.world` + `isDirector` 过滤可用工具（ROLEPLAY_TOOL_IDS 白名单）
-
-## P0-6: embody 工具 + god-only-filter
-
-- [x] `packages/opencode/src/tool/embody.ts` — 角色代入派发工具 + filterGodOnly 函数
-- [x] `packages/opencode/src/tool/embody.txt` — 工具描述
-- [x] `packages/opencode/src/tool/god-only-filter.ts` — 导出 filterGodOnly（从 embody re-export）
-- [x] `packages/opencode/src/tool/registry.ts` — 注册 embody 工具
-
-## P0-7: calc 工具
-
-- [x] `packages/opencode/src/tool/calc.ts` — date, tier, delta, age
-- [x] `packages/opencode/src/tool/calc.txt` — 工具描述
-- [x] `packages/opencode/src/tool/registry.ts` — 注册 calc 工具
-
-## P0-8: 其他 Roleplay 工具
-
-- [x] `packages/opencode/src/tool/dice-roll.ts` — 骰子工具
-- [x] `packages/opencode/src/tool/dice-roll.txt` — 工具描述
-- [x] `packages/opencode/src/tool/narrate.ts` — 叙事生成工具
-- [x] `packages/opencode/src/tool/narrate.txt` — 工具描述
-- [x] `packages/opencode/src/tool/scene-update.ts` — 场景状态更新工具
-- [x] `packages/opencode/src/tool/scene-update.txt` — 工具描述
-- [x] `packages/opencode/src/tool/registry.ts` — 注册 dice_roll, narrate, scene_update
-
-## P0-9: Session 世界关联
-
-- [x] `packages/opencode/src/session/session.sql.ts` — SessionTable 新增 `world_id`, `world_path` 列
-- [x] `packages/opencode/src/session/session.ts` — Session.Info 新增 `worldID`, `worldPath` 字段；创建时填充 world
-- [x] Migration 文件 `migration/20260516200659_add_world_fields/`
-
-## P0-10: 默认 Agent 选择逻辑
-
-- [x] `packages/opencode/src/agent/agent.ts` — 当 `ctx.world` 存在时，defaultInfo 返回 `director` agent
+品牌重命名：opencode → openplay，@opencode-ai → @openplay-ai，bin/opencode → bin/openplay。
 
 ---
 
-## P1+ (After P0)
+## 近期修复（2026-05-17 ~ 2026-05-20）
 
-- [x] P1-1: 前端 UI 适配
-- [x] P1-2: 形态切换支持
-- [x] P1-3: `openplay init` 命令
-- [x] P2-1: God Only 过滤 + Subagent 派发
-- [x] P3: 品牌重命名
+| 日期 | 描述 |
+|------|------|
+| 2026-05-17 | 数据库迁移修复：drizzle.config.ts 使用 HOME 环境变量，自动修复 session 表缺失列 |
+| 2026-05-17 | 基本对话降级修复：default_agent 失效时自动回退到可用主 agent |
+| 2026-05-17 | Roleplay 运行态隔离修复：runtime.yaml 为世界检测第一信号，Director 不继承开发态 AGENTS.md/CLAUDE.md |
+| 2026-05-17 | Character Subagent 启用修复：新增隐藏 character subagent，embody 派发固定调用该 subagent |
+| 2026-05-18 | Character limited-view 补强：embody 注入程序化 Core Self-Knowledge，执行 God Only 剥离 |
+| 2026-05-20 | Director 上下文压缩策略优化：专用 compaction 摘要模板，recent-context 预算提升到 ~64K token |
+| 2026-05-20 | Director narrate 正文级渲染：UI 移除 narrate 对 BasicTool 工具卡壳依赖，直接渲染为正文块 |
+| 2026-05-20 | TUI narrate 专用渲染：注册 TOOL_RULES，final completed 直接输出 markdown 正文 |
+| 2026-05-20 | TUI narrate 正文色与正文块语义：使用 assistant 级正文色，取消 final/system dim 语义 |
+| 2026-05-20 | Roleplay memory 支撑：memories/{character}.yaml 为角色主观记忆路径，新增 memory_update 工具 |
+| 2026-05-20 | 结构化角色记忆与分层压缩：newest-first 结构化 YAML 条目，渐进压缩规则（每 20 条一档） |
+| 2026-05-20 | Roleplay memory 拟人遗忘模型：印象分 0-5，近因更清晰/强印象更抗遗忘/弱印象更快模糊/5分永不压缩 |
+| 2026-05-20 | Roleplay memory 高印象稀缺化：每 20 条记忆最多保留 1 条 5 分、3 条 4-5 分，总量溢出时旧高分自动回落，抑制高印象级别泛滥 |
+| 2026-05-20 | Roleplay memory 评分语义校正：印象级别明确按角色主观可记忆性/情绪残留评分，而非按上帝视角事件重要性评分 |
+| 2026-05-20 | Director embody 报错修复：memory schema 兼容 `{content,...}` 包装字段，异常记忆内容降级为空记忆，避免 `content.trim is not a function` |
+| 2026-05-20 | Director embody 稳定性补强：memory schema 入口兼容对象型 payload，避免历史脏数据/包装对象在记忆读取阶段打断 Director 对话 |
+| 2026-05-20 | Director 记忆越权修复：`scene_update` 收紧为仅允许 `runtime.yaml` / `records/**`，硬性拒绝 `memories/**`、绝对路径与穿越路径 |
+| 2026-05-20 | Character-owned memory flow：新增 `memory_reflect`，由 Director 触发、Character subagent 决定并调用 `memory_update` 写入主观记忆 |
+| 2026-05-21 | Director/Character 边界修复：`embody` 改为 objective-first 契约，新增 `sceneFacts`/`situationFrame`/`playerNudge`/`focusHints`，拦截 Director 代写角色认知/心理/意图 |
+| 2026-05-21 | Director 越权收紧：扩展 `embody` 主观泄漏拦截，新增对情绪/立场/意图标签化表述的程序级拒绝；明确 `playerNudge` 默认留空，未获玩家明确要求时不得替角色预置主观倾向 |
+| 2026-05-21 | Embody 自动注入增强：从 `runtime.yaml` 与角色状态自动注入客观环境、当前身体状态、基线感官能力与当前有效感知状态 |
+| 2026-05-21 | Runtime schema 补强：`present_characters` 新增可选结构化身体/携带/束缚/感官受损字段，兼容旧文本字段 |
+| 2026-05-21 | runtime.yaml 兼容修复：`current_scene.present_characters` 也会被解析，避免嵌套写法导致 Director 右侧面板名单缺失 |
+| 2026-05-21 | 本机路径迁移：默认 XDG 数据/配置/状态/缓存目录改为 `openplay`，启动时一次性迁移旧 `opencode` 本地配置、数据库、历史会话与日志到新路径 |
+| 2026-05-21 | Character 绑定自动化：Director 运行时自动生成 `/.openplay/character-bindings.json`，在工作区内维护 角色→设定文件→记忆文件 对应关系 |
+| 2026-05-21 | Character 设定注入修复：`embody` / `memory_reflect` 不再依赖预配角色 agent；会自动发现角色设定文件，并向 Character SubAgent 注入本人非 `God Only` 设定内容与记忆文件 |
 
 ---
+
+## 待办
+
+（暂无待办项，所有计划阶段已完成）
 
 ## Changelog
 
-| Date | Phase | Description |
-|------|-------|-------------|
-| 2026-05-17 | P0-1 | World 检测与配置发现完成：新增 world/schema.ts (WorldID 品牌), world/world.ts (Service.fromDirectory 检测逻辑), 修改 instance-context.ts (新增 world? 字段), 修改 instance-store.ts (启动时检测 world) |
-| 2026-05-17 | P0-2 | 配置 Schema 扩展完成：新增 config/roleplay.ts (NarrativeStyle, ConfigRoleplay.Info), 修改 config.ts (Info 新增 roleplay 字段 + openplay 配置加载路径), 修改 config/agent.ts (Info 新增 persona/senses/knowledgeAccess/statePath/isDirector), 修改 config/paths.ts (.openplay 目录搜索) |
-| 2026-05-17 | P0-3 | Agent 系统扩展完成：修改 agent/agent.ts (Agent.Info 新增 persona/senses/knowledgeAccess/statePath/isDirector 字段, 新增 director 内置 Agent 仅在 world 存在时激活, 配置加载时传播角色相关字段) |
-| 2026-05-17 | P0-4 | 提示词隔离机制：新增 session/roleplay.ts (RoleplayContext 类型 + applyEnvironmentOverride/applyInstructionOverride/applySkillsOverride 工具函数), 修改 session/prompt.ts (PromptInput 新增 roleplay 字段), 修改 session/system.ts (environment/skills 支持 roleplay override 参数), 创建 director.txt + character.txt 提示词模板 |
-| 2026-05-17 | P0-5 | 工具注册模式切换：修改 tool/registry.ts (新增 ROLEPLAY_TOOL_IDS 白名单, 当 isDirector + world 存在时过滤掉非角色扮演工具) |
-| 2026-05-17 | P0-7 | calc 工具：新增 tool/calc.ts (支持 date/tier/delta/age 四种确定性计算), 新增 tool/calc.txt (工具描述), 修改 registry.ts 注册 calc 工具 |
-| 2026-05-17 | P0-8 | 其他 Roleplay 工具：新增 dice-roll.ts (骰子工具), narrate.ts (叙事生成工具), scene-update.ts (场景状态更新工具), 均含 .txt 描述; 修改 registry.ts 注册三个工具 |
-| 2026-05-17 | P0-6 | embody 工具 + god-only-filter：新增 tool/embody.ts (角色代入工具含 filterGodOnly 函数), 新增 tool/embody.txt, 新增 tool/god-only-filter.ts (re-export), 修改 registry.ts 注册 embody |
-| 2026-05-17 | P0-9 | Session 世界关联：修改 session.sql.ts (新增 world_id/world_path 列), 修改 session.ts (Info 新增 worldID/worldPath 字段, 创建时从 ctx.world 填充), 生成 migration |
-| 2026-05-17 | P0-10 | 默认 Agent 选择逻辑：修改 agent.ts (当 ctx.world 存在时 defaultInfo 返回 director agent) |
-| 2026-05-17 | P1-2 | 形态切换支持：新增 docs/openplay/runtime-yaml-schema.md (runtime.yaml 字段说明，含 form 形态字段) |
-| 2026-05-17 | P1-3 | `openplay init` 命令：新增 cli/cmd/init.ts (交互式世界初始化，检查并创建 openplay.json/runtime.yaml 及目录结构) |
-| 2026-05-17 | P3 | 品牌重命名：修改 package.json (opencode → openplay, @opencode-ai → @openplay-ai)，重命名 bin/opencode → bin/openplay，更新 CLI 帮助文本和错误消息，npm link 创建全局 openplay 命令 |
-| 2026-05-17 | Fix | 数据库迁移问题修复：修改 drizzle.config.ts (使用 process.env.HOME 替代硬编码路径)，运行 drizzle-kit push 应用 world_id/world_path 列迁移 |
-| 2026-05-17 | Fix | OpenPlay 会话创建修复：修改 storage/db.ts，在启动时自动修复 `session` 表缺失的 `world_id/world_path` 列；新增 storage/session-world-columns-repair.test.ts 回归测试，修复 roleplay 世界无法创建会话、无法进入 Director Agent 的问题 |
-| 2026-05-17 | Fix | 基本对话降级修复：修改 agent/agent.ts 与 session/prompt.ts，当 `default_agent` 配置失效、Director 不可用或请求的 agent 不存在时自动回退到可用主 agent，避免 OpenPlay/配置异常阻塞基础会话与首条消息发送 |
-| 2026-05-17 | Fix | Roleplay 运行态隔离修复：修改 world/world.ts 使 `runtime.yaml` 成为世界检测第一信号，`openplay.json` 仅作补充配置；修改 session/instruction.ts 与 session/prompt.ts，使 Director 主会话进入 roleplay 模式时不再继承项目开发态 `AGENTS.md`/`CLAUDE.md`/`config.instructions`；新增 instruction/world 回归测试 |
-| 2026-05-17 | Fix | Character Subagent 启用修复：新增隐藏 `character` subagent 并绑定 `character.txt`，修改 embody 派发逻辑固定调用该 subagent 而非角色名；在 message-v2.ts / session/prompt.ts 持久化并消费 roleplay overrides，确保角色子代理沿整条会话链路继承隔离环境/指令/skills；新增 agent/prompt 回归测试 |
-| 2026-05-18 | Fix | Character limited-view 补强：修改 `tool/embody.ts`，在 `l2View` 之外为子代理注入程序化 `Core Self-Knowledge`（从角色配置与状态 YAML 抽取姓名/性别/种族/身份/修为/阵营/形态/状态等自知基础信息），并对该层同样执行 God Only 剥离；更新 `embody.txt`、`director.txt`、`character.txt` 明确区分“自我认知”与“当前感知”；新增 `test/tool/embody.test.ts` 回归测试，覆盖 self/condition/apparent_content/god-only 过滤场景 |
-
-## P2-1: God Only 过滤 + Subagent 派发
-
-- [x] 添加 `yaml` 依赖到 `packages/opencode/package.json`
-- [x] `packages/opencode/src/tool/god-only-filter.ts` — 重构：使用 yaml 库解析，大小写不敏感匹配，文件级/字段级 god-only 提取，缓存机制
-- [x] `packages/opencode/src/tool/embody.ts` — 重构：调用 GodOnlyFilter 服务，派发受限 Subagent Session（仅 question 工具，roleplay 覆盖）
-- [x] `packages/opencode/src/tool/registry.ts` — 添加 GodOnlyFilter.Service 依赖，更新 defaultLayer
-- [x] 更新测试文件以提供 GodOnlyFilter.Service
-
----
-
-## P1-1: 前端 UI 适配
-
-- [x] `packages/opencode/src/server/routes/instance/httpapi/groups/instance.ts` — PathInfo 新增 `world` 可选字段
-- [x] `packages/opencode/src/server/routes/instance/httpapi/handlers/instance.ts` — getPath handler 返回 world 信息
-- [x] `packages/sdk/js/src/v2/gen/types.gen.ts` — 新增 WorldInfo 类型, Path 新增 world?, Agent 新增 persona/isDirector/senses/knowledgeAccess/statePath
-- [x] `packages/ui/src/context/data.tsx` — agent 类型从 `{ name, color }` 扩展为完整 `Agent` 类型
-- [x] `packages/ui/src/components/message-part.tsx` — 新增 agentDisplayName 函数, 用户/助手消息 meta 行使用角色显示名；新增 embody/narrate/dice_roll/calc/scene_update 工具渲染器
-- [x] `packages/ui/src/components/message-part.css` — 新增 narrative-output 样式
-- [x] `packages/ui/src/components/icon.tsx` — 新增 user/dice/quill/calculator/file-edit 图标
-- [x] `packages/app/src/utils/agent.ts` — 新增 director 色调, 新增 agentDisplayName 函数
-- [x] `packages/app/src/utils/roleplay.ts` — 新增 roleplay 工具函数（isRoleplayMode, getDirectorAgent, etc.）
-
-## P1-2: 形态切换支持
-
-- [x] `docs/openplay/runtime-yaml-schema.md` — 新增，说明 runtime.yaml 字段结构（含 form 形态字段）
+- 2026-05-21: Director 触发角色链路时，现在会在世界根自动创建或刷新 `/.openplay/character-bindings.json`，把角色名绑定到对应设定文件与记忆文件。
+- 2026-05-21: Character SubAgent 提示词新增 `Accessible Setting File` 段；来源为角色本人设定文件中剥离 `God Only` 后的可见内容。
+- 2026-05-21: `memory_reflect` 复用同一角色绑定与设定解析链路，避免“有记忆文件但拿不到设定文件”的不一致行为。

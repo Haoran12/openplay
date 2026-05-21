@@ -1,27 +1,53 @@
-Dispatch a character subagent to respond in character based on filtered scene perception plus stable self-knowledge.
+Dispatch a character subagent to sample a character's in-character state from objective inputs plus stable self-knowledge.
 
-The Director calls this tool to have a character act within the narrative. You (the Director) must:
+The Director calls this tool to collect structured character output. You (the Director) must:
 
-1. **Construct the current perception (`l2View`)**: Filter what this character can perceive right now based on access tags:
-   - `Public` / `public` → include for everyone
-   - `God Only` / `god-only` → NEVER include (the system will also strip it)
-   - `Condition: X` → include only if the character satisfies condition X
-   - `self` → include only for the character themselves
-   - `participant` → include only if the character was involved in the event
-   - `List: A, B` → include only if the character is in the named list
+1. **Pass objective external facts**
+   - Prefer `sceneFacts` for what the character can directly perceive right now.
+   - Prefer `situationFrame` for the objective event frame of the current moment.
+   - Legacy `l2View` and `situation` still work, but are deprecated.
 
-2. **Keep self-knowledge separate from scene perception**:
-   - `l2View` should describe what the character can currently perceive in the outside world.
-   - Do not rely on `l2View` alone to restate the character's own stable identity every time.
-   - The system will add a separate self-knowledge layer from character config/state when available.
+2. **Keep subjective interpretation out of objective fields**
+   - `sceneFacts`, `situationFrame`, and `focusHints` must not contain thoughts, judgments, decisions, or finished conclusions.
+   - Do not write lines like `you realize`, `you suspect`, `你意识到`, `你怀疑`, `你打算`.
+   - Do pass visible, audible, tactile, olfactory, spiritual, and bodily information.
 
-3. **Translate numbers into sensory descriptions when they are perceived externally**: Don't write "power level 2500" — write "you sense formidable spiritual pressure."
+3. **Let the runtime inject stable layers**
+   - The system will add self-knowledge from character config and state.
+   - The system will add objective environment from `runtime.yaml`.
+   - The system will add current body state from `runtime.yaml` and available state data.
+   - The system will add baseline sensory profile and current effective sensory state when possible.
 
-4. **Pass the situation**: Describe what is happening right now from this character's vantage point.
+4. **Use `playerNudge` only for weak steer**
+   - `playerNudge` is optional.
+   - It may bias attention or lean, but it is not a fact and must not be phrased as an already-finished inner conclusion.
+   - If the player did not explicitly ask for directional influence, leave `playerNudge` empty.
+   - Do not use `focusHints` to inject conclusions like `she is testing you` or `he means no harm`. Keep hints sensory and external.
+
+5. **Translate raw numbers into perceptible experience when needed**
+   - Do not write `power level 2500`.
+   - Write what the character would detect, such as `you sense formidable spiritual pressure`.
+
+## Output Contract
+
+This tool returns a compact character sample:
+
+- `inner_thought`: the character's private internal monologue
+- `speech`: the exact words spoken aloud, or an empty string if silent
+- `action_intent`: what the character intends to do next
+- `outward_action`: immediate visible behavior, gesture, or movement, or an empty string if none
+
+The character subagent is instructed to return exactly one JSON object with those four string fields and nothing else.
+The runtime still tolerates minor formatting drift and passes the sample back instead of aborting the whole turn, but you should continue reasoning as if JSON is the contract.
+
+The character subagent does not decide final outcomes and does not write the final scene narration. The Director must consume these samples, coordinate the scene, decide outcomes, and present the player-facing prose.
+
+After calling this tool, the Director should continue the turn and produce the visible narrative result. Do not stop at raw samples. Prefer consolidating the outcome into a single `narrate` call or an equivalent complete Director-written narrative passage.
 
 ## Important
 
-- Never paraphrase or hint at God Only information in the L2 view.
-- The system will programmatically strip any remaining God Only content from both self-knowledge and scene perception as a safety net.
-- Make sure `l2View` contains enough immediate, player-facing scene facts for action, but do not pad it with omniscient lore.
-- This tool returns the character's response — you then continue directing the scene.
+- Never paraphrase or hint at God Only information in objective inputs.
+- The system programmatically strips any remaining God Only content from self-knowledge and objective inputs as a safety net.
+- Objective inputs should contain enough immediate scene facts for action, but should not be padded with omniscient lore.
+- Do not ask the character subagent for outcome plans or omniscient narration.
+- This tool returns structured character samples — you then continue directing the scene.

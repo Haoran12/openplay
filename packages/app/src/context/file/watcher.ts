@@ -15,6 +15,16 @@ type WatcherOps = {
   refreshDir: (path: string) => void
 }
 
+export function isRuntimeYamlWatcherUpdate(event: WatcherEvent) {
+  if (event.type !== "file.watcher.updated") return false
+  const props =
+    typeof event.properties === "object" && event.properties ? (event.properties as Record<string, unknown>) : undefined
+  const rawPath = typeof props?.file === "string" ? props.file : undefined
+  if (!rawPath) return false
+  const path = rawPath.replaceAll("\\", "/")
+  return path === "runtime.yaml" || path.endsWith("/runtime.yaml")
+}
+
 export function invalidateFromWatcher(event: WatcherEvent, ops: WatcherOps) {
   if (event.type !== "file.watcher.updated") return
   const props =

@@ -36,6 +36,7 @@ import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
 import { SessionV2 } from "../../src/v2/session"
+import { World } from "../../src/world/world"
 import { Skill } from "../../src/skill"
 import { SystemPrompt } from "../../src/session/system"
 import { Shell } from "../../src/shell/shell"
@@ -2309,6 +2310,70 @@ it.instance(
       const textPart = message.parts.find((part) => part.type === "text")
       expect(textPart?.type).toBe("text")
       if (textPart?.type === "text") expect(textPart.text).toBe("hello")
+    }),
+  { git: true },
+  30_000,
+)
+
+it.instance(
+  "roleplay director does not finish after embody alone and continues to narrate",
+  () =>
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const world = yield* World.Service
+      const { directory: dir } = yield* TestInstance
+
+      yield* writeText(
+        path.join(dir, "runtime.yaml"),
+        ["scene:", "  location: 竹舍", "present_characters:", "  - 孟缘"].join("\n"),
+      )
+      const info = yield* world.fromDirectory(dir)
+      if (!info) throw new Error("expected roleplay world")
+
+      const chat = yield* sessions.create({
+        title: "Roleplay Director",
+        agent: "director",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+
+      yield* llm.push(
+        reply()
+          .tool("embody", {
+            character: "孟缘",
+            sceneFacts: "竹门半掩，风过灯影微动。",
+            situationFrame: "夜色深沉，门外脚步声停在竹阶前。",
+          })
+          .stop(),
+      )
+      yield* llm.push(
+        reply()
+          .tool("narrate", {
+            content: "门外脚步声在竹阶前一顿，屋内烛影轻晃。孟缘抬眼望向门扉，指尖在案沿轻轻一叩，声音不高，却稳稳落进夜色里：“既已到了，何不进来说话？”",
+            perspective: "third-person limited",
+            style: "dramatic",
+          })
+          .stop(),
+      )
+      yield* llm.push(reply().text("收束完成。").stop())
+
+      const result = yield* Session.withInstance(
+        { directory: dir },
+        prompt.prompt({
+          sessionID: chat.id,
+          agent: "director",
+          parts: [{ type: "text", text: "继续这一幕。" }],
+        }),
+      )
+
+      expect((yield* llm.calls)).toBe(3)
+      expect(result.info.role).toBe("assistant")
+      expect(
+        result.parts.some(
+          (part) => part.type === "tool" && part.tool === "narrate" && part.state.status === "completed",
+        ),
+      ).toBe(true)
     }),
   { git: true },
   30_000,

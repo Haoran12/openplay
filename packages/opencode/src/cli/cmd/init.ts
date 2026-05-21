@@ -11,7 +11,7 @@ type Args = {
   path?: string
 }
 
-const DIRECTORIES = ["worldview", "characters", "social", "records", "location_and_faction"]
+const DIRECTORIES = ["worldview", "characters", "social", "records", "memories", "location_and_faction"]
 
 interface RuntimeConfig {
   currentDate: string

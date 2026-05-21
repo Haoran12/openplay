@@ -114,6 +114,13 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
     const fullSyncedSessions = new Set<string>()
 
+    const isRuntimeYamlUpdate = (event: { type: string; properties: any }) => {
+      if (event.type !== "file.watcher.updated") return false
+      const file = typeof event.properties?.file === "string" ? event.properties.file.replaceAll("\\", "/") : undefined
+      if (!file) return false
+      return file === "runtime.yaml" || file.endsWith("/runtime.yaml")
+    }
+
     function sessionListQuery(): { scope?: "project"; path?: string } {
       if (!kv.get("session_directory_filter_enabled", true)) return { scope: "project" }
       if (!project.data.instance.path.worktree || !project.data.instance.path.directory) return { scope: "project" }
@@ -131,6 +138,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     }
 
     event.subscribe((event, { workspace }) => {
+      if (isRuntimeYamlUpdate(event)) {
+        void project.sync()
+      }
+
       switch (event.type) {
         case "server.instance.disposed":
           void bootstrap()

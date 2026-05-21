@@ -1,0 +1,18 @@
+Trigger a character-owned subjective memory update inside the roleplay world.
+
+Use this tool when a memory becomes stable, emotionally or relationally important, meaningfully changed, or needs compression.
+
+The Director may decide when memory handling should happen, but the character subagent must decide the actual subjective wording, selection, compression, and impression scoring.
+
+## Parameters
+
+- `character`: The character whose memory should be updated.
+- `situation`: A concise current-scene summary from the character's perspective.
+- `event`: The concrete event or realization that may need to enter long-term memory.
+- `guidance` (optional): Extra Director guidance about why this memory update is being triggered, such as "relationship shifted", "compress older entries", or "keep this brief if it would not stick".
+
+## Important
+
+- Do not use this tool for public world history. Use `records/` for that.
+- The runtime will dispatch a character subagent session and expose only the character's own memory-writing tool.
+- The character, not the Director, owns the final contents of `memories/{character}.yaml`.

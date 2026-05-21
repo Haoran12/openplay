@@ -1,0 +1,24 @@
+Update the current character's subjective memory file in the roleplay world.
+
+Use this tool to persist stable personal memories, recurring impressions, relationship shifts, or compressed recollections for the current character only.
+
+## Parameters
+
+- `content`: The complete YAML file content to write.
+- `create` (optional, default true): Whether to create the file if it doesn't exist.
+
+## Important
+
+- This tool is for subjective memory only, not public world records.
+- Keep memories durable, newest-first, and structured.
+- Do not write raw scene transcripts.
+- Each full memory entry should include exact time, location, scene feeling, observable people, the character's own observable action/perception, and other people's observable words/actions.
+- Each memory entry should include an impression rating from 0 to 5 judged by the character's own subjective memorability, not by an omniscient ranking of plot importance.
+- Treat 4-5 as scarce: in roughly each 20-memory block, keep at most one 5-point memory and only a few total 4-or-5-point memories. If many events are externally important, keep 4-5 only for the ones this character would subjectively relive most vividly, and demote the rest to 3.
+- Model memory like a person would remember it: recent events stay clearer, emotionally stronger events fade more slowly, and low-importance events blur faster as time passes and more events accumulate.
+- Impression 5 means engraved and should never be compressed away. Impression 4 fades more slowly than ordinary memories. Impression 0-1 fades faster.
+- After every additional 20 older entries, earlier memories should usually be compressed one level further, modulated by impression strength.
+- Prefer overwriting with the full current YAML state rather than appending endless unstructured detail.
+- The file path is fixed by the system as `{world}/memories/{character}.yaml`.
+- Use newest-first ordering.
+- The Director should trigger this only when a memory becomes stable, changes meaningfully, or needs compression.

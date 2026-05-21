@@ -286,6 +286,85 @@ describe("run entry body", () => {
     })
   })
 
+  test("renders narrate start as lightweight status and final as markdown narrative", () => {
+    expect(
+      entryBody(
+        toolCommit({
+          tool: "narrate",
+          phase: "start",
+          toolState: "running",
+          state: {
+            status: "running",
+            input: {
+              content: "Moonlight spills across the courtyard.",
+              perspective: "third-person",
+              style: "lyrical",
+            },
+            title: "",
+            metadata: {
+              length: 39,
+            },
+            time: { start: 1 },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "text",
+      content: "✒ Narrating · third-person · lyrical",
+    })
+
+    expect(
+      entryBody(
+        toolCommit({
+          tool: "narrate",
+          state: {
+            status: "completed",
+            input: {
+              content: "Moonlight spills across the courtyard.",
+              perspective: "third-person",
+              style: "lyrical",
+            },
+            output: "Moonlight spills across the courtyard.",
+            title: "narrate: Moonlight spills across the courtyard.",
+            metadata: {
+              length: 39,
+            },
+            time: { start: 1, end: 2 },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "markdown",
+      content: "Moonlight spills across the courtyard.",
+    })
+  })
+
+  test("keeps narrate errors as text failures", () => {
+    expect(
+      entryBody(
+        toolCommit({
+          tool: "narrate",
+          text: "provider timeout",
+          state: {
+            status: "error",
+            input: {
+              content: "A sudden silence settles over the room.",
+            },
+            output: "",
+            title: "",
+            metadata: {},
+            error: "provider timeout",
+            time: { start: 1, end: 2 },
+          } as ToolPart["state"],
+          toolState: "error",
+        }),
+      ),
+    ).toEqual({
+      type: "text",
+      content: "✖ narrate failed: provider timeout",
+    })
+  })
+
   test("streams tool progress text and treats completed progress as done", () => {
     const body = entryBody(
       commit({

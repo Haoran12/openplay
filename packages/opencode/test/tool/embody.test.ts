@@ -1,6 +1,20 @@
 import { describe, expect, test } from "bun:test"
-import { buildCharacterSelfKnowledge } from "@/tool/embody"
+import {
+  buildCharacterSettingSection,
+  buildCharacterSelfKnowledge,
+  detectSubjectiveLeakage,
+  ensureCharacterBinding,
+  inferCharacterBindingsFromFiles,
+  tryParseCharacterSample,
+} from "@/tool/embody"
 import { filterL2View, type ForbiddenSet } from "@/tool/god-only-filter"
+import { characterMemoryPath } from "@/tool/memory-update"
+import { formatMemoryEntry, normalizeMemoryFile } from "@/tool/memory-schema"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
+import fs from "fs/promises"
+import path from "path"
+import { tmpdirScoped } from "../fixture/fixture"
+import { Effect } from "effect"
 
 describe("tool.embody", () => {
   const forbiddenSet: ForbiddenSet = {
@@ -84,5 +98,452 @@ cultivation:
 
     expect(lines).toEqual(["- Name: 孟缘"])
     expect(filterL2View("你隐约察觉到天道筑基的气息。", forbiddenSet)).toBe("你隐约察觉到[已隐去]的气息。")
+  })
+
+  test("parses strict json character samples", () => {
+    expect(
+      tryParseCharacterSample(
+        '{"inner_thought":"她终于不哭了。","speech":"别怕，我在。","action_intent":"继续抱稳她，轻声安抚。","outward_action":"下巴轻轻抵着她的发顶。"}',
+      ),
+    ).toEqual({
+      inner_thought: "她终于不哭了。",
+      speech: "别怕，我在。",
+      action_intent: "继续抱稳她，轻声安抚。",
+      outward_action: "下巴轻轻抵着她的发顶。",
+    })
+  })
+
+  test("normalizes aliased fields from parsed json", () => {
+    expect(
+      tryParseCharacterSample(
+        '{"inner_monologue":"她还小。","dialogue":"我不会不要你。","intent":"先让她安心睡会儿。","gesture":"指腹轻轻拍着她的背。"}',
+      ),
+    ).toEqual({
+      inner_thought: "她还小。",
+      speech: "我不会不要你。",
+      action_intent: "先让她安心睡会儿。",
+      outward_action: "指腹轻轻拍着她的背。",
+    })
+  })
+
+  test("extracts embedded json from stray prose instead of failing", () => {
+    expect(
+      tryParseCharacterSample(
+        '先给导演一个样本：\n```json\n{"inner_thought":"湖风有些凉。","speech":"","action_intent":"再把她往怀里拢紧一点。","outward_action":"抬手替她拢了拢鬓发。"}\n```',
+      ),
+    ).toEqual({
+      inner_thought: "湖风有些凉。",
+      speech: "",
+      action_intent: "再把她往怀里拢紧一点。",
+      outward_action: "抬手替她拢了拢鬓发。",
+    })
+  })
+
+  test("returns undefined for non-json samples instead of throwing", () => {
+    expect(
+      tryParseCharacterSample("她只是低头抱紧遐蝶，没有说话，只把呼吸放得更轻。"),
+    ).toBeUndefined()
+  })
+
+  test("includes explicit sensory traits in self-knowledge", () => {
+    const lines = buildCharacterSelfKnowledge({
+      character: "孟缘",
+      characterAgent: {
+        senses: { vision: "Master" },
+        senseTraits: ["狐狸血脉，嗅觉敏锐", "对灵力扰动敏感"],
+      },
+    })
+
+    expect(lines).toContain("- Sensory capabilities: vision=Master")
+    expect(lines).toContain("- Sensory traits: 狐狸血脉，嗅觉敏锐、对灵力扰动敏感")
+  })
+
+  test("collects sensory traits from state yaml when present", () => {
+    const lines = buildCharacterSelfKnowledge({
+      character: "孟缘",
+      stateContent: `
+sense_traits:
+  - 夜视优于常人
+  - 对魂魄波动敏感
+`,
+    })
+
+    expect(lines).toContain("- Sensory traits: 夜视优于常人、对魂魄波动敏感")
+  })
+
+  test("builds accessible setting section from non-god-only character state", () => {
+    const section = buildCharacterSettingSection({
+      character: "孟缘",
+      stateContent: `
+孟缘:
+  name: 孟缘
+  role:
+    content: 云梦泽的大妖长老
+    access: self
+  relationship:
+    access: "Condition: 云梦泽妖族可知"
+    宋祈: 配偶关系
+  hidden_truth:
+    content: 被封印过
+    access: God Only
+`,
+    })
+
+    expect(section).toContain("name: 孟缘")
+    expect(section).toContain("role: 云梦泽的大妖长老")
+    expect(section).toContain("宋祈: 配偶关系")
+    expect(section).not.toContain("被封印过")
+  })
+
+  test("rejects subjective leakage in objective embody inputs", () => {
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "你意识到她在故意试探你。",
+        situationFrame: "她站在门边看着你。",
+      }),
+    ).toContain("sceneFacts contains subjective interpretation")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "门外脚步停在竹阶前，烛影轻轻一晃。",
+        situationFrame: "你怀疑门外的人认出了你。",
+      }),
+    ).toContain("situationFrame contains subjective interpretation")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "她的语气让你不由得警惕起来。",
+        situationFrame: "她缓步走近，袖口还带着雨气。",
+      }),
+    ).toContain("sceneFacts contains subjective interpretation")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "她站在门边，指尖轻轻敲了两下门框。",
+        focusHints: "重点留意她话里的试探和敌意。",
+        situationFrame: "她没有立刻进门。",
+      }),
+    ).toContain("focusHints contains subjective interpretation")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "她站在门边，眼神短暂停在你袖口。",
+        situationFrame: "她明显是在故意试探你会不会让步。",
+      }),
+    ).toContain("situationFrame contains subjective interpretation")
+  })
+
+  test("allows weak player nudge but blocks hard override phrasing", () => {
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "门外脚步停在竹阶前，烛影轻轻一晃。",
+        situationFrame: "门外的人停在门前，没有立刻出声。",
+        playerNudge: "如果多个客观线索都支持，请更留意对方语气中的试探意味。",
+      }),
+    ).toBeUndefined()
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "门外脚步停在竹阶前，烛影轻轻一晃。",
+        situationFrame: "门外的人停在门前，没有立刻出声。",
+        playerNudge: "你已经意识到她在试探你。",
+      }),
+    ).toContain("playerNudge must remain a weak external steer")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "门外脚步停在竹阶前，烛影轻轻一晃。",
+        situationFrame: "门外的人停在门前，没有立刻出声。",
+        playerNudge: "先把她认定为带着敌意而来。",
+      }),
+    ).toContain("playerNudge must remain a weak external steer")
+  })
+
+  test("uses fixed per-character memory path", () => {
+    expect(characterMemoryPath("/world", "孟缘")).toBe("/world/memories/孟缘.yaml")
+  })
+
+  test("parses structured memory entries newest-first", () => {
+    const file = normalizeMemoryFile(`
+version: 1
+entries:
+  - id: old
+    created_at: 2026-05-19T08:00:00.000Z
+    impression: 2
+    summary: 初见宋祈时，她在雨里递来一盏灯。
+    time: "灵历1003年三月初二，夜"
+    location: 云梦泽北岸
+    scene_feeling: 湖风冷，心却松了一瞬
+    observed_people: [宋祈]
+    self_observation: 我接过灯，袖口还在滴水。
+    others_observation: 她只说“拿着”，声音很轻。
+  - id: new
+    created_at: 2026-05-20T08:00:00.000Z
+    impression: 4
+    summary: 今日重逢时，她先认出了我的脚步声。
+    time: "灵历1003年三月初三，黄昏"
+    location: 旧竹桥
+    scene_feeling: 风软，胸口却发紧
+    observed_people: [宋祈, 遐蝶]
+    self_observation: 我停在桥心，没有立刻开口。
+    others_observation: 宋祈回头望来，先叫了我的名字。
+`)
+
+    expect(file.entries.map((item) => item.id)).toEqual(["new", "old"])
+    expect(file.compression_policy.engraved_preserved).toBe(true)
+    expect(file.compression_policy.impression_modulated).toBe(true)
+    expect(formatMemoryEntry(file.entries[0])).toContain("印象 4/5")
+    expect(formatMemoryEntry(file.entries[0])).toContain("时间=灵历1003年三月初三，黄昏")
+    expect(formatMemoryEntry(file.entries[0])).toContain("在场人物=宋祈、遐蝶")
+  })
+
+  test("compresses older memories with human-like forgetting: recent clearer, weak faster, strong slower, engraved preserved", () => {
+    const entries = Array.from({ length: 45 }, (_, index) => ({
+      id: `m-${index}`,
+      created_at: `2026-05-${String(45 - index).padStart(2, "0")}T08:00:00.000Z`,
+      impression: index === 24 ? 5 : index === 25 ? 4 : index === 26 ? 0 : 2,
+      summary: `记忆 ${index}`,
+      time: `时间 ${index}`,
+      location: `地点 ${index}`,
+      scene_feeling: `感受 ${index}`,
+      observed_people: [`人物${index}`],
+      self_observation: `自己 ${index}`,
+      others_observation: `他人 ${index}`,
+      compression: 0,
+    }))
+    const file = normalizeMemoryFile(`entries:\n${entries
+      .map(
+        (entry) => `  - id: ${entry.id}
+    created_at: ${entry.created_at}
+    impression: ${entry.impression}
+    summary: ${entry.summary}
+    time: ${entry.time}
+    location: ${entry.location}
+    scene_feeling: ${entry.scene_feeling}
+    observed_people: [${entry.observed_people[0]}]
+    self_observation: ${entry.self_observation}
+    others_observation: ${entry.others_observation}`,
+      )
+      .join("\n")}`)
+
+    const engraved = file.entries.find((item) => item.id === "m-24")
+    const strong = file.entries.find((item) => item.id === "m-25")
+    const weak = file.entries.find((item) => item.id === "m-26")
+    const ordinary = file.entries.find((item) => item.id === "m-27")
+    const recent = file.entries[0]
+
+    expect(recent.compression).toBe(0)
+    expect(engraved?.compression).toBe(0)
+    expect(strong?.compression).toBe(0)
+    expect(ordinary?.compression).toBe(1)
+    expect(weak?.compression).toBeGreaterThan(ordinary?.compression ?? 0)
+    expect(weak?.self_observation).toBe("")
+  })
+
+  test("rebalances high impressions so 4/5 do not flood each 20-memory block", () => {
+    const entries = Array.from({ length: 8 }, (_, index) => ({
+      id: `quota-${index}`,
+      created_at: `2026-05-${String(20 - index).padStart(2, "0")}T08:00:00.000Z`,
+      impression: 4,
+      summary: `高印象记忆 ${index}`,
+      time: `时间 ${index}`,
+      location: `地点 ${index}`,
+      scene_feeling: `感受 ${index}`,
+      observed_people: [`人物${index}`],
+      self_observation: `自己 ${index}`,
+      others_observation: `他人 ${index}`,
+      compression: 0,
+    }))
+
+    const file = normalizeMemoryFile({
+      entries,
+    })
+
+    expect(file.entries.slice(0, 3).map((item) => item.impression)).toEqual([4, 4, 4])
+    expect(file.entries.slice(3).every((item) => item.impression === 3)).toBe(true)
+  })
+
+  test("preserves only one engraved memory per 20-memory block and demotes later 5s", () => {
+    const file = normalizeMemoryFile({
+      entries: [
+        {
+          id: "engraved-newest",
+          created_at: "2026-05-20T08:00:00.000Z",
+          impression: 5,
+          summary: "第一段刻骨记忆",
+          time: "今晨",
+          location: "桥头",
+          scene_feeling: "发烫",
+          observed_people: ["宋祈"],
+          self_observation: "我停了下来。",
+          others_observation: "她先叫了我。",
+          compression: 0,
+        },
+        {
+          id: "engraved-later",
+          created_at: "2026-05-19T08:00:00.000Z",
+          impression: 5,
+          summary: "第二段也被错误标成刻骨",
+          time: "昨夜",
+          location: "廊下",
+          scene_feeling: "沉",
+          observed_people: ["宋祈"],
+          self_observation: "我没有说话。",
+          others_observation: "她看了我很久。",
+          compression: 0,
+        },
+      ],
+    })
+
+    expect(file.entries[0].impression).toBe(5)
+    expect(file.entries[1].impression).toBe(4)
+  })
+
+  test("migrates legacy plain text memories into highly compressed summaries", () => {
+    const file = normalizeMemoryFile(`
+- 她在雨夜递给我一盏灯。
+- 我记得她说“回家再哭”。
+    `)
+
+    expect(file.entries).toHaveLength(2)
+    expect(file.entries[0].summary).toContain("我记得她说“回家再哭”")
+    expect(file.entries[1].summary).toContain("她在雨夜递给我一盏灯")
+    expect(file.entries[1].compression).toBe(0)
+  })
+
+  test("accepts wrapped memory fields without assuming raw strings", () => {
+    const file = normalizeMemoryFile(`
+entries:
+  - id:
+      content: memory-1
+    created_at:
+      content: 2026-05-20T08:00:00.000Z
+    summary:
+      content: 她终于肯抬眼看我了。
+      access: self
+    time:
+      content: 灵历1003年三月初三，夜
+    location:
+      content: 竹舍门前
+    scene_feeling:
+      content: 心口发紧，却松了一口气
+    observed_people:
+      - content: 宋祈
+      - 遐蝶
+    self_observation:
+      content: 我没有再逼近，只把伞往她那边倾了倾。
+    others_observation:
+      content: 她抬手擦了擦眼睛，却没再躲开。
+`)
+
+    expect(file.entries).toHaveLength(1)
+    expect(file.entries[0].id).toBe("memory-1")
+    expect(file.entries[0].summary).toBe("她终于肯抬眼看我了。")
+    expect(file.entries[0].observed_people).toEqual(["宋祈", "遐蝶"])
+    expect(formatMemoryEntry(file.entries[0])).toContain("地点=竹舍门前")
+  })
+
+  test("accepts non-string memory payloads without calling trim on objects", () => {
+    const file = normalizeMemoryFile({
+      content: {
+        entries: [
+          {
+            id: { content: "memory-obj-1" },
+            summary: { content: "她这次没有再躲开我的目光。" },
+            location: { content: "竹舍檐下" },
+            observed_people: [{ content: "宋祈" }, "遐蝶"],
+          },
+        ],
+      },
+    })
+
+    expect(file.entries).toHaveLength(1)
+    expect(file.entries[0].id).toBe("memory-obj-1")
+    expect(file.entries[0].summary).toBe("她这次没有再躲开我的目光。")
+    expect(file.entries[0].location).toBe("竹舍檐下")
+    expect(file.entries[0].observed_people).toEqual(["宋祈", "遐蝶"])
+  })
+
+  test("infers character bindings from named yaml files and nested character roots", () => {
+    const bindings = inferCharacterBindingsFromFiles([
+      {
+        relativePath: "characters/云梦泽-孟缘.yaml",
+        content: `
+孟缘:
+  name: 孟缘
+  aliases: [树妖]
+`,
+      },
+      {
+        relativePath: "characters/遐蝶-Hidden.yaml",
+        content: `
+遐蝶:
+  name: 遐蝶
+`,
+      },
+      {
+        relativePath: "characters/遐蝶.yaml",
+        content: `
+name: 遐蝶
+aliases: [小蝶]
+`,
+      },
+    ])
+
+    expect(bindings["孟缘"]).toEqual({
+      statePath: "characters/云梦泽-孟缘.yaml",
+      memoryPath: "memories/孟缘.yaml",
+    })
+    expect(bindings["遐蝶"]).toEqual({
+      statePath: "characters/遐蝶.yaml",
+      memoryPath: "memories/遐蝶.yaml",
+    })
+  })
+
+})
+
+describe("tool.embody bindings", () => {
+  test("creates workspace character binding file during resolution", async () => {
+    const worldPath = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const worldPath = yield* tmpdirScoped()
+          yield* Effect.promise(() => fs.mkdir(path.join(worldPath, "characters"), { recursive: true }))
+          yield* Effect.promise(() =>
+            fs.writeFile(
+              path.join(worldPath, "characters", "云梦泽-孟缘.yaml"),
+              `
+孟缘:
+  name: 孟缘
+  role: 云梦泽的大妖长老
+`,
+            ),
+          )
+
+          const fsSvc = yield* AppFileSystem.Service
+          const binding = yield* ensureCharacterBinding({
+            fs: fsSvc,
+            worldPath,
+            character: "孟缘",
+          })
+
+          const written = yield* fsSvc
+            .readFileStringSafe(path.join(worldPath, ".openplay", "character-bindings.json"))
+            .pipe(Effect.orDie)
+          return { binding, written }
+        }).pipe(Effect.provide(AppFileSystem.defaultLayer)),
+      ),
+    )
+
+    expect(worldPath.binding).toEqual({
+      statePath: "characters/云梦泽-孟缘.yaml",
+      memoryPath: "memories/孟缘.yaml",
+    })
+    expect(worldPath.written).toBeTruthy()
+    const parsed = JSON.parse(worldPath.written!)
+    expect(parsed.characters["孟缘"]).toEqual({
+      statePath: "characters/云梦泽-孟缘.yaml",
+      memoryPath: "memories/孟缘.yaml",
+    })
   })
 })

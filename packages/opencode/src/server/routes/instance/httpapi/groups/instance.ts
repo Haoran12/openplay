@@ -19,8 +19,28 @@ const WorldInfo = Schema.Struct({
   id: Schema.String,
   rootPath: Schema.String,
   configPath: Schema.String,
+  scene: Schema.optional(
+    Schema.Struct({
+      date: Schema.optional(Schema.String),
+      location: Schema.optional(Schema.String),
+      impression: Schema.optional(Schema.String),
+    }),
+  ),
   currentScene: Schema.optional(Schema.String),
-  presentCharacters: Schema.optional(Schema.Array(Schema.String)),
+  presentCharacters: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        age: Schema.optional(Schema.String),
+        appearance: Schema.optional(Schema.String),
+        activity: Schema.optional(Schema.String),
+        state: Schema.optional(Schema.String),
+        knowledge: Schema.optional(Schema.String),
+        note: Schema.optional(Schema.String),
+        commitment: Schema.optional(Schema.String),
+      }),
+    ),
+  ),
 }).annotate({ identifier: "WorldInfo" })
 
 const PathInfo = Schema.Struct({

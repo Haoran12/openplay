@@ -30,6 +30,10 @@ import { TestConfig } from "../fixture/config"
 import { SyncEvent } from "@/sync"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { InstanceRef } from "@/effect/instance-ref"
+import type { InstanceContext } from "@/project/instance-context"
+import { ProjectID } from "@/project/schema"
+import { WorldID } from "@/world/schema"
 
 void Log.init({ print: false })
 
@@ -83,14 +87,14 @@ function createModel(opts: {
 
 const wide = () => ProviderTest.fake({ model: createModel({ context: 100_000, output: 32_000 }) })
 
-function createUserMessage(sessionID: SessionID, text: string) {
+function createUserMessage(sessionID: SessionID, text: string, agent = "build") {
   return Effect.gen(function* () {
     const ssn = yield* SessionNs.Service
     const msg = yield* ssn.updateMessage({
       id: MessageID.ascending(),
       role: "user",
       sessionID,
-      agent: "build",
+      agent,
       model: ref,
       time: { created: Date.now() },
     })
@@ -166,7 +170,7 @@ function createSummaryAssistantMessage(sessionID: SessionID, parentID: MessageID
   )
 }
 
-function createCompactionMarker(sessionID: SessionID) {
+function createCompactionMarker(sessionID: SessionID, agent = "build") {
   return SessionNs.Service.use((ssn) =>
     Effect.gen(function* () {
       const msg = yield* ssn.updateMessage({
@@ -174,7 +178,7 @@ function createCompactionMarker(sessionID: SessionID) {
         role: "user",
         model: ref,
         sessionID,
-        agent: "build",
+        agent,
         time: { created: Date.now() },
       })
       yield* ssn.updatePart({
@@ -217,6 +221,26 @@ function cfg(compaction?: Config.Info["compaction"]) {
   return TestConfig.layer({
     get: () => Effect.succeed({ ...base, compaction }),
   })
+}
+
+function withRoleplayDirectorContext(directory: string) {
+  const ctx: InstanceContext = {
+    directory,
+    worktree: directory,
+    project: {
+      id: ProjectID.global,
+      worktree: directory,
+      vcs: "git",
+      time: { created: 0, updated: 0 },
+      sandboxes: [],
+    },
+    world: {
+      id: WorldID.generate(),
+      rootPath: directory,
+      configPath: `${directory}/runtime.yaml`,
+    },
+  }
+  return <A, E, R>(self: Effect.Effect<A, E, R>) => self.pipe(Effect.provideService(InstanceRef, ctx))
 }
 
 const deps = Layer.mergeAll(
@@ -1438,6 +1462,46 @@ describe("session.compaction.process", () => {
     { git: true },
   )
 
+  itCompaction.instance(
+    "uses roleplay director summary template for director sessions",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(
+        reply("summary one", (input) => {
+          captured = JSON.stringify(input.messages)
+        }),
+      )
+
+      return Effect.gen(function* () {
+        const test = yield* TestInstance
+        return yield* Effect.gen(function* () {
+          const ssn = yield* SessionNs.Service
+          const session = yield* ssn.create({ agent: "director" })
+          yield* createUserMessage(session.id, "player enters the shrine", "director")
+          yield* createUserMessage(session.id, "the bamboo spirit watches in silence", "director")
+          yield* createCompactionMarker(session.id, "director")
+
+          const msgs = yield* ssn.messages({ sessionID: session.id })
+          const parent = msgs.at(-1)?.info.id
+          expect(parent).toBeTruthy()
+          yield* SessionCompaction.use.process({
+            parentID: parent!,
+            messages: msgs,
+            sessionID: session.id,
+            auto: false,
+          })
+
+          expect(captured).toContain("## Scene State")
+          expect(captured).toContain("## Runtime Authority")
+          expect(captured).toContain("## Records Strategy")
+          expect(captured).toContain("records/")
+        }).pipe(withRoleplayDirectorContext(test.directory))
+      }).pipe(withCompaction({ llm: stub.layer }))
+    },
+    { git: true },
+  )
+
   itCompaction.instance("keeps recent pre-compaction turns across repeated compactions", () => {
     const stub = llm()
     stub.push(reply("summary one"))
@@ -1477,6 +1541,55 @@ describe("session.compaction.process", () => {
       ).toBe(true)
     }).pipe(withCompaction({ llm: stub.layer, config: cfg({ tail_turns: 2, preserve_recent_tokens: 10_000 }) }))
   })
+
+  itCompaction.instance(
+    "roleplay director budget can retain more than default tail turns within 64K window",
+    () => {
+      const stub = llm()
+      stub.push(reply("summary one"))
+
+      return Effect.gen(function* () {
+        const test = yield* TestInstance
+        return yield* Effect.gen(function* () {
+          const ssn = yield* SessionNs.Service
+          const session = yield* ssn.create({ agent: "director" })
+          const kept: MessageID[] = []
+
+          for (let i = 1; i <= 5; i++) {
+            const msg = yield* createUserMessage(session.id, `turn-${i}`, "director")
+            kept.push(msg.id)
+            const replyMsg = yield* createAssistantMessage(session.id, msg.id, test.directory)
+            yield* ssn.updatePart({
+              id: PartID.ascending(),
+              messageID: replyMsg.id,
+              sessionID: session.id,
+              type: "text",
+              text: "x".repeat(4000),
+            })
+          }
+          yield* createCompactionMarker(session.id, "director")
+
+          const msgs = yield* ssn.messages({ sessionID: session.id })
+          const parent = msgs.at(-1)?.info.id
+          expect(parent).toBeTruthy()
+          yield* SessionCompaction.use.process({
+            parentID: parent!,
+            messages: msgs,
+            sessionID: session.id,
+            auto: false,
+          })
+
+          const filtered = MessageV2.filterCompacted(MessageV2.stream(session.id))
+          const ids = filtered.map((msg) => msg.info.id)
+
+          expect(ids).toContain(kept[2]!)
+          expect(ids).toContain(kept[3]!)
+          expect(ids).toContain(kept[4]!)
+        }).pipe(withRoleplayDirectorContext(test.directory))
+      }).pipe(withCompaction({ llm: stub.layer }))
+    },
+    { git: true },
+  )
 
   itCompaction.instance(
     "ignores previous summaries when sizing the retained tail",

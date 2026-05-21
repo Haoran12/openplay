@@ -52,6 +52,9 @@ const AgentSchema = Schema.StructWithRest(
     senses: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
       description: "Sensory capability map for roleplay agents, e.g. { vision: 'Master', hearing: 'Adept' }",
     }),
+    senseTraits: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+      description: "Additional sensory traits for roleplay agents, e.g. ['狐狸精嗅觉敏锐', '对灵力波动敏感']",
+    }),
     knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
       description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
     }),
@@ -84,6 +87,7 @@ const KNOWN_KEYS = new Set([
   "tools",
   "persona",
   "senses",
+  "senseTraits",
   "knowledgeAccess",
   "statePath",
   "isDirector",

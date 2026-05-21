@@ -84,6 +84,15 @@ IMPORTANT:
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
+const ROLEPLAY_COMPLETION_REMINDER = [
+  "<system-reminder>",
+  "You are the Director of a roleplay session.",
+  "You have gathered internal character samples, but the player still needs a complete visible result.",
+  "Do not stop at embody output.",
+  "Continue this turn by deciding the outcome and producing one coherent player-facing narrative passage, preferably with the narrate tool, or ask a clear player-facing question if a decision is required.",
+  "</system-reminder>",
+].join("\n")
+
 const log = Log.create({ service: "session.prompt" })
 const elog = EffectLogger.create({ service: "session.prompt" })
 
@@ -101,6 +110,22 @@ type ReferencePromptMetadata = {
 
 function stringField(record: Record<string, unknown>, key: string) {
   return typeof record[key] === "string" ? record[key] : undefined
+}
+
+export function isRoleplayDirectorTurnComplete(input: {
+  world: unknown
+  agent: Pick<Agent.Info, "isDirector">
+  parts: readonly MessageV2.Part[]
+}) {
+  if (!input.world || !input.agent.isDirector) return true
+  const completedTools = input.parts.filter(
+    (part): part is MessageV2.ToolPart => part.type === "tool" && part.state.status === "completed",
+  )
+  const hasEmbody = completedTools.some((part) => part.tool === "embody")
+  if (!hasEmbody) return true
+  const hasNarrate = completedTools.some((part) => part.tool === "narrate")
+  const hasQuestion = completedTools.some((part) => part.tool === "question")
+  return hasNarrate || hasQuestion
 }
 
 function referencePromptMetadata(input: unknown): ReferencePromptMetadata | undefined {
@@ -543,6 +568,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         messageID: input.processor.message.id,
         callID: options.toolCallId,
         extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
+        roleplayCharacter: input.agent.isDirector ? undefined : input.agent.name,
         agent: input.agent.name,
         messages: input.messages,
         metadata: (val) =>
@@ -1847,6 +1873,32 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               }
             }
 
+            if (
+              step > 1 &&
+              !isRoleplayDirectorTurnComplete({
+                world: ctx.world,
+                agent,
+                parts: MessageV2.parts(handle.message.id),
+              })
+            ) {
+              const reminderPart = msgs
+                .filter((m) => m.info.role === "user" && m.info.id === lastUser.id)
+                .flatMap((m) => m.parts)
+                .findLast((part): part is MessageV2.TextPart => part.type === "text" && part.synthetic === true)
+
+              if (!reminderPart?.text.includes("You have gathered internal character samples")) {
+                yield* sessions.updatePart({
+                  id: PartID.ascending(),
+                  messageID: lastUser.id,
+                  sessionID,
+                  type: "text",
+                  text: ROLEPLAY_COMPLETION_REMINDER,
+                  synthetic: true,
+                })
+                msgs = yield* MessageV2.filterCompactedEffect(sessionID)
+              }
+            }
+
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
             const [skills, env, instructions, modelMsgs] = yield* Effect.all([
@@ -1900,6 +1952,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 }).toObject()
                 yield* sessions.updateMessage(handle.message)
                 return "break" as const
+              }
+              if (
+                !isRoleplayDirectorTurnComplete({
+                  world: ctx.world,
+                  agent,
+                  parts: MessageV2.parts(handle.message.id),
+                })
+              ) {
+                handle.message.finish = undefined
+                yield* sessions.updateMessage(handle.message)
+                return "continue" as const
               }
             }
 

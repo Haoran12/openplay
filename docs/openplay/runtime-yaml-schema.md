@@ -26,6 +26,12 @@ present_characters:
     appearance: "衣裳半解, 妩媚勾人"
     activity: "与宋祈交欢双修中"
     state: "情动, 被宋祈压在身下, 与丈夫灵力交融"
+    body_condition: ["左臂旧伤未愈", "呼吸微乱"]
+    carried_items: []
+    worn_items: ["青色外衫", "玉佩"]
+    restraints: []
+    impairments: []
+    sensed_effects: ["对屋内灵力波动格外敏感"]
   - name: "宋祈"
     age: 632
     appearance: "温柔霸道"
@@ -94,8 +100,19 @@ narrative_style:
 | `appearance` | string | 外观描述 |
 | `activity` | string | 当前活动 |
 | `state` | string | 身体/精神状态 |
+| `body_condition` | string[] | 当前身体状况，如伤势、疲惫、发热、寒冷 |
+| `carried_items` | string[] | 手持、背负、携带的物件 |
+| `worn_items` | string[] | 穿戴中的衣物、饰品、装备 |
+| `restraints` | string[] | 束缚、限制、封锁状态 |
+| `impairments` | string[] | 明确的身体/感官受损，如遮眼、耳伤、跛行 |
+| `sensed_effects` | string[] | 当前已确认的客观异常感知状态，如“对灵力波动格外敏感” |
 
 角色状态通过 `scene_update` 工具更新。
+
+说明：
+
+- 旧世界仍可只使用 `appearance` / `activity` / `state` 文本字段。
+- 新结构化字段是可选增强层，`embody` 会优先消费它们来生成角色的当前身体状态与有效感知状态。
 
 ### environment
 
@@ -113,6 +130,11 @@ narrative_style:
 | `illumination` | object | 光照详情 |
 | `atmosphere` | object | 空气质量 |
 | `magical_effects` | array | 法术影响列表 |
+
+说明：
+
+- `embody` 会把 `environment` 视为角色的客观环境输入来源。
+- `illumination`、`visibility_obstruction`、`atmosphere`、`magical_effects` 会参与推导角色当前的有效感知状态，例如视觉受阻、灵觉受扰、极端冷热导致注意力迟钝等。
 
 #### weather 子字段
 

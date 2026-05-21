@@ -3,7 +3,7 @@ import { TextRenderable, type ColorInput, type ScrollbackRenderContext, type Scr
 import { Match, Switch, createMemo } from "solid-js"
 import { entryBody, entryFlags } from "./entry.body"
 import { entryColor, entryLook, entrySyntax } from "./scrollback.shared"
-import { toolFiletype, toolStructuredFinal } from "./tool"
+import { isNarrateFinalCompleted, toolFiletype, toolStructuredFinal } from "./tool"
 import { RUN_THEME_FALLBACK, transparent, type RunTheme } from "./theme"
 import type { EntryLayout, RunEntryBody, ScrollbackOptions, StreamCommit } from "./types"
 
@@ -50,6 +50,10 @@ export function sameEntryGroup(left: StreamCommit | undefined, right: StreamComm
 }
 
 export function entryLayout(commit: StreamCommit, body: RunEntryBody = entryBody(commit)): EntryLayout {
+  if (isNarrateFinalCompleted(commit) && body.type === "markdown") {
+    return "block"
+  }
+
   if (commit.kind === "tool") {
     if (body.type === "structured" || body.type === "markdown") {
       return "block"

@@ -133,6 +133,36 @@ describe("tool.registry", () => {
     }),
   )
 
+  it.instance("roleplay director tools include memory_reflect but not general coding tools", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      yield* Effect.promise(() =>
+        fs.writeFile(path.join(test.directory, "runtime.yaml"), "scene: {}\n"),
+      )
+      yield* Effect.promise(() =>
+        fs.writeFile(path.join(test.directory, "openplay.json"), JSON.stringify({ id: "wld_test_registry" })),
+      )
+
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const director = yield* agents.get("director")
+      if (!director) throw new Error("director agent not found")
+      const tools = yield* registry.tools({
+        providerID: ProviderID.opencode,
+        modelID: ModelID.make("test"),
+        agent: director,
+      })
+      const ids = tools.map((tool) => tool.id)
+
+      expect(ids).toContain("scene_update")
+      expect(ids).toContain("memory_reflect")
+      expect(ids).toContain("memory_update")
+      expect(ids).not.toContain("shell")
+      expect(ids).not.toContain("edit")
+      expect(ids).not.toContain("write")
+    }),
+  )
+
   it.instance("loads tools from .opencode/tool (singular)", () =>
     Effect.gen(function* () {
       const test = yield* TestInstance

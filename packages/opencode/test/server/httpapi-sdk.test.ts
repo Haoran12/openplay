@@ -1,6 +1,7 @@
 import { afterEach, describe, expect } from "bun:test"
 import { ConfigProvider, Effect, Layer } from "effect"
 import type * as Scope from "effect/Scope"
+import fs from "fs/promises"
 import { HttpRouter } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
@@ -563,6 +564,62 @@ describe("HttpApi SDK", () => {
           listedFile: JSON.stringify(files.data).includes("hello.txt"),
         }
       }),
+    ),
+  )
+
+  serverPathParity("refreshes path.world from runtime.yaml without requiring instance reload", (serverPath) =>
+    withProject(
+      serverPath,
+      {
+        git: false,
+        setup: (dir) =>
+          Effect.promise(() =>
+            fs.writeFile(
+              path.join(dir, "runtime.yaml"),
+              [
+                "current_scene:",
+                '  date: "1003-07-14"',
+                '  location: "竹舍"',
+                "present_characters:",
+                '  - name: "孟缘"',
+                "",
+              ].join("\n"),
+            ),
+          ),
+      },
+      ({ sdk, directory }) =>
+        Effect.gen(function* () {
+          const first = yield* capture(() => sdk.path.get())
+
+          yield* Effect.promise(() =>
+            fs.writeFile(
+              path.join(directory, "runtime.yaml"),
+              [
+                "current_scene:",
+                '  date: "1003-07-15"',
+                '  location: "建木府前庭"',
+                '  impression: "晨雾未散"',
+                "present_characters:",
+                '  - name: "孟缘"',
+                '  - name: "新登场角色"',
+                "    age: 19",
+                "",
+              ].join("\n"),
+            ),
+          )
+
+          const second = yield* capture(() => sdk.path.get())
+          const firstWorld = record(first.data).world
+          const secondWorld = record(second.data).world
+
+          return {
+            statuses: statuses({ first, second }),
+            firstLocation: record(record(firstWorld).scene).location,
+            secondLocation: record(record(secondWorld).scene).location,
+            secondImpression: record(record(secondWorld).scene).impression,
+            secondCharacters: array(record(secondWorld).presentCharacters).map((item) => record(item)),
+          }
+        }),
     ),
   )
 

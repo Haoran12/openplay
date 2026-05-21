@@ -6,6 +6,7 @@ import { Global } from "@openplay-ai/core/global"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { Skill } from "@/skill"
+import { World } from "@/world/world"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
@@ -20,6 +21,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const world = yield* World.Service
 
     const dispose = Effect.fn("InstanceHttpApi.dispose")(function* () {
       yield* markInstanceForDisposal(yield* InstanceState.context)
@@ -28,19 +30,23 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
 
     const getPath = Effect.fn("InstanceHttpApi.path")(function* () {
       const ctx = yield* InstanceState.context
+      const freshWorld = yield* world.fromDirectory(ctx.directory, ctx.worktree).pipe(
+        Effect.catch(() => Effect.succeed(undefined)),
+      )
       return {
         home: Global.Path.home,
         state: Global.Path.state,
         config: Global.Path.config,
         worktree: ctx.worktree,
         directory: ctx.directory,
-        world: ctx.world
+        world: freshWorld
           ? {
-              id: ctx.world.id,
-              rootPath: ctx.world.rootPath,
-              configPath: ctx.world.configPath,
-              currentScene: ctx.world.currentScene,
-              presentCharacters: ctx.world.presentCharacters,
+              id: freshWorld.id,
+              rootPath: freshWorld.rootPath,
+              configPath: freshWorld.configPath,
+              scene: freshWorld.scene,
+              currentScene: freshWorld.currentScene,
+              presentCharacters: freshWorld.presentCharacters,
             }
           : undefined,
       }

@@ -53,6 +53,9 @@ export const Info = Schema.Struct({
   senses: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
     description: "Sensory capability map for roleplay agents, e.g. { vision: 'Master', hearing: 'Adept' }",
   }),
+  senseTraits: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+    description: "Additional sensory traits for roleplay agents, e.g. ['狐狸精嗅觉敏锐', '对灵力波动敏感']",
+  }),
   knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
   }),
@@ -208,9 +211,10 @@ export const layer = Layer.effect(
                     Permission.fromConfig({
                       "*": "deny",
                       question: "allow",
+                      memory_update: "allow",
                     }),
                     user,
-                  ),
+                ),
                   options: {},
                   mode: "subagent" as const,
                   native: true,
@@ -336,6 +340,7 @@ export const layer = Layer.effect(
                       embody: "allow",
                       narrate: "allow",
                       scene_update: "allow",
+                      memory_reflect: "allow",
                       question: "allow",
                     }),
                     user,
@@ -377,6 +382,7 @@ export const layer = Layer.effect(
           item.isDirector = value.isDirector ?? item.isDirector
           item.persona = value.persona ?? item.persona
           item.senses = value.senses ?? item.senses
+          item.senseTraits = value.senseTraits ?? item.senseTraits
           item.knowledgeAccess = value.knowledgeAccess ?? item.knowledgeAccess
           item.statePath = value.statePath ?? item.statePath
           item.options = mergeDeep(item.options, value.options ?? {})

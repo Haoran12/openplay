@@ -10,6 +10,16 @@ import { warn } from "console"
 const log = Log.create({ service: "config" })
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
+const LEGACY_MANAGED_CONFIG_DIR = (() => {
+  switch (process.platform) {
+    case "darwin":
+      return "/Library/Application Support/opencode"
+    case "win32":
+      return path.join(process.env.ProgramData || "C:\\ProgramData", "opencode")
+    default:
+      return "/etc/opencode"
+  }
+})()
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
 const PLIST_META = new Set([
@@ -24,16 +34,19 @@ const PLIST_META = new Set([
 function systemManagedConfigDir(): string {
   switch (process.platform) {
     case "darwin":
-      return "/Library/Application Support/opencode"
+      return "/Library/Application Support/openplay"
     case "win32":
-      return path.join(process.env.ProgramData || "C:\\ProgramData", "opencode")
+      return path.join(process.env.ProgramData || "C:\\ProgramData", "openplay")
     default:
-      return "/etc/opencode"
+      return "/etc/openplay"
   }
 }
 
 export function managedConfigDir() {
-  return process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
+  const current = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
+  if (existsSync(current)) return current
+  if (existsSync(LEGACY_MANAGED_CONFIG_DIR)) return LEGACY_MANAGED_CONFIG_DIR
+  return current
 }
 
 export function parseManagedPlist(json: string): string {

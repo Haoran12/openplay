@@ -138,6 +138,9 @@ function stateApi(sync: ReturnType<typeof useSync>): TuiPluginApi["state"] {
     get path() {
       return sync.path
     },
+    get agent() {
+      return sync.data.agent
+    },
     get vcs() {
       if (!sync.data.vcs) return
       return {

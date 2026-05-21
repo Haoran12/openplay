@@ -1,4 +1,5 @@
 import { SyntaxStyle, TextAttributes, type ColorInput } from "@opentui/core"
+import { isNarrateFinalCompleted } from "./tool"
 import { type RunEntryTheme, type RunTheme } from "./theme"
 import type { StreamCommit } from "./types"
 
@@ -31,6 +32,10 @@ export function entryLook(commit: StreamCommit, theme: RunEntryTheme): { fg: Col
       fg: theme.error.body,
       attrs: TextAttributes.BOLD,
     }
+  }
+
+  if (isNarrateFinalCompleted(commit)) {
+    return { fg: theme.assistant.body }
   }
 
   if (commit.phase === "final") {
@@ -72,7 +77,7 @@ export function entryLook(commit: StreamCommit, theme: RunEntryTheme): { fg: Col
 }
 
 export function entryColor(commit: StreamCommit, theme: RunTheme): ColorInput {
-  if (commit.kind === "assistant") {
+  if (commit.kind === "assistant" || isNarrateFinalCompleted(commit)) {
     return theme.entry.assistant.body
   }
 

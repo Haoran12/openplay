@@ -38,6 +38,16 @@ function load<A>(fn: (svc: Agent.Interface) => Effect.Effect<A>) {
   return Agent.Service.use(fn)
 }
 
+function expectDefaultAgentError(message: string) {
+  return Effect.gen(function* () {
+    const exit = yield* load((svc) => svc.defaultAgent()).pipe(Effect.exit)
+    expect(exit._tag).toBe("Failure")
+    if (exit._tag !== "Failure") return
+    const text = yield* Cause.pretty(exit.cause)
+    expect(text).toContain(message)
+  })
+}
+
 afterEach(async () => {
   await disposeAllInstances()
 })
@@ -161,7 +171,7 @@ it.instance("general agent denies todo tools", () =>
   }),
 )
 
-it.instance("roleplay worlds expose a hidden character subagent with question-only permissions", () =>
+it.instance("roleplay worlds expose a hidden character subagent with character-memory-only write permissions", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance
     yield* Effect.promise(() =>
@@ -176,12 +186,33 @@ it.instance("roleplay worlds expose a hidden character subagent with question-on
     expect(character?.mode).toBe("subagent")
     expect(character?.hidden).toBe(true)
     expect(evalPerm(character, "question")).toBe("allow")
+    expect(evalPerm(character, "memory_update")).toBe("allow")
     expect(evalPerm(character, "read")).toBe("deny")
     expect(evalPerm(character, "glob")).toBe("deny")
     expect(evalPerm(character, "grep")).toBe("deny")
     expect(evalPerm(character, "edit")).toBe("deny")
     expect(evalPerm(character, "write")).toBe("deny")
+    expect(evalPerm(character, "scene_update")).toBe("deny")
     expect(evalPerm(character, "task")).toBe("deny")
+  }),
+)
+
+it.instance("roleplay worlds expose a director with memory_reflect but not direct memory_update", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* Effect.promise(() =>
+      fs.writeFile(path.join(test.directory, "runtime.yaml"), "scene: {}\n"),
+    )
+    yield* Effect.promise(() =>
+      fs.writeFile(path.join(test.directory, "openplay.json"), JSON.stringify({ id: "wld_test_director" })),
+    )
+
+    const director = yield* load((svc) => svc.get("director"))
+    expect(director).toBeDefined()
+    expect(director?.isDirector).toBe(true)
+    expect(evalPerm(director, "scene_update")).toBe("allow")
+    expect(evalPerm(director, "memory_reflect")).toBe("allow")
+    expect(evalPerm(director, "memory_update")).toBe("deny")
   }),
 )
 
@@ -249,6 +280,33 @@ it.instance(
       },
     },
   },
+)
+
+it.instance(
+  "custom roleplay character config preserves senseTraits",
+  () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      yield* Effect.promise(() =>
+        fs.writeFile(path.join(test.directory, "runtime.yaml"), "scene: {}\n"),
+      )
+      yield* Effect.promise(() =>
+        fs.writeFile(
+          path.join(test.directory, "openplay.json"),
+          JSON.stringify({
+            id: "wld_test_sense_traits",
+            agent: {
+              孟缘: {
+                senseTraits: ["狐狸血脉，嗅觉敏锐", "对灵力波动敏感"],
+              },
+            },
+          }),
+        ),
+      )
+
+      const agent = yield* load((svc) => svc.get("孟缘"))
+      expect(agent?.senseTraits).toEqual(["狐狸血脉，嗅觉敏锐", "对灵力波动敏感"])
+    }),
 )
 
 it.instance(

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { invalidateFromWatcher } from "./watcher"
+import { invalidateFromWatcher, isRuntimeYamlWatcherUpdate } from "./watcher"
 
 describe("file watcher invalidation", () => {
   test("reloads open files and refreshes loaded parent on add", () => {
@@ -145,5 +145,42 @@ describe("file watcher invalidation", () => {
     )
 
     expect(refresh).toEqual([])
+  })
+
+  test("detects runtime.yaml watcher updates", () => {
+    expect(
+      isRuntimeYamlWatcherUpdate({
+        type: "file.watcher.updated",
+        properties: { file: "runtime.yaml", event: "change" },
+      }),
+    ).toBe(true)
+
+    expect(
+      isRuntimeYamlWatcherUpdate({
+        type: "file.watcher.updated",
+        properties: { file: "/repo/world/runtime.yaml", event: "change" },
+      }),
+    ).toBe(true)
+
+    expect(
+      isRuntimeYamlWatcherUpdate({
+        type: "file.watcher.updated",
+        properties: { file: "C:\\world\\runtime.yaml", event: "change" },
+      }),
+    ).toBe(true)
+
+    expect(
+      isRuntimeYamlWatcherUpdate({
+        type: "file.watcher.updated",
+        properties: { file: "characters/A.yaml", event: "change" },
+      }),
+    ).toBe(false)
+
+    expect(
+      isRuntimeYamlWatcherUpdate({
+        type: "session.updated",
+        properties: { file: "runtime.yaml", event: "change" },
+      }),
+    ).toBe(false)
   })
 })

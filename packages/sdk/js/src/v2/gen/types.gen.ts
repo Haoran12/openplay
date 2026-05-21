@@ -1597,8 +1597,22 @@ export type WorldInfo = {
   id: string
   rootPath: string
   configPath: string
+  scene?: {
+    date?: string
+    location?: string
+    impression?: string
+  }
   currentScene?: string
-  presentCharacters?: Array<string>
+  presentCharacters?: Array<{
+    name: string
+    age?: string
+    appearance?: string
+    activity?: string
+    state?: string
+    knowledge?: string
+    note?: string
+    commitment?: string
+  }>
 }
 
 export type Path = {

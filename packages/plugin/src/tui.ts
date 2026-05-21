@@ -1,4 +1,5 @@
 import type {
+  Agent,
   AgentPart,
   OpencodeClient,
   Event,
@@ -15,6 +16,7 @@ import type {
   SessionStatus,
   TextPart,
   Config as SdkConfig,
+  WorldInfo,
 } from "@openplay-ai/sdk/v2"
 import type { CliRenderer, KeyEvent, RGBA, Renderable, SlotMode } from "@opentui/core"
 import type { Binding, Keymap } from "@opentui/keymap"
@@ -377,7 +379,9 @@ export type TuiState = {
     config: string
     worktree: string
     directory: string
+    world?: WorldInfo
   }
+  readonly agent: ReadonlyArray<Agent>
   readonly vcs: { branch?: string } | undefined
   session: {
     count: () => number

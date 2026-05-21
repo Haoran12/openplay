@@ -24,6 +24,7 @@ import type { GlobTool } from "@/tool/glob"
 import type { GrepTool } from "@/tool/grep"
 import type { InvalidTool } from "@/tool/invalid"
 import type { LspTool } from "@/tool/lsp"
+import type { NarrateTool } from "@/tool/narrate"
 import type { PlanExitTool } from "@/tool/plan"
 import type { QuestionTool } from "@/tool/question"
 import type { ReadTool } from "@/tool/read"
@@ -106,6 +107,7 @@ type ToolDefs = {
   grep: typeof GrepTool
   list: Tool.Info
   lsp: typeof LspTool
+  narrate: typeof NarrateTool
   webfetch: typeof WebFetchTool
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
@@ -283,6 +285,41 @@ function fallbackInline(ctx: ToolFrame): ToolInline {
 
 function count(n: number, label: string): string {
   return `${n} ${label}${n === 1 ? "" : "es"}`
+}
+
+function narrateMeta(input: ToolDict): string {
+  const parts: string[] = []
+  const perspective = text(input.perspective).trim()
+  const style = text(input.style).trim()
+  if (perspective) parts.push(perspective)
+  if (style) parts.push(style)
+  return parts.join(" · ")
+}
+
+function runNarrate(p: ToolProps<typeof NarrateTool>): ToolInline {
+  const meta = narrateMeta(dict(p.input))
+  return {
+    icon: "✒",
+    title: "Narrate",
+    ...(meta ? { description: meta } : {}),
+  }
+}
+
+function scrollNarrateStart(p: ToolProps<typeof NarrateTool>): string {
+  const meta = narrateMeta(dict(p.input))
+  return meta ? `✒ Narrating · ${meta}` : "✒ Narrating"
+}
+
+function scrollNarrateFinal(p: ToolProps<typeof NarrateTool>): string {
+  if (p.frame.status === "error") {
+    return fail(p.frame)
+  }
+
+  if (p.frame.status && p.frame.status !== "completed") {
+    return p.frame.raw.trim()
+  }
+
+  return ""
 }
 
 function runGlob(p: ToolProps<typeof GlobTool>): ToolInline {
@@ -1186,6 +1223,17 @@ const TOOL_RULES = {
     },
     permission: permLsp,
   },
+  narrate: {
+    view: {
+      output: false,
+      final: true,
+    },
+    run: runNarrate,
+    scroll: {
+      start: scrollNarrateStart,
+      final: scrollNarrateFinal,
+    },
+  },
   webfetch: {
     view: {
       output: false,
@@ -1407,6 +1455,34 @@ export function toolEntryBody(commit: StreamCommit, raw: string): RunEntryBody |
   const ctx = toolFrame(commit, raw)
   const view = toolView(ctx.name)
 
+  if (ctx.name === "narrate") {
+    if (commit.phase === "start") {
+      return textBody(toolScroll("start", ctx))
+    }
+
+    if (commit.phase === "final") {
+      if (ctx.status === "error") {
+        return textBody(toolScroll("final", ctx))
+      }
+
+      if (ctx.status && ctx.status !== "completed") {
+        return textBody(ctx.raw.trim())
+      }
+
+      const output = text(ctx.state.output).trim()
+      if (output) {
+        return markdownBody(output)
+      }
+
+      const content = text(ctx.input.content).trim()
+      if (content) {
+        return markdownBody(content)
+      }
+
+      return undefined
+    }
+  }
+
   if (ctx.name === "task") {
     if (commit.phase === "start") {
       return undefined
@@ -1443,6 +1519,20 @@ export function toolEntryBody(commit: StreamCommit, raw: string): RunEntryBody |
   }
 
   return textBody(toolScroll(commit.phase, ctx))
+}
+
+export function isNarrateFinalCompleted(commit: StreamCommit): boolean {
+  if (commit.kind !== "tool") {
+    return false
+  }
+
+  const name = commit.tool ?? commit.part?.tool
+  if (name !== "narrate" || commit.phase !== "final") {
+    return false
+  }
+
+  const status = commit.toolState ?? text(commit.part?.state.status)
+  return status === "completed"
 }
 
 export function toolFiletype(input?: string): string | undefined {
