@@ -65,10 +65,11 @@ describe("tool.scene_update", () => {
         content: "current_scene: Tea House\npresent_characters:\n  - SongQi\n",
       })
 
-      expect(result.metadata).toEqual({
+      expect(result.metadata).toMatchObject({
         path: "runtime.yaml",
         created: true,
         size: "current_scene: Tea House\npresent_characters:\n  - SongQi\n".length,
+        truncated: false,
       })
       expect(yield* Effect.promise(() => fs.readFile(runtimePath, "utf-8"))).toBe(
         "current_scene: Tea House\npresent_characters:\n  - SongQi\n",
@@ -99,19 +100,20 @@ describe("tool.scene_update", () => {
     }),
   )
 
-  it.instance("blocks writes to memories paths", () =>
+  it.instance("blocks writes to character resource paths", () =>
     Effect.gen(function* () {
       const result = yield* run({
-        path: "memories/孟缘.yaml",
+        path: "characters/孟缘/memory.yaml",
         content: "entries: []\n",
       })
 
       expect(result.title).toContain("(blocked)")
-      expect(result.output).toContain("cannot write memories/")
-      expect(result.metadata).toEqual({
-        path: "memories/孟缘.yaml",
+      expect(result.output).toContain("cannot write character resource paths")
+      expect(result.metadata).toMatchObject({
+        path: "characters/孟缘/memory.yaml",
         created: false,
         size: 0,
+        truncated: false,
       })
     }),
   )

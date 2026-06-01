@@ -228,27 +228,39 @@ function waitTurn(done: Wait["done"], signal: AbortSignal) {
   ]).pipe(Effect.flatMap((exit) => (Exit.isFailure(exit) ? Effect.failCause(exit.cause) : Effect.succeed(exit.value))))
 }
 
+const CERT_ERROR_PATTERN =
+  /certificate|CERT|unable to verify|self.signed|DEPTH_ZERO|UNABLE_TO_VERIFY|CERT_HAS_EXPIRED|local issuer/i
+
 export function formatUnknownError(error: unknown): string {
+  let base: string
   if (typeof error === "string") {
-    return error
-  }
-
-  if (error instanceof Error) {
-    return error.message || error.name
-  }
-
-  if (error && typeof error === "object") {
+    base = error
+  } else if (error instanceof Error) {
+    base = error.message || error.name
+  } else if (error && typeof error === "object") {
     const value = error as { message?: unknown; name?: unknown }
     if (typeof value.message === "string" && value.message.trim()) {
-      return value.message
+      base = value.message
+    } else if (typeof value.name === "string" && value.name.trim()) {
+      base = value.name
+    } else {
+      base = "unknown error"
     }
-
-    if (typeof value.name === "string" && value.name.trim()) {
-      return value.name
-    }
+  } else {
+    base = "unknown error"
   }
 
-  return "unknown error"
+  if (CERT_ERROR_PATTERN.test(base)) {
+    base =
+      `TLS certificate verification failed: ${base}\n\n` +
+      `This usually happens when a proxy or firewall intercepts HTTPS traffic with a custom CA certificate.\n` +
+      `To fix this, set the NODE_EXTRA_CA_CERTS environment variable to the path of your CA certificate:\n` +
+      `  export NODE_EXTRA_CA_CERTS=/path/to/ca-cert.pem\n\n` +
+      `If you need to bypass certificate verification (not recommended), set:\n` +
+      `  export NODE_TLS_REJECT_UNAUTHORIZED=0`
+  }
+
+  return base
 }
 
 function sameView(a: FooterView, b: FooterView) {

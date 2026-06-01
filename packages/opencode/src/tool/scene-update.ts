@@ -38,8 +38,8 @@ function normalizeScenePath(input: string): string | undefined {
     safe === ".." ||
     safe.startsWith("../") ||
     safe.includes("/../") ||
-    safe.startsWith("memories/") ||
-    safe === "memories"
+    safe.startsWith("characters/") ||
+    safe === "characters"
   ) {
     return
   }
@@ -67,7 +67,7 @@ export const SceneUpdateTool = Tool.define(
             return {
               title: `scene_update: ${params.path} (blocked)`,
               output:
-                "scene_update may only write runtime.yaml or files under records/. It cannot write memories/, absolute paths, or parent-relative paths.",
+                "scene_update may only write runtime.yaml or files under records/. It cannot write character resource paths, absolute paths, or parent-relative paths.",
               metadata: { path: params.path, created: false, size: 0 },
             }
           }

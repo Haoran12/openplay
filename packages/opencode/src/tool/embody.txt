@@ -5,11 +5,14 @@ The Director calls this tool to collect structured character output. You (the Di
 1. **Pass objective external facts**
    - Prefer `sceneFacts` for what the character can directly perceive right now.
    - Prefer `situationFrame` for the objective event frame of the current moment.
+   - When exact current interaction detail matters, pass `sceneEvents` as structured JSON objects so speech lines, outward actions, and objective results are not flattened into Director summary prose.
    - Legacy `l2View` and `situation` still work, but are deprecated.
 
 2. **Keep subjective interpretation out of objective fields**
-   - `sceneFacts`, `situationFrame`, and `focusHints` must not contain thoughts, judgments, decisions, or finished conclusions.
+   - `sceneFacts`, `situationFrame`, `sceneEvents`, and `focusHints` must not contain thoughts, judgments, decisions, or finished conclusions.
    - Do not write lines like `you realize`, `you suspect`, `你意识到`, `你怀疑`, `你打算`.
+   - `sceneEvents` may include only observable material: direct `speech`, outward `action`, and objective event/result fields.
+   - Never include any character's `inner_thought`, emotion label, hidden intent, private plan, or similar subjective field in `sceneEvents`.
    - Do pass visible, audible, tactile, olfactory, spiritual, and bodily information.
 
 3. **Let the runtime inject stable layers**
@@ -48,6 +51,7 @@ After calling this tool, the Director should continue the turn and produce the v
 
 - Never paraphrase or hint at God Only information in objective inputs.
 - The system programmatically strips any remaining God Only content from self-knowledge and objective inputs as a safety net.
+- The system also rejects structured event payloads that leak another character's private subjective state.
 - Objective inputs should contain enough immediate scene facts for action, but should not be padded with omniscient lore.
 - Do not ask the character subagent for outcome plans or omniscient narration.
 - This tool returns structured character samples — you then continue directing the scene.

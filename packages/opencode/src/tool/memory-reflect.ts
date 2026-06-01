@@ -10,9 +10,9 @@ import { MessageID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import type { TaskPromptOps } from "./task"
 import { deriveSubagentSessionPermission } from "@/agent/subagent-permissions"
-import { buildCharacterSelfKnowledge, buildCharacterSettingSection, resolveCharacterWorldResources } from "./embody"
-import { GodOnlyFilter, filterL2View } from "./god-only-filter"
-import path from "path"
+import { buildCharacterSelfKnowledge, resolveCharacterWorldResources } from "./embody"
+import { GodOnlyFilter } from "./god-only-filter"
+import { readManifest, resolveForCharacter } from "./character-directory"
 
 const Parameters = Schema.Struct({
   character: Schema.String.annotate({
@@ -40,20 +40,15 @@ function parseModelString(modelStr: string): { modelID: string; providerID: stri
   return { providerID: parts[0], modelID: parts[1] }
 }
 
-export const MemoryReflectTool = Tool.define(
-  "memory_reflect",
-  Effect.gen(function* () {
+const init: Effect.Effect<Tool.DefWithoutID<typeof Parameters, MemoryReflectMetadata>, never, any> = Effect.gen(function* () {
     const sessions = yield* Session.Service
     const agents = yield* Agent.Service
     const config = yield* Config.Service
     const fs = yield* AppFileSystem.Service
     const filterService = yield* GodOnlyFilter.Service
 
-    return {
-      description: DESCRIPTION,
-      parameters: Parameters,
-      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<MemoryReflectMetadata>) =>
-        Effect.gen(function* () {
+    const execute = (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<MemoryReflectMetadata>) =>
+      Effect.gen(function* () {
           const ins = yield* InstanceState.context
           const worldPath = ins.world?.rootPath
           const ops = ctx.extra?.promptOps as TaskPromptOps | undefined
@@ -85,7 +80,6 @@ export const MemoryReflectTool = Tool.define(
             fs,
             worldPath,
             character: params.character,
-            preferredStatePath: characterAgent?.statePath,
           })
           const stateContent = characterResources.stateContent
           const selfKnowledgeLines = buildCharacterSelfKnowledge({
@@ -94,14 +88,13 @@ export const MemoryReflectTool = Tool.define(
             stateContent,
             forbiddenSet,
           })
-          const characterSettingSection =
-            buildCharacterSettingSection({
-              character: params.character,
-              stateContent,
-              forbiddenSet,
-            }) ?? "- (none)"
           const selfKnowledgeSection =
             selfKnowledgeLines.length > 0 ? selfKnowledgeLines.join("\n") : `- Name: ${params.character}`
+          const directoryInfo = (yield* resolveForCharacter({ fs, worldPath, character: params.character })).info
+          const manifestItems = directoryInfo
+            ? yield* readManifest({ fs, info: directoryInfo }).pipe(Effect.catch(() => Effect.succeed(["profile.yaml", "memory.yaml"])))
+            : ["profile.yaml", "memory.yaml"]
+          const manifestSection = manifestItems.length > 0 ? manifestItems.join("\n") : "(empty)"
 
           const cfg = yield* config.get().pipe(Effect.orDie)
           let model: { modelID: string; providerID: string }
@@ -125,16 +118,6 @@ export const MemoryReflectTool = Tool.define(
           }).pipe(Effect.orDie)
 
           const subagentSessionID = subagentSession.id
-          const memoryPath = characterResources.binding.memoryPath
-          const currentMemory =
-            filterL2View(
-              (yield* fs.readFileStringSafe(path.join(worldPath, memoryPath)).pipe(Effect.orDie))
-                ?.trim()
-                .replaceAll("\r\n", "\n") || "version: 1\nordering: newest-first\nentries: []\n",
-              forbiddenSet,
-            ) ||
-            "version: 1\nordering: newest-first\nentries: []\n"
-
           const systemPrompt = [
             `Character name: ${params.character}`,
             ...(characterAgent?.persona ? ["", "## Persona", characterAgent.persona] : []),
@@ -142,15 +125,16 @@ export const MemoryReflectTool = Tool.define(
             "## Core Self-Knowledge",
             selfKnowledgeSection,
             "",
-            "## Accessible Setting File",
-            characterSettingSection,
-            "",
-            "## Current Subjective Memory File",
-            currentMemory,
+            "## Visible Character Resources",
+            manifestSection,
             "",
             "You are updating your own subjective long-term memory file.",
             "You, not the Director, are the authority over what belongs in that file.",
+            "Start by reading your own manifest, then read whichever listed resources you need with character_view_read(target=\"resource\", path=...).",
+            "Your own listed role resources are your source of self-understanding; the Director is not.",
+            "If a file contains access tags other than God Only, interpret them cautiously in character instead of treating them as automatic facts.",
             "Use the memory_update tool when and only when you decide the memory file should change.",
+            "If the event mainly changes a stable understanding instead of episodic memory, prefer revising a knowledge resource with knowledge_update instead.",
             "If the triggering event would not stick in memory, leave the file unchanged and say so briefly.",
             "Keep newest-first ordering and preserve the structured YAML format.",
             "Judge impression strictly from your own lived memorability, not omniscient plot importance.",
@@ -168,6 +152,7 @@ export const MemoryReflectTool = Tool.define(
             params.event,
             ...(params.guidance ? ["", "## Director Guidance", params.guidance] : []),
             "",
+            "First inspect the listed role resources you need. Then decide whether this should enter or alter long-term memory.",
             "If this should change long-term memory, call memory_update with the full updated YAML content.",
             "If not, answer in plain text with one short sentence explaining that no memory update is needed.",
           ].join("\n")
@@ -193,12 +178,15 @@ export const MemoryReflectTool = Tool.define(
                 dice_roll: false,
                 narrate: false,
                 scene_update: false,
+                character_view_read: true,
+                memory_update: true,
+                knowledge_update: true,
                 embody: false,
                 todowrite: false,
               },
               system: systemPrompt,
               roleplay: {
-                environmentOverride: `You are in a roleplay scene as ${params.character}. Update only your own subjective memory if the event would truly remain with you.`,
+                environmentOverride: `You are in a roleplay scene as ${params.character}. Read your own listed role resources first, then update only your own subjective memory if the event would truly remain with you.`,
                 instructionOverride: "",
                 skillsOverride: "",
               },
@@ -221,14 +209,27 @@ export const MemoryReflectTool = Tool.define(
               .join("\n")
               .trim() || "[No memory result returned]"
 
-          return {
-            title: `memory_reflect: ${params.character}`,
-            output: responseText,
-            metadata: { character: params.character, subagentSessionID } satisfies MemoryReflectMetadata,
-          }
-        }).pipe(Effect.orDie),
+        return {
+          title: `memory_reflect: ${params.character}`,
+          output: responseText,
+          metadata: { character: params.character, subagentSessionID } satisfies MemoryReflectMetadata,
+        }
+      }).pipe(Effect.orDie)
+    const tool = {
+      description: DESCRIPTION,
+      parameters: Parameters,
+      execute,
     }
-  }),
+    return tool satisfies Tool.DefWithoutID<typeof Parameters, MemoryReflectMetadata>
+  }).pipe(Effect.orDie)
+
+export const MemoryReflectTool = Tool.define(
+  "memory_reflect",
+  init as Effect.Effect<
+    Tool.DefWithoutID<typeof Parameters, MemoryReflectMetadata>,
+    never,
+    Session.Service | Agent.Service | Config.Service | AppFileSystem.Service | GodOnlyFilter.Service
+  >,
 )
 
 export * as MemoryReflect from "./memory-reflect"

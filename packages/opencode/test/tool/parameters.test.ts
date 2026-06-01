@@ -10,6 +10,7 @@ import { ToolJsonSchema } from "../../src/tool/json-schema"
 // provider-compatible while tools use Effect Schema internally.
 
 import { Parameters as ApplyPatch } from "../../src/tool/apply_patch"
+import { Parameters as Calc } from "../../src/tool/calc"
 import { Parameters as Edit } from "../../src/tool/edit"
 import { Parameters as Glob } from "../../src/tool/glob"
 import { Parameters as Grep } from "../../src/tool/grep"
@@ -37,6 +38,7 @@ const toJsonSchema = ToolJsonSchema.fromSchema
 describe("tool parameters", () => {
   describe("JSON Schema (wire shape)", () => {
     test("apply_patch", () => expect(toJsonSchema(ApplyPatch)).toMatchSnapshot())
+    test("calc", () => expect(toJsonSchema(Calc)).toMatchSnapshot())
     test("bash", () => expect(toJsonSchema(Shell)).toMatchSnapshot())
     test("edit", () => expect(toJsonSchema(Edit)).toMatchSnapshot())
     test("glob", () => expect(toJsonSchema(Glob)).toMatchSnapshot())
@@ -80,6 +82,17 @@ describe("tool parameters", () => {
     test("bounds bare integer fields to safe integer range", () => {
       expect(toJsonSchema(Schema.Struct({ value: Schema.Int }))).toMatchObject({
         properties: { value: { minimum: Number.MIN_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER } },
+      })
+    })
+
+    test("preserves calc type enum variants for roleplay tool calls", () => {
+      expect(toJsonSchema(Calc)).toMatchObject({
+        properties: {
+          type: {
+            type: "string",
+            enum: ["date", "tier", "delta", "age"],
+          },
+        },
       })
     })
   })

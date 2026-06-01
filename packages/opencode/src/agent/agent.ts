@@ -59,9 +59,6 @@ export const Info = Schema.Struct({
   knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
   }),
-  statePath: Schema.optional(Schema.String).annotate({
-    description: "Relative path to the character state YAML file",
-  }),
   isDirector: Schema.optional(Schema.Boolean).annotate({
     description: "Mark this agent as the Director agent for roleplay mode",
   }),
@@ -205,13 +202,15 @@ export const layer = Layer.effect(
                 character: {
                   name: "character",
                   description:
-                    "Roleplay character subagent. Strictly stays in character using only the filtered scene view provided by the Director.",
+                    "Roleplay character subagent. Stays in character and actively reads its own listed role resources.",
                   permission: Permission.merge(
                     defaults,
                     Permission.fromConfig({
                       "*": "deny",
                       question: "allow",
+                      character_view_read: "allow",
                       memory_update: "allow",
+                      knowledge_update: "allow",
                     }),
                     user,
                 ),
@@ -341,6 +340,9 @@ export const layer = Layer.effect(
                       narrate: "allow",
                       scene_update: "allow",
                       memory_reflect: "allow",
+                      knowledge_reflect: "allow",
+                      memory_update: "deny",
+                      knowledge_update: "deny",
                       question: "allow",
                     }),
                     user,
@@ -384,7 +386,6 @@ export const layer = Layer.effect(
           item.senses = value.senses ?? item.senses
           item.senseTraits = value.senseTraits ?? item.senseTraits
           item.knowledgeAccess = value.knowledgeAccess ?? item.knowledgeAccess
-          item.statePath = value.statePath ?? item.statePath
           item.options = mergeDeep(item.options, value.options ?? {})
           item.permission = Permission.merge(item.permission, Permission.fromConfig(value.permission ?? {}))
         }

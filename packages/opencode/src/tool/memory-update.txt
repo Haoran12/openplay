@@ -19,6 +19,6 @@ Use this tool to persist stable personal memories, recurring impressions, relati
 - Impression 5 means engraved and should never be compressed away. Impression 4 fades more slowly than ordinary memories. Impression 0-1 fades faster.
 - After every additional 20 older entries, earlier memories should usually be compressed one level further, modulated by impression strength.
 - Prefer overwriting with the full current YAML state rather than appending endless unstructured detail.
-- The file path is fixed by the system as `{world}/memories/{character}.yaml`.
+- The file path is fixed by the system as that character's `characters/<directory>/memory.yaml`.
 - Use newest-first ordering.
 - The Director should trigger this only when a memory becomes stable, changes meaningfully, or needs compression.

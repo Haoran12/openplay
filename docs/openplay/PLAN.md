@@ -85,10 +85,10 @@ Director Agent (持有 L1 真相)
   │   - 看到 "access: self" → 仅角色本人可见
   │   - 数值翻译为体感描述
   │
-  ├── 调用 embody(character="孟缘", l2View=..., situation=...)
+  ├── 调用 embody(character="孟缘", sceneFacts=..., situationFrame=..., sceneEvents=[...])
   │   │  embody 内部：
   │   │  1. 构建角色 Agent 配置
-  │   │  2. 程序化过滤 l2View 中的 God Only 内容
+  │   │  2. 程序化过滤 sceneFacts / situationFrame / sceneEvents 中的 God Only 内容
   │   │  3. 创建 Subagent Session（受限权限：只有 question）
   │   │  4. 传入 roleplay 覆盖（禁用真实 env/instructions/skills）
   │   │  5. 返回 L3 输出
@@ -96,8 +96,8 @@ Director Agent (持有 L1 真相)
   │   └── Character Subagent 只看到：
   │       ├── 角色卡 + 输出格式约束（system prompt）
   │       ├── 游戏内环境（environmentOverride）
-  │       ├── 清洗后的 L2 视图文本
-  │       └── 当前情境描述
+  │       ├── 清洗后的客观 sceneFacts / situationFrame
+  │       └── 清洗后的结构化 sceneEvents（仅 speech / outward action / objective result，不含任何角色的 inner_thought）
   │       ❌ 没有 read/glob/grep
   │       ❌ 没有真实文件路径/日期/平台信息
   │       ❌ 所有 God Only 内容已被程序剥离
@@ -238,8 +238,7 @@ shell, edit, write, read, glob, grep, task, task_status, fetch, search, question
       "model": { "id": "claude-sonnet-4-20250514" },
       "persona": "竹精灵，沉稳内敛...",
       "senses": { "vision": "Master", "hearing": "Adept" },
-      "knowledgeAccess": ["Public", "Condition:修行者"],
-      "statePath": "characters/MengYuan.yaml"
+      "knowledgeAccess": ["Public", "Condition:修行者"]
     }
   }
 }

@@ -2317,20 +2317,16 @@ it.instance(
 
 it.instance(
   "roleplay director does not finish after embody alone and continues to narrate",
-  () =>
-    Effect.gen(function* () {
+  Effect.gen(function* () {
       const { llm } = yield* useServerConfig(providerCfg)
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
-      const world = yield* World.Service
       const { directory: dir } = yield* TestInstance
 
       yield* writeText(
         path.join(dir, "runtime.yaml"),
         ["scene:", "  location: 竹舍", "present_characters:", "  - 孟缘"].join("\n"),
       )
-      const info = yield* world.fromDirectory(dir)
-      if (!info) throw new Error("expected roleplay world")
 
       const chat = yield* sessions.create({
         title: "Roleplay Director",
@@ -2358,20 +2354,17 @@ it.instance(
       )
       yield* llm.push(reply().text("收束完成。").stop())
 
-      const result = yield* Session.withInstance(
-        { directory: dir },
-        prompt.prompt({
-          sessionID: chat.id,
-          agent: "director",
-          parts: [{ type: "text", text: "继续这一幕。" }],
-        }),
-      )
+      const result = yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "director",
+        parts: [{ type: "text", text: "继续这一幕。" }],
+      })
 
       expect((yield* llm.calls)).toBe(3)
       expect(result.info.role).toBe("assistant")
       expect(
         result.parts.some(
-          (part) => part.type === "tool" && part.tool === "narrate" && part.state.status === "completed",
+          (part: MessageV2.Part) => part.type === "tool" && part.tool === "narrate" && part.state.status === "completed",
         ),
       ).toBe(true)
     }),

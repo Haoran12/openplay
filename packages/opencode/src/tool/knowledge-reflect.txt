@@ -1,0 +1,18 @@
+Trigger a character-owned long-term knowledge update inside the roleplay world.
+
+Use this tool when a character's stable understanding changes: about society, nature, their own body or senses, or another person.
+
+The Director may decide when knowledge handling should happen, but the character subagent must decide the final topic, wording, target file, and whether any update is warranted.
+
+## Parameters
+
+- `character`: The character whose long-term knowledge may need revision.
+- `situation`: A concise current-scene summary from that character's perspective.
+- `event`: The concrete event, realization, or repeated pattern that may change the character's durable understanding.
+- `guidance` (optional): Extra Director guidance such as "relationship re-evaluation", "new natural pattern learned", or "social judgment changed".
+
+## Important
+
+- This is not for public records. Use `records/` for public world history.
+- The runtime will dispatch a character subagent session and expose only the character's own read/write knowledge tools plus memory access.
+- The character, not the Director, owns the final contents of their directory-based knowledge files.

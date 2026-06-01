@@ -25,6 +25,7 @@ async function exists(target: string) {
 
 async function copyMissing(src: string, dst: string) {
   if (await exists(dst)) return
+  if (!(await exists(src))) return
   await fs.mkdir(path.dirname(dst), { recursive: true })
   await fs.copyFile(src, dst)
 }

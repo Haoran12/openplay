@@ -69,11 +69,18 @@ const run = Effect.fn("MemoryUpdateToolTest.run")(function* (
 })
 
 describe("tool.memory_update", () => {
-  it.effect("creates the memories directory when it is missing and normalizes structured yaml", () =>
+  it.effect("creates the character memory file when it is missing and normalizes structured yaml", () =>
     Effect.gen(function* () {
       const dir = yield* Effect.promise(() => tmpdir())
       yield* Effect.addFinalizer(() => Effect.promise(() => dir[Symbol.asyncDispose]()))
-      const fullPath = path.join(dir.path, "memories", "孟缘.yaml")
+      const fullPath = path.join(dir.path, "characters", "云梦泽-孟缘", "memory.yaml")
+      yield* Effect.promise(() => fs.mkdir(path.join(dir.path, "characters", "云梦泽-孟缘"), { recursive: true }))
+      yield* Effect.promise(() =>
+        fs.writeFile(
+          path.join(dir.path, "characters", "云梦泽-孟缘", "profile.yaml"),
+          ["name: 孟缘", "role: 云梦泽的大妖长老", ""].join("\n"),
+        ),
+      )
       const instance = {
         directory: dir.path,
         worktree: dir.path,
@@ -116,7 +123,14 @@ entries:
     Effect.gen(function* () {
       const dir = yield* Effect.promise(() => tmpdir())
       yield* Effect.addFinalizer(() => Effect.promise(() => dir[Symbol.asyncDispose]()))
-      const fullPath = path.join(dir.path, "memories", "孟缘.yaml")
+      const fullPath = path.join(dir.path, "characters", "云梦泽-孟缘", "memory.yaml")
+      yield* Effect.promise(() => fs.mkdir(path.join(dir.path, "characters", "云梦泽-孟缘"), { recursive: true }))
+      yield* Effect.promise(() =>
+        fs.writeFile(
+          path.join(dir.path, "characters", "云梦泽-孟缘", "profile.yaml"),
+          ["name: 孟缘", "role: 云梦泽的大妖长老", ""].join("\n"),
+        ),
+      )
 
       yield* run({
         content: `

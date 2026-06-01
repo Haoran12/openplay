@@ -489,3 +489,67 @@ exports[`tool parameters JSON Schema (wire shape) write 1`] = `
   "type": "object",
 }
 `;
+
+exports[`tool parameters JSON Schema (wire shape) calc 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "a": {
+      "description": "First value",
+      "type": "number",
+    },
+    "b": {
+      "description": "Second value",
+      "type": "number",
+    },
+    "birthDate": {
+      "description": "Birth date in YYYY-MM-DD or YYYY-MM-DD BC format",
+      "type": "string",
+    },
+    "currentDate": {
+      "description": "Current date in YYYY-MM-DD or YYYY-MM-DD BC format",
+      "type": "string",
+    },
+    "from": {
+      "description": "Start date in YYYY-MM-DD or YYYY-MM-DD BC format",
+      "type": "string",
+    },
+    "tiers": {
+      "description": "Custom tier table as [threshold, name]. Defaults to standard cultivation tiers.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number",
+        },
+        {
+          "type": "string",
+        },
+      ],
+      "type": "array",
+    },
+    "to": {
+      "description": "End date in YYYY-MM-DD or YYYY-MM-DD BC format",
+      "type": "string",
+    },
+    "type": {
+      "description": "Operation type: date, tier, delta, or age",
+      "enum": [
+        "date",
+        "tier",
+        "delta",
+        "age",
+      ],
+      "type": "string",
+    },
+    "value": {
+      "description": "Numeric value to classify into a tier",
+      "type": "number",
+    },
+  },
+  "required": [
+    "type",
+  ],
+  "type": "object",
+}
+`;

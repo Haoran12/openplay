@@ -9,6 +9,8 @@ import { Session } from "@/session/session"
 import * as Tool from "./tool"
 import DESCRIPTION from "./memory-update.txt"
 import { normalizeMemoryFile, serializeMemoryFile } from "./memory-schema"
+import { parseCharacterSessionTitle } from "./character-session"
+import { createEmptyCharacterMemory, getCharacterMemoryFilePath, getCharacterMemoryRelativePath, resolveForCharacter } from "./character-directory"
 
 const Parameters = Schema.Struct({
   content: Schema.String.annotate({
@@ -26,7 +28,7 @@ type MemoryUpdateMetadata = {
 }
 
 export function characterMemoryPath(worldRoot: string, character: string) {
-  return path.join(worldRoot, "memories", `${character}.yaml`)
+  return path.join(worldRoot, "characters", character, "memory.yaml")
 }
 
 export const MemoryUpdateTool = Tool.define(
@@ -43,10 +45,11 @@ export const MemoryUpdateTool = Tool.define(
         Effect.gen(function* () {
           const ins = yield* InstanceState.context
           const shouldCreate = params.create !== false
-          const worldRoot = ins.world?.rootPath ?? ins.directory
-          const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
-          const match = session.title.match(/^Character:\s*(.+)$/)
-          const character = match?.[1]?.trim()
+          const worldRoot = ins.world?.rootPath
+          const session = ctx.roleplayCharacter
+            ? undefined
+            : yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
+          const character = ctx.roleplayCharacter ?? (session ? parseCharacterSessionTitle(session.title) : undefined)
           if (!character) {
             return {
               title: "memory_update: unavailable",
@@ -54,19 +57,41 @@ export const MemoryUpdateTool = Tool.define(
               metadata: { path: "", created: false, size: 0 },
             }
           }
-          const fullPath = characterMemoryPath(worldRoot, character)
+          if (!worldRoot) {
+            return {
+              title: "memory_update: unavailable",
+              output: "Memory updates are only available in roleplay worlds.",
+              metadata: { path: "", created: false, size: 0 },
+            }
+          }
+
+          const resolved = yield* resolveForCharacter({ fs, worldPath: worldRoot, character })
+          const info = resolved.info
+          if (!info) {
+            return {
+              title: `memory_update: ${character} (not found)`,
+              output: `Character directory not found for ${character}.`,
+              metadata: { path: "", created: false, size: 0 },
+            }
+          }
+          const fullPath = getCharacterMemoryFilePath(info)
+          const relativePath = getCharacterMemoryRelativePath(info)
 
           const exists = yield* fs.existsSafe(fullPath)
           if (!exists && !shouldCreate) {
             return {
               title: `memory_update: ${character} (not found)`,
-              output: `File not found: ${path.relative(worldRoot, fullPath)}. Set create=true to create it.`,
-              metadata: { path: path.relative(worldRoot, fullPath), created: false, size: 0 },
+              output: `File not found: ${relativePath}. Set create=true to create it.`,
+              metadata: { path: relativePath, created: false, size: 0 },
             }
           }
 
           const normalized = normalizeMemoryFile(params.content)
           const serialized = serializeMemoryFile(normalized)
+
+          if (!exists && shouldCreate) {
+            yield* fs.writeWithDirs(fullPath, `${createEmptyCharacterMemory()}\n`).pipe(Effect.orDie)
+          }
 
           yield* fs.writeWithDirs(fullPath, serialized).pipe(Effect.orDie)
           yield* bus.publish(File.Event.Edited, { file: fullPath })
@@ -76,8 +101,8 @@ export const MemoryUpdateTool = Tool.define(
           })
           return {
             title: `memory_update: ${character}`,
-            output: `Updated ${path.relative(worldRoot, fullPath)} (${serialized.length} bytes)`,
-            metadata: { path: path.relative(worldRoot, fullPath), created: !exists, size: serialized.length },
+            output: `Updated ${relativePath} (${serialized.length} bytes)`,
+            metadata: { path: relativePath, created: !exists, size: serialized.length },
           }
         }),
     }

@@ -13,6 +13,6 @@ Use this tool to persist narrative changes, event records, and state updates to 
 - Always write the complete file content — this tool overwrites the existing file.
 - The path is resolved relative to the world root directory (where openplay.json is located).
 - Use this for updating runtime.yaml and writing event records.
-- This tool cannot write `memories/`, absolute paths, or parent-relative paths.
+- This tool cannot write character resource paths, absolute paths, or parent-relative paths.
 - Subjective character memory must be updated through the dedicated character-memory flow, not through `scene_update`.
 - Treat `runtime.yaml` as the authoritative live state for the roleplay side panel. If scene facts or present-character facts changed, persist them here in the same turn.

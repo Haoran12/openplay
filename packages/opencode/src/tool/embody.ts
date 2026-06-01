@@ -18,11 +18,22 @@ import type { TaskPromptOps } from "./task"
 import { deriveSubagentSessionPermission } from "@/agent/subagent-permissions"
 import { characterMemoryPath } from "./memory-update"
 import { formatMemoryEntry, normalizeMemoryFile, serializeMemoryFile } from "./memory-schema"
+import {
+  createEmptyCharacterMemory,
+  resolveForCharacter,
+  readManifest as readCharacterManifest,
+} from "./character-directory"
 
 const Parameters = Schema.Struct({
   character: Schema.String.annotate({
     description: "Name of the character to embody (must be present in the scene)",
   }),
+  sceneEvents: Schema.optional(
+    Schema.Array(Schema.Record(Schema.String, Schema.Unknown)).annotate({
+      description:
+        "Optional structured current-scene event feed. Use JSON objects for fully observable events happening right now, especially direct speech, outward actions, and objective results. Never include any character's inner thoughts, feelings, intentions, plans, or hidden truth.",
+    }),
+  ),
   sceneFacts: Schema.optional(
     Schema.String.annotate({
       description:
@@ -98,23 +109,19 @@ type RuntimeData = Partial<{
   environment: Record<string, unknown>
 }>
 
+type SceneEvent = Record<string, unknown>
+
 type EffectiveInput = {
   sceneFacts: string
   situationFrame: string
+  sceneEvents?: SceneEvent[]
   playerNudge?: string
   focusHints?: string
   usedLegacyFields: boolean
 }
 
 type CharacterBindingInfo = {
-  statePath?: string
   memoryPath: string
-}
-
-type CharacterBindingsFile = {
-  version: 1
-  generatedAt: string
-  characters: Record<string, CharacterBindingInfo>
 }
 
 type CharacterWorldResources = {
@@ -123,8 +130,6 @@ type CharacterWorldResources = {
 }
 
 const GOD_ONLY_ACCESS = new Set(["godonly"])
-const CHARACTER_BINDINGS_RELATIVE_PATH = path.join(".openplay", "character-bindings.json")
-const CHARACTER_STATE_PATTERNS = ["characters/**/*.yaml", "characters/**/*.yml"] as const
 const CHARACTER_SAMPLE_ALIASES = new Map<string, keyof CharacterSample>([
   ["innerthought", "inner_thought"],
   ["innermonologue", "inner_thought"],
@@ -232,6 +237,82 @@ const PLAYER_NUDGE_HARD_OVERRIDE_RULES = [
   /(?:默认|先|直接)(?:把|将).{0,12}(?:视为|当成|认定为)/,
   /(?:更倾向于|倾向于|优先)(?:认为|认定|判断|怀疑|确信)/,
 ]
+const SCENE_EVENT_SUBJECTIVE_KEYS = new Set([
+  "innerthought",
+  "innermonologue",
+  "monologue",
+  "thought",
+  "thinking",
+  "feeling",
+  "feelings",
+  "emotion",
+  "emotions",
+  "mood",
+  "intent",
+  "intents",
+  "intention",
+  "intentions",
+  "actionintent",
+  "plan",
+  "plans",
+  "goal",
+  "goals",
+  "motivation",
+  "motivations",
+  "motive",
+  "motives",
+  "belief",
+  "beliefs",
+  "judgment",
+  "judgement",
+  "conclusion",
+  "conclusions",
+  "inference",
+  "inferences",
+  "suspicion",
+  "suspicions",
+  "private",
+  "privateknowledge",
+  "mentalstate",
+  "mindstate",
+])
+const SCENE_EVENT_DIRECT_SPEECH_KEYS = new Set(["speech", "dialogue", "line", "quote", "words", "utterance", "text"])
+const SCENE_EVENT_SUBJECTIVE_SUFFIXES = [
+  "innerthought",
+  "innermonologue",
+  "thought",
+  "thinking",
+  "feeling",
+  "feelings",
+  "emotion",
+  "emotions",
+  "mood",
+  "intent",
+  "intents",
+  "intention",
+  "intentions",
+  "actionintent",
+  "plan",
+  "plans",
+  "goal",
+  "goals",
+  "motivation",
+  "motivations",
+  "motive",
+  "motives",
+  "belief",
+  "beliefs",
+  "judgment",
+  "judgement",
+  "conclusion",
+  "conclusions",
+  "inference",
+  "inferences",
+  "suspicion",
+  "suspicions",
+  "mentalstate",
+  "mindstate",
+]
 
 function normalizeToken(value: string): string {
   return value.toLowerCase().replace(/[\s_\-]/g, "")
@@ -300,10 +381,6 @@ export function tryParseCharacterSample(text: string): CharacterSample | undefin
 
 function isGodOnlyAccess(access: unknown): boolean {
   return typeof access === "string" && GOD_ONLY_ACCESS.has(normalizeToken(access))
-}
-
-function characterMemoryRelativePath(character: string): string {
-  return path.join("memories", `${character}.yaml`)
 }
 
 function isHiddenCharacterStatePath(relativePath: string): boolean {
@@ -421,32 +498,39 @@ function collectBindingCandidatesFromParsed(parsed: unknown, relativePath: strin
 export function inferCharacterBindingsFromFiles(
   files: Array<{ relativePath: string; content: string }>,
 ): Record<string, CharacterBindingInfo> {
-  const best = new Map<string, { score: number; statePath: string }>()
-
+  const result = new Map<string, { binding: CharacterBindingInfo; score: number }>()
   for (const file of files) {
+    const basename = path.basename(file.relativePath)
+    if (basename !== "profile.yaml") continue
     try {
       const parsed = parse(file.content)
-      const candidates = collectBindingCandidatesFromParsed(parsed, file.relativePath)
-      for (const [character, score] of candidates.entries()) {
-        const prev = best.get(character)
-        if (!prev || score > prev.score) {
-          best.set(character, { score, statePath: file.relativePath })
+      const root = readObject(parsed)
+      if (!root) continue
+      let character = formatPrimitive(root.name)
+      if (!character) {
+        for (const [key, value] of Object.entries(root)) {
+          const nested = readObject(value)
+          if (!nested) continue
+          character = extractCharacterNames(nested, key)[0]
+          if (character) break
         }
       }
+      if (!character) continue
+      const relativeDir = path.dirname(file.relativePath)
+      const score = isHiddenCharacterStatePath(file.relativePath) ? -1000 : 0
+      const previous = result.get(character)
+      if (previous && previous.score >= score) continue
+      result.set(character, {
+        binding: {
+          memoryPath: path.join(relativeDir, "memory.yaml"),
+        },
+        score,
+      })
     } catch {
       continue
     }
   }
-
-  return Object.fromEntries(
-    Array.from(best.entries()).map(([character, value]) => [
-      character,
-      {
-        statePath: value.statePath,
-        memoryPath: characterMemoryRelativePath(character),
-      } satisfies CharacterBindingInfo,
-    ]),
-  )
+  return Object.fromEntries(Array.from(result.entries()).map(([character, value]) => [character, value.binding]))
 }
 
 function resolveSelfKnowledgeValue(
@@ -551,9 +635,16 @@ function buildAccessibleSettingNode(node: unknown): unknown {
   const obj = node as Record<string, unknown>
   if (isGodOnlyAccess(obj.access)) return undefined
 
-  for (const field of VALUE_FIELDS) {
-    const resolved = buildAccessibleSettingNode(obj[field])
-    if (resolved !== undefined) return resolved
+  const hasWrapperSemantics =
+    "access" in obj ||
+    "apparent_content" in obj ||
+    VALUE_FIELDS.some((field) => field in obj) && Object.keys(obj).every((key) => ACCESSIBLE_SETTING_SKIP_KEYS.has(key) || VALUE_FIELDS.includes(key as (typeof VALUE_FIELDS)[number]))
+
+  if (hasWrapperSemantics) {
+    for (const field of VALUE_FIELDS) {
+      const resolved = buildAccessibleSettingNode(obj[field])
+      if (resolved !== undefined) return resolved
+    }
   }
 
   const output: Record<string, unknown> = {}
@@ -573,6 +664,63 @@ function sanitizeLines(lines: string[], forbiddenSet: ForbiddenSet | undefined):
   return lines
     .map((line) => sanitizeValue(line, forbiddenSet))
     .filter((line) => line.length > 0 && line !== "- [已隐去]" && line !== "[已隐去]")
+}
+
+export function sanitizeSceneEvents(value: unknown, forbiddenSet: ForbiddenSet | undefined): unknown {
+  if (typeof value === "string") {
+    return forbiddenSet ? filterL2View(value, forbiddenSet) : value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeSceneEvents(item, forbiddenSet))
+  }
+  const obj = readObject(value)
+  if (!obj) return value
+
+  return Object.fromEntries(
+    Object.entries(obj).map(([key, item]) => [key, sanitizeSceneEvents(item, forbiddenSet)]),
+  )
+}
+
+export function formatSceneEventsSection(events: SceneEvent[] | undefined): string | undefined {
+  if (!events || events.length === 0) return
+  return JSON.stringify(events, null, 2)
+}
+
+function isSubjectiveSceneEventKey(key: string): boolean {
+  const normalized = normalizeToken(key)
+  return (
+    SCENE_EVENT_SUBJECTIVE_KEYS.has(normalized) ||
+    SCENE_EVENT_SUBJECTIVE_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
+  )
+}
+
+function detectSceneEventLeakage(value: unknown, path = "sceneEvents", parentKey?: string): string | undefined {
+  if (typeof value === "string") {
+    if (parentKey && SCENE_EVENT_DIRECT_SPEECH_KEYS.has(normalizeToken(parentKey))) return
+    for (const rule of SUBJECTIVE_LEAKAGE_RULES) {
+      if (rule.test(value)) {
+        return `${path} contains subjective interpretation or intention. Keep sceneEvents strictly to observable speech, outward action, and objective results.`
+      }
+    }
+    return
+  }
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const issue = detectSceneEventLeakage(value[index], `${path}[${index}]`, parentKey)
+      if (issue) return issue
+    }
+    return
+  }
+  const obj = readObject(value)
+  if (!obj) return
+
+  for (const [key, item] of Object.entries(obj)) {
+    if (isSubjectiveSceneEventKey(key)) {
+      return `${path}.${key} exposes another character's private subjective state. sceneEvents may include only observable speech, outward action, and objective results.`
+    }
+    const issue = detectSceneEventLeakage(item, `${path}.${key}`, key)
+    if (issue) return issue
+  }
 }
 
 function formatBulletSection(lines: string[]): string {
@@ -645,126 +793,26 @@ export function buildCharacterSettingSection(input: {
   }
 }
 
-function parseCharacterBindingsFile(value: unknown): CharacterBindingsFile | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return
-  const input = value as Record<string, unknown>
-  const characters = readObject(input.characters)
-  if (!characters) return
-
-  const normalized: Record<string, CharacterBindingInfo> = {}
-  for (const [character, raw] of Object.entries(characters)) {
-    const entry = readObject(raw)
-    if (!entry) continue
-    const memoryPath = formatPrimitive(entry.memoryPath)
-    const statePath = formatPrimitive(entry.statePath)
-    if (!memoryPath) continue
-    normalized[character] = { memoryPath, ...(statePath ? { statePath } : {}) }
-  }
-
-  return {
-    version: 1,
-    generatedAt: formatPrimitive(input.generatedAt) ?? new Date(0).toISOString(),
-    characters: normalized,
-  }
-}
-
-function bindingsEqual(a: CharacterBindingInfo | undefined, b: CharacterBindingInfo | undefined): boolean {
-  if (!a && !b) return true
-  if (!a || !b) return false
-  return a.statePath === b.statePath && a.memoryPath === b.memoryPath
-}
-
-function readBindingsFile(input: { fs: AppFileSystem.Interface; worldPath: string }) {
-  return Effect.gen(function* () {
-    const filepath = path.join(input.worldPath, CHARACTER_BINDINGS_RELATIVE_PATH)
-    const content = yield* input.fs.readFileStringSafe(filepath).pipe(Effect.orDie)
-    if (!content) return
-    try {
-      return parseCharacterBindingsFile(JSON.parse(content))
-    } catch {
-      return
-    }
-  })
-}
-
-function discoverCharacterBindings(input: { fs: AppFileSystem.Interface; worldPath: string }) {
-  return Effect.gen(function* () {
-    const relativePaths = new Set<string>()
-    for (const pattern of CHARACTER_STATE_PATTERNS) {
-      const matches = yield* input.fs.glob(pattern, { cwd: input.worldPath, include: "file", dot: true }).pipe(Effect.orDie)
-      for (const match of matches) relativePaths.add(match)
-    }
-
-    const files: Array<{ relativePath: string; content: string }> = []
-    for (const relativePath of relativePaths) {
-      const fullPath = path.join(input.worldPath, relativePath)
-      const content = yield* input.fs.readFileStringSafe(fullPath).pipe(Effect.orDie)
-      if (content) files.push({ relativePath, content })
-    }
-
-    return inferCharacterBindingsFromFiles(files)
-  })
-}
-
 export function ensureCharacterBinding(input: {
   fs: AppFileSystem.Interface
   worldPath: string
   character: string
-  preferredStatePath?: string
 }) {
   return Effect.gen(function* () {
-    const bindingFilePath = path.join(input.worldPath, CHARACTER_BINDINGS_RELATIVE_PATH)
-    const memoryPath = characterMemoryRelativePath(input.character)
-    const existing = yield* readBindingsFile({ fs: input.fs, worldPath: input.worldPath })
-    const current = existing?.characters[input.character]
-
-    const preferredExists =
-      input.preferredStatePath &&
-      (yield* input.fs.existsSafe(path.join(input.worldPath, input.preferredStatePath)).pipe(Effect.orDie))
-
-    const currentExists =
-      current?.statePath &&
-      (yield* input.fs.existsSafe(path.join(input.worldPath, current.statePath)).pipe(Effect.orDie))
-
-    if (current && currentExists && (!preferredExists || current.statePath === input.preferredStatePath) && current.memoryPath === memoryPath) {
-      return current
+    const resolved = yield* resolveForCharacter({
+      fs: input.fs,
+      worldPath: input.worldPath,
+      character: input.character,
+    })
+    const info = resolved.info
+    if (!info) {
+      return {
+        memoryPath: path.join("characters", input.character, "memory.yaml"),
+      } satisfies CharacterBindingInfo
     }
-
-    const discovered = yield* discoverCharacterBindings({ fs: input.fs, worldPath: input.worldPath })
-    const mergedCharacters: Record<string, CharacterBindingInfo> = {
-      ...(existing?.characters ?? {}),
-      ...discovered,
-    }
-    const nextBinding: CharacterBindingInfo = {
-      memoryPath,
-      ...(preferredExists
-        ? { statePath: input.preferredStatePath }
-        : discovered[input.character]?.statePath
-          ? { statePath: discovered[input.character].statePath }
-          : current?.statePath && currentExists
-            ? { statePath: current.statePath }
-            : {}),
-    }
-    mergedCharacters[input.character] = nextBinding
-
-    const nextFile: CharacterBindingsFile = {
-      version: 1,
-      generatedAt: new Date().toISOString(),
-      characters: mergedCharacters,
-    }
-
-    const shouldWrite =
-      !existing ||
-      !bindingsEqual(existing.characters[input.character], nextBinding) ||
-      Object.keys(mergedCharacters).length !== Object.keys(existing.characters).length
-
-    if (shouldWrite) {
-      yield* input.fs
-        .writeWithDirs(bindingFilePath, JSON.stringify(nextFile, null, 2))
-        .pipe(Effect.orDie)
-    }
-
-    return nextBinding
+    return {
+      memoryPath: info.memoryRelativePath,
+    } satisfies CharacterBindingInfo
   })
 }
 
@@ -772,14 +820,22 @@ export function resolveCharacterWorldResources(input: {
   fs: AppFileSystem.Interface
   worldPath: string
   character: string
-  preferredStatePath?: string
 }) {
   return Effect.gen(function* () {
-    const binding = yield* ensureCharacterBinding(input)
-    const stateContent =
-      binding.statePath
-        ? yield* input.fs.readFileStringSafe(path.join(input.worldPath, binding.statePath)).pipe(Effect.orDie)
-        : undefined
+    const resolved = yield* resolveForCharacter({
+      fs: input.fs,
+      worldPath: input.worldPath,
+      character: input.character,
+    })
+    const info = resolved.info
+    const binding = info
+      ? ({
+          memoryPath: info.memoryRelativePath,
+        } satisfies CharacterBindingInfo)
+      : (yield* ensureCharacterBinding(input))
+    const stateContent = info
+      ? yield* input.fs.readFileStringSafe(info.profilePath).pipe(Effect.orDie)
+      : undefined
     return {
       binding,
       stateContent,
@@ -795,12 +851,20 @@ function readCharacterMemory(input: {
   forbiddenSet?: ForbiddenSet
 }) {
   return Effect.gen(function* () {
-    const fullPath = input.memoryPath
+    let fullPath = input.memoryPath
       ? path.join(input.worldPath, input.memoryPath)
       : characterMemoryPath(input.worldPath, input.character)
+    const resolved = yield* resolveForCharacter({
+      fs: input.fs,
+      worldPath: input.worldPath,
+      character: input.character,
+    })
+    if (resolved.info) {
+      fullPath = resolved.info.memoryPath
+    }
     const exists = yield* input.fs.existsSafe(fullPath).pipe(Effect.orDie)
     if (!exists) {
-      const empty = serializeMemoryFile(normalizeMemoryFile(undefined))
+      const empty = `${createEmptyCharacterMemory()}\n`
       yield* input.fs.writeWithDirs(fullPath, empty).pipe(Effect.orDie)
       return []
     }
@@ -1085,6 +1149,7 @@ function resolveEffectiveInput(params: Schema.Schema.Type<typeof Parameters>): E
   return {
     sceneFacts,
     situationFrame,
+    sceneEvents: params.sceneEvents?.filter((item) => Object.keys(item).length > 0),
     playerNudge: params.playerNudge?.trim() || undefined,
     focusHints: params.focusHints?.trim() || undefined,
     usedLegacyFields: !params.sceneFacts || !params.situationFrame,
@@ -1094,6 +1159,7 @@ function resolveEffectiveInput(params: Schema.Schema.Type<typeof Parameters>): E
 export function detectSubjectiveLeakage(input: {
   sceneFacts: string
   situationFrame: string
+  sceneEvents?: SceneEvent[]
   focusHints?: string
   playerNudge?: string
 }): string | undefined {
@@ -1109,6 +1175,11 @@ export function detectSubjectiveLeakage(input: {
         return `${field} contains subjective interpretation or intention. Rewrite it as objectively perceptible facts only.`
       }
     }
+  }
+
+  if (input.sceneEvents) {
+    const issue = detectSceneEventLeakage(input.sceneEvents)
+    if (issue) return issue
   }
 
   if (input.playerNudge) {
@@ -1139,14 +1210,14 @@ function buildSubagentSystemPrompt(input: {
   character: string
   persona?: string
   selfKnowledgeSection: string
-  characterSettingSection: string
-  memorySection: string
+  visibleResourcesSection: string
   objectiveEnvironmentSection: string
   bodyStateSection: string
   baselineSensorySection: string
   effectiveSensorySection: string
   situationFrame: string
   sceneFacts: string
+  sceneEventsSection?: string
   focusHints?: string
   playerNudge?: string
 }): string {
@@ -1163,11 +1234,8 @@ function buildSubagentSystemPrompt(input: {
     "## Core Self-Knowledge",
     input.selfKnowledgeSection,
     "",
-    "## Accessible Setting File",
-    input.characterSettingSection,
-    "",
-    "## Subjective Memories",
-    input.memorySection,
+    "## Visible Character Resources",
+    input.visibleResourcesSection,
     "",
     "## Objective Environment",
     input.objectiveEnvironmentSection,
@@ -1186,6 +1254,13 @@ function buildSubagentSystemPrompt(input: {
     "",
     "## Scene Facts",
     input.sceneFacts,
+    ...(input.sceneEventsSection
+      ? [
+          "",
+          "## Structured Scene Events",
+          input.sceneEventsSection,
+        ]
+      : []),
     ...(input.focusHints
       ? [
           "",
@@ -1202,15 +1277,13 @@ function buildSubagentSystemPrompt(input: {
       : []),
     "",
     "Treat Core Self-Knowledge as facts you know about yourself.",
-    "Treat Accessible Setting File as the non-God Only material from your own setting file. Use it as part of your personal background knowledge.",
-    "Treat Subjective Memories as the current contents of your own memory file and as your own remembered experience history.",
-    "You are the authority over what belongs in that memory file; the Director only decides when to trigger memory handling.",
-    "Use Subjective Memories to recall patterns, relationships, promises, and prior impressions, but do not let them override the current scene.",
-    "If the memory file is empty, treat that as a blank starting state rather than missing data.",
-    "Only update subjective memory when a detail is stable, emotionally or relationally important, or would reasonably be remembered later; otherwise keep it in the current turn only.",
-    "When memory grows long, compress it into the most important recent truths and enduring patterns, preferably newest-first or highest-importance-first.",
-    "Treat Objective Environment, Current Body State, Effective Sensory State Right Now, Situation Frame, and Scene Facts as the full extent of what you currently know about the outside world.",
+    "Your own role resources are listed in Visible Character Resources.",
+    "Start by reading the manifest, then read the specific resources you need with character_view_read(target=\"resource\", path=...).",
+    "Use your own resources to understand your background, memory, relationships, habits, and personal knowledge.",
+    "If a resource includes access tags other than God Only, interpret them cautiously in character instead of treating them as automatic facts.",
+    "Treat Objective Environment, Current Body State, Effective Sensory State Right Now, Situation Frame, Scene Facts, and Structured Scene Events as the full extent of what you currently know about the outside world.",
     "Generate your own inner thought, emotion, and intent from those objective inputs. The Director is not the authority over your subjective interpretation.",
+    "Structured Scene Events contains only observable data. Other characters' speech and outward actions are visible to you; their inner thoughts are never available unless they become outwardly expressed.",
     "If Optional Player Nudge is present, treat it as a weak external steer about emphasis or lean, not as a fact, command, or already-finished inner conclusion.",
     "Use a positive information-boundary rule: rely on what is present in these sections, and do not mention missing or hidden information in negated form.",
     "If these sections support a plausible in-character suspicion or inference, you may express that suspicion or inference.",
@@ -1254,11 +1327,15 @@ export const EmbodyTool = Tool.define(
 
         const sceneFacts = filterL2View(effective.sceneFacts, forbiddenSet)
         const situationFrame = filterL2View(effective.situationFrame, forbiddenSet)
+        const sceneEvents = effective.sceneEvents?.map((item) => sanitizeSceneEvents(item, forbiddenSet) as SceneEvent)
         const focusHints = effective.focusHints ? filterL2View(effective.focusHints, forbiddenSet) : undefined
         const playerNudge = effective.playerNudge ? filterL2View(effective.playerNudge, forbiddenSet) : undefined
+        const rawSceneEvents = effective.sceneEvents ? JSON.stringify(effective.sceneEvents) : undefined
+        const filteredSceneEvents = sceneEvents ? JSON.stringify(sceneEvents) : undefined
         const wasFiltered =
           sceneFacts !== effective.sceneFacts ||
           situationFrame !== effective.situationFrame ||
+          rawSceneEvents !== filteredSceneEvents ||
           focusHints !== effective.focusHints ||
           playerNudge !== effective.playerNudge
 
@@ -1269,7 +1346,6 @@ export const EmbodyTool = Tool.define(
                 fs,
                 worldPath,
                 character: params.character,
-                preferredStatePath: characterAgent?.statePath,
               })
             : undefined
         const stateContent = characterResources?.stateContent
@@ -1278,24 +1354,9 @@ export const EmbodyTool = Tool.define(
           : undefined
         const runtime = parseRuntimeData(runtimeContent)
         const runtimeCharacter = readRuntimeCharacter(runtime, params.character)
-        const memoryLines =
-          worldPath
-            ? yield* readCharacterMemory({
-                fs,
-                worldPath,
-                character: params.character,
-                memoryPath: characterResources?.binding.memoryPath,
-                forbiddenSet,
-              })
-            : []
         const selfKnowledgeLines = buildCharacterSelfKnowledge({
           character: params.character,
           characterAgent,
-          stateContent,
-          forbiddenSet,
-        })
-        const characterSettingSection = buildCharacterSettingSection({
-          character: params.character,
           stateContent,
           forbiddenSet,
         })
@@ -1315,12 +1376,18 @@ export const EmbodyTool = Tool.define(
 
         const selfKnowledgeSection =
           selfKnowledgeLines.length > 0 ? selfKnowledgeLines.join("\n") : `- Name: ${params.character}`
-        const accessibleSettingSection = characterSettingSection ?? "- (none)"
-        const memorySection = formatMemorySection(memoryLines)
+        const directoryInfo =
+          worldPath ? (yield* resolveForCharacter({ fs, worldPath, character: params.character })).info : undefined
+        const visibleResources =
+          directoryInfo
+            ? yield* readCharacterManifest({ fs, info: directoryInfo }).pipe(Effect.catch(() => Effect.succeed(["profile.yaml", "memory.yaml"])))
+            : ["profile.yaml", "memory.yaml"]
+        const visibleResourcesSection = visibleResources.length > 0 ? visibleResources.join("\n") : "(empty)"
         const objectiveEnvironmentSection = formatBulletSection(objectiveEnvironmentLines)
         const bodyStateSection = formatBulletSection(bodyStateLines)
         const baselineSensorySection = formatBulletSection(baselineSensoryLines)
         const effectiveSensorySection = formatBulletSection(effectiveSensoryLines)
+        const sceneEventsSection = formatSceneEventsSection(sceneEvents)
 
         const ops = ctx.extra?.promptOps as TaskPromptOps | undefined
         if (!ops) {
@@ -1330,15 +1397,10 @@ export const EmbodyTool = Tool.define(
             "### Core Self-Knowledge",
             selfKnowledgeSection,
             "",
-            "### Accessible Setting File",
-            accessibleSettingSection,
+            "### Visible Character Resources",
+            visibleResourcesSection,
             "",
-            "### Subjective Memories",
-            memorySection,
-            "",
-            "Treat Subjective Memories as the current contents of your own memory file. You are the authority over what belongs there.",
-            "The Director only decides when to trigger memory handling; you decide the actual subjective content and impression scoring.",
-            "If the memory file is empty, treat that as a blank starting state rather than missing data.",
+            "Read your own manifest first, then use character_view_read(target=\"resource\", path=...) for whichever listed resources you need.",
             "",
             "### Objective Environment",
             objectiveEnvironmentSection,
@@ -1357,6 +1419,13 @@ export const EmbodyTool = Tool.define(
             "",
             "### Scene Facts",
             sceneFacts,
+            ...(sceneEventsSection
+              ? [
+                  "",
+                  "### Structured Scene Events",
+                  sceneEventsSection,
+                ]
+              : []),
             ...(focusHints
               ? [
                   "",
@@ -1428,14 +1497,14 @@ export const EmbodyTool = Tool.define(
           character: params.character,
           persona: characterAgent?.persona,
           selfKnowledgeSection,
-          characterSettingSection: accessibleSettingSection,
-          memorySection,
+          visibleResourcesSection,
           objectiveEnvironmentSection,
           bodyStateSection,
           baselineSensorySection,
           effectiveSensorySection,
           situationFrame,
           sceneFacts,
+          sceneEventsSection,
           focusHints,
           playerNudge,
         })
@@ -1461,6 +1530,7 @@ export const EmbodyTool = Tool.define(
               dice_roll: false,
               narrate: false,
               scene_update: false,
+              character_view_read: true,
               memory_update: false,
               memory_reflect: false,
               embody: false,
@@ -1468,14 +1538,14 @@ export const EmbodyTool = Tool.define(
             },
             system: systemPrompt,
             roleplay: {
-              environmentOverride: `You are in a roleplay scene as ${params.character}. Objective environment, body state, and current sensory conditions have already been filtered to remove hidden truths that only the Director should know.`,
+              environmentOverride: `You are in a roleplay scene as ${params.character}. Read your own listed role resources as needed, then respond from the current objective scene state.`,
               instructionOverride: "",
               skillsOverride: "",
             },
             parts: [
               {
                 type: "text",
-                text: `Respond as ${params.character} in character based only on the provided self-knowledge, objective environment, body state, sensory state, situation frame, scene facts, and any optional weak player nudge. Give the Director a compact character sample, not final narration.`,
+                text: `Respond as ${params.character} in character. First inspect any listed role resources you need, then use the provided objective scene state to give the Director a compact character sample, not final narration.`,
               },
             ],
           })

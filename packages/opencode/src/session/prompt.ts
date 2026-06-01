@@ -56,6 +56,7 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { parseCharacterSessionTitle } from "@/tool/character-session"
 import { EventV2 } from "@openplay-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionEvent } from "@openplay-ai/core/session-event"
@@ -568,7 +569,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         messageID: input.processor.message.id,
         callID: options.toolCallId,
         extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
-        roleplayCharacter: input.agent.isDirector ? undefined : input.agent.name,
+        roleplayCharacter: input.agent.isDirector
+          ? undefined
+          : input.agent.name === "character"
+            ? parseCharacterSessionTitle(input.session.title)
+            : input.agent.name,
         agent: input.agent.name,
         messages: input.messages,
         metadata: (val) =>

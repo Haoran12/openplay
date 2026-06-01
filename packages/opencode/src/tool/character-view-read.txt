@@ -1,0 +1,16 @@
+Read the current character's own roleplay resources.
+
+Use this tool from a character subagent session to inspect your own character-resource manifest and then read the specific resource files that appear in that manifest.
+
+## Parameters
+
+- `target`: One of `manifest` or `resource`.
+- `path`: Required when `target=resource`; must match a path from your own manifest.
+- `refresh` (optional): Re-read from disk instead of relying on any cached state.
+
+## Important
+
+- This tool only resolves the current character bound to the current character session.
+- Programmatic filtering only removes `God Only` / `god-only` content.
+- Other `access` tags remain in the file so the character can interpret them in character.
+- Start with `manifest`, then read only the listed resource paths you actually need.

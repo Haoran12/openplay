@@ -1,0 +1,17 @@
+Update the current character's own long-term knowledge resources in the roleplay world.
+
+Use this tool to revise stable character-owned knowledge about society, nature, other people, habits, judgments, and recurring understandings that should live outside the transient scene.
+
+## Parameters
+
+- `path`: The knowledge resource path to write, relative to the current character's `knowledge/` directory.
+- `content`: The complete file content to write.
+- `create` (optional, default true): Whether to create the file if it does not exist.
+
+## Important
+
+- This tool is only for the current character's own `knowledge/**` resources.
+- Do not use absolute paths, parent-directory traversal, or non-knowledge paths.
+- Prefer one stable topic per file so future revisions stay readable.
+- Good fits include long-term social understanding, natural or bodily experience, and knowledge about specific other people.
+- Do not write public event records or omniscient world truth here.

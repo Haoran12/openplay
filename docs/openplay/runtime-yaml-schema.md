@@ -9,6 +9,10 @@ my-world/
 ├── openplay.json
 ├── runtime.yaml          ← 场景状态（热数据）
 ├── characters/
+│   └── <character-dir>/
+│       ├── profile.yaml
+│       ├── memory.yaml
+│       └── knowledge/
 └── ...
 ```
 
@@ -111,7 +115,7 @@ narrative_style:
 
 说明：
 
-- 旧世界仍可只使用 `appearance` / `activity` / `state` 文本字段。
+- 旧世界可继续只使用 `appearance` / `activity` / `state` 文本字段。
 - 新结构化字段是可选增强层，`embody` 会优先消费它们来生成角色的当前身体状态与有效感知状态。
 
 ### environment
@@ -236,7 +240,7 @@ scene_update(
 
 ## 注意事项
 
-- 此文件由 Director Agent 维护，玩家不应直接编辑
+- 此文件由 Director Agent 维护，玩家通常不直接编辑
 - 所有字段都是可选的，缺失字段由 Director 推断
 - `present_characters` 中的角色名应与 `characters/` 目录中的角色文件对应
 - `environment.inferred: true` 表示环境由 Director 推断，非玩家指定

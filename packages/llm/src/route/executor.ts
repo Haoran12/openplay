@@ -293,6 +293,19 @@ const statusError =
       })
     })
 
+const CERT_ERROR_PATTERN =
+  /certificate|CERT|unable to verify|self.signed|DEPTH_ZERO|UNABLE_TO_VERIFY|CERT_HAS_EXPIRED|local issuer|TLS|SSL|unsafe legacy renegotiation/i
+
+const certDiagnostic = (description: string) =>
+  `TLS certificate verification failed: ${description}
+
+This usually happens when a proxy or firewall intercepts HTTPS traffic with a custom CA certificate.
+To fix this, set the NODE_EXTRA_CA_CERTS environment variable to the path of your CA certificate:
+  export NODE_EXTRA_CA_CERTS=/path/to/ca-cert.pem
+
+If you need to bypass certificate verification (not recommended), set:
+  export NODE_TLS_REJECT_UNAUTHORIZED=0`
+
 const toHttpError = (redactedNames: ReadonlyArray<string | RegExp>) => (error: unknown) => {
   const transportError = (input: {
     readonly message: string
@@ -318,8 +331,16 @@ const toHttpError = (redactedNames: ReadonlyArray<string | RegExp>) => (error: u
   }
   const request = "request" in error ? error.request : undefined
   if (error.reason._tag === "TransportError") {
+    const desc = error.reason.description ?? ""
+    if (CERT_ERROR_PATTERN.test(desc)) {
+      return transportError({
+        message: certDiagnostic(desc),
+        kind: "CertificateError",
+        request,
+      })
+    }
     return transportError({
-      message: error.reason.description ?? "HTTP transport failed",
+      message: desc || "HTTP transport failed",
       kind: error.reason._tag,
       request,
     })

@@ -15,4 +15,4 @@ The Director may decide when memory handling should happen, but the character su
 
 - Do not use this tool for public world history. Use `records/` for that.
 - The runtime will dispatch a character subagent session and expose only the character's own memory-writing tool.
-- The character, not the Director, owns the final contents of `memories/{character}.yaml`.
+- The character, not the Director, owns the final contents of their directory-based memory file.

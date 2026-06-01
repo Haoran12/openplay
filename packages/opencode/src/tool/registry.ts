@@ -19,7 +19,10 @@ import { NarrateTool } from "./narrate"
 import { SceneUpdateTool } from "./scene-update"
 import { MemoryUpdateTool } from "./memory-update"
 import { MemoryReflectTool } from "./memory-reflect"
+import { KnowledgeReflectTool } from "./knowledge-reflect"
 import { EmbodyTool } from "./embody"
+import { CharacterViewReadTool } from "./character-view-read"
+import { KnowledgeUpdateTool } from "./knowledge-update"
 import { GodOnlyFilter } from "./god-only-filter"
 import * as Tool from "./tool"
 import { Config } from "@/config/config"
@@ -76,7 +79,10 @@ const ROLEPLAY_TOOL_IDS = new Set([
   "narrate",
   "scene_update",
   "memory_reflect",
+  "knowledge_reflect",
   "memory_update",
+  "knowledge_update",
+  "character_view_read",
   "todo",
 ])
 
@@ -163,8 +169,11 @@ export const layer: Layer.Layer<
     const narrate = yield* NarrateTool
     const sceneupdate = yield* SceneUpdateTool
     const memoryreflect = yield* MemoryReflectTool
+    const knowledgereflect = yield* KnowledgeReflectTool
     const memoryupdate = yield* MemoryUpdateTool
+    const knowledgeupdate = yield* KnowledgeUpdateTool
     const embody = yield* EmbodyTool
+    const characterviewread = yield* CharacterViewReadTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -274,8 +283,11 @@ export const layer: Layer.Layer<
           narrate: Tool.init(narrate),
           scene_update: Tool.init(sceneupdate),
           memory_reflect: Tool.init(memoryreflect),
+          knowledge_reflect: Tool.init(knowledgereflect),
           memory_update: Tool.init(memoryupdate),
+          knowledge_update: Tool.init(knowledgeupdate),
           embody: Tool.init(embody),
+          character_view_read: Tool.init(characterviewread),
         })
 
         return {
@@ -304,8 +316,11 @@ export const layer: Layer.Layer<
             tool.narrate,
             tool.scene_update,
             tool.memory_reflect,
+            tool.knowledge_reflect,
             tool.memory_update,
+            tool.knowledge_update,
             tool.embody,
+            tool.character_view_read,
           ],
           task: tool.task,
           read: tool.read,

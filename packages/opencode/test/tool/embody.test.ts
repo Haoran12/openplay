@@ -4,16 +4,19 @@ import {
   buildCharacterSelfKnowledge,
   detectSubjectiveLeakage,
   ensureCharacterBinding,
+  formatSceneEventsSection,
   inferCharacterBindingsFromFiles,
+  sanitizeSceneEvents,
   tryParseCharacterSample,
 } from "@/tool/embody"
+import { readManifest, resolveForCharacter } from "@/tool/character-directory"
 import { filterL2View, type ForbiddenSet } from "@/tool/god-only-filter"
 import { characterMemoryPath } from "@/tool/memory-update"
 import { formatMemoryEntry, normalizeMemoryFile } from "@/tool/memory-schema"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import fs from "fs/promises"
 import path from "path"
-import { tmpdirScoped } from "../fixture/fixture"
+import { tmpdir, tmpdirScoped } from "../fixture/fixture"
 import { Effect } from "effect"
 
 describe("tool.embody", () => {
@@ -231,6 +234,102 @@ sense_traits:
         situationFrame: "她明显是在故意试探你会不会让步。",
       }),
     ).toContain("situationFrame contains subjective interpretation")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "她站在门边，袖口带着雨气。",
+        situationFrame: "她刚刚停步，尚未入门。",
+        sceneEvents: [
+          {
+            actor: "宋祈",
+            inner_thought: "先试试看她会不会退。",
+            speech: "我能进来吗？",
+          },
+        ],
+      }),
+    ).toContain("sceneEvents[0].inner_thought exposes another character's private subjective state")
+
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "她站在门边，袖口带着雨气。",
+        situationFrame: "她刚刚停步，尚未入门。",
+        sceneEvents: [
+          {
+            actor: "宋祈",
+            action: "抬手轻敲门框两下",
+            target_intent: "逼你先表态",
+          },
+        ],
+      }),
+    ).toContain("sceneEvents[0].target_intent exposes another character's private subjective state")
+  })
+
+  test("allows structured scene events with observable speech, action, and results", () => {
+    expect(
+      detectSubjectiveLeakage({
+        sceneFacts: "门边有潮湿雨气，竹阶上还残着水声。",
+        situationFrame: "她停在门边，先敲门，再开口。",
+        sceneEvents: [
+          {
+            type: "speech",
+            actor: "宋祈",
+            speech: "我能进来吗？",
+          },
+          {
+            type: "action",
+            actor: "宋祈",
+            action: "指节轻轻敲了两下门框",
+          },
+          {
+            type: "result",
+            actor: "门",
+            result: "门框发出两声很轻的空响",
+          },
+        ],
+      }),
+    ).toBeUndefined()
+  })
+
+  test("sanitizes god-only strings inside structured scene events", () => {
+    const sceneEvents = [
+      {
+        actor: "宋祈",
+        speech: "你身上还带着天道筑基的余波。",
+        action: "抬手碰了碰你的衣袖。",
+      },
+    ]
+
+    expect(sanitizeSceneEvents(sceneEvents, forbiddenSet)).toEqual([
+      {
+        actor: "宋祈",
+        speech: "你身上还带着[已隐去]的余波。",
+        action: "抬手碰了碰你的衣袖。",
+      },
+    ])
+
+    expect(formatSceneEventsSection(sceneEvents)).toContain('"speech": "你身上还带着天道筑基的余波。"')
+  })
+
+  test("auto-creates starter knowledge resources and exposes them in manifest", async () => {
+    await using dir = await tmpdir()
+    const worldPath = dir.path
+    const characterDir = path.join(worldPath, "characters", "孟缘")
+    await fs.mkdir(characterDir, { recursive: true })
+    await fs.writeFile(path.join(characterDir, "profile.yaml"), "name: 孟缘\n")
+    const manifest = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fsService = yield* AppFileSystem.Service
+        const resolved = yield* resolveForCharacter({ fs: fsService, worldPath, character: "孟缘" })
+        expect(resolved.info).toBeDefined()
+        return yield* readManifest({ fs: fsService, info: resolved.info! })
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer)),
+    )
+
+    expect(manifest).toContain("profile.yaml")
+    expect(manifest).toContain("knowledge/social_and_world.md")
+    expect(manifest).toContain("knowledge/nature_and_body.md")
+    expect(manifest).toContain("knowledge/people/README.md")
+    expect(await fs.readFile(path.join(characterDir, "knowledge", "social_and_world.md"), "utf-8")).toContain("对社会与世道的长期认知")
   })
 
   test("allows weak player nudge but blocks hard override phrasing", () => {
@@ -260,7 +359,7 @@ sense_traits:
   })
 
   test("uses fixed per-character memory path", () => {
-    expect(characterMemoryPath("/world", "孟缘")).toBe("/world/memories/孟缘.yaml")
+    expect(characterMemoryPath("/world", "孟缘")).toBe("/world/characters/孟缘/memory.yaml")
   })
 
   test("parses structured memory entries newest-first", () => {
@@ -464,10 +563,10 @@ entries:
     expect(file.entries[0].observed_people).toEqual(["宋祈", "遐蝶"])
   })
 
-  test("infers character bindings from named yaml files and nested character roots", () => {
+  test("infers character bindings from directory profile files", () => {
     const bindings = inferCharacterBindingsFromFiles([
       {
-        relativePath: "characters/云梦泽-孟缘.yaml",
+        relativePath: "characters/云梦泽-孟缘/profile.yaml",
         content: `
 孟缘:
   name: 孟缘
@@ -475,14 +574,14 @@ entries:
 `,
       },
       {
-        relativePath: "characters/遐蝶-Hidden.yaml",
+        relativePath: "characters/遐蝶-Hidden/profile.yaml",
         content: `
 遐蝶:
   name: 遐蝶
 `,
       },
       {
-        relativePath: "characters/遐蝶.yaml",
+        relativePath: "characters/遐蝶/profile.yaml",
         content: `
 name: 遐蝶
 aliases: [小蝶]
@@ -491,59 +590,44 @@ aliases: [小蝶]
     ])
 
     expect(bindings["孟缘"]).toEqual({
-      statePath: "characters/云梦泽-孟缘.yaml",
-      memoryPath: "memories/孟缘.yaml",
+      memoryPath: "characters/云梦泽-孟缘/memory.yaml",
     })
     expect(bindings["遐蝶"]).toEqual({
-      statePath: "characters/遐蝶.yaml",
-      memoryPath: "memories/遐蝶.yaml",
+      memoryPath: "characters/遐蝶/memory.yaml",
     })
   })
 
 })
 
 describe("tool.embody bindings", () => {
-  test("creates workspace character binding file during resolution", async () => {
-    const worldPath = await Effect.runPromise(
-      Effect.scoped(
-        Effect.gen(function* () {
-          const worldPath = yield* tmpdirScoped()
-          yield* Effect.promise(() => fs.mkdir(path.join(worldPath, "characters"), { recursive: true }))
-          yield* Effect.promise(() =>
-            fs.writeFile(
-              path.join(worldPath, "characters", "云梦泽-孟缘.yaml"),
-              `
-孟缘:
-  name: 孟缘
-  role: 云梦泽的大妖长老
+  test("resolves character directory binding from profile.yaml", async () => {
+    const dir = await tmpdir()
+    const worldPath = dir.path
+    await fs.mkdir(path.join(worldPath, "characters", "云梦泽-孟缘"), { recursive: true })
+    await fs.writeFile(
+      path.join(worldPath, "characters", "云梦泽-孟缘", "profile.yaml"),
+      `
+name: 孟缘
+role: 云梦泽的大妖长老
 `,
-            ),
-          )
-
-          const fsSvc = yield* AppFileSystem.Service
-          const binding = yield* ensureCharacterBinding({
-            fs: fsSvc,
-            worldPath,
-            character: "孟缘",
-          })
-
-          const written = yield* fsSvc
-            .readFileStringSafe(path.join(worldPath, ".openplay", "character-bindings.json"))
-            .pipe(Effect.orDie)
-          return { binding, written }
-        }).pipe(Effect.provide(AppFileSystem.defaultLayer)),
-      ),
     )
 
-    expect(worldPath.binding).toEqual({
-      statePath: "characters/云梦泽-孟缘.yaml",
-      memoryPath: "memories/孟缘.yaml",
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fsSvc = yield* AppFileSystem.Service
+        const binding = yield* ensureCharacterBinding({
+          fs: fsSvc,
+          worldPath,
+          character: "孟缘",
+        })
+        return { binding }
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer)),
+    )
+
+    expect(result.binding).toEqual({
+      memoryPath: "characters/云梦泽-孟缘/memory.yaml",
     })
-    expect(worldPath.written).toBeTruthy()
-    const parsed = JSON.parse(worldPath.written!)
-    expect(parsed.characters["孟缘"]).toEqual({
-      statePath: "characters/云梦泽-孟缘.yaml",
-      memoryPath: "memories/孟缘.yaml",
-    })
+
+    await dir[Symbol.asyncDispose]()
   })
 })

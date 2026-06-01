@@ -86,30 +86,23 @@ function parseDate(s: string): { ms: number } | null {
   }
 }
 
-const Params = Schema.Union([
-  Schema.Struct({
-    type: Schema.Literal("date"),
-    from: Schema.String.annotate({ description: "Start date in YYYY-MM-DD or YYYY-MM-DD BC format" }),
-    to: Schema.String.annotate({ description: "End date in YYYY-MM-DD or YYYY-MM-DD BC format" }),
+export const Parameters = Schema.Struct({
+  type: Schema.Literals(["date", "tier", "delta", "age"]).annotate({
+    description: "Operation type: date, tier, delta, or age",
   }),
-  Schema.Struct({
-    type: Schema.Literal("tier"),
-    value: Schema.Number.annotate({ description: "Numeric value to classify into a tier" }),
-    tiers: Schema.optional(Schema.mutable(Schema.Tuple([Schema.Number, Schema.String]))).annotate({
-      description: "Custom tier table as [threshold, name]. Defaults to standard cultivation tiers.",
-    }),
+  from: Schema.optional(Schema.String.annotate({ description: "Start date in YYYY-MM-DD or YYYY-MM-DD BC format" })),
+  to: Schema.optional(Schema.String.annotate({ description: "End date in YYYY-MM-DD or YYYY-MM-DD BC format" })),
+  value: Schema.optional(Schema.Number.annotate({ description: "Numeric value to classify into a tier" })),
+  tiers: Schema.optional(
+    Schema.mutable(Schema.Tuple([Schema.Number, Schema.String])),
+  ).annotate({
+    description: "Custom tier table as [threshold, name]. Defaults to standard cultivation tiers.",
   }),
-  Schema.Struct({
-    type: Schema.Literal("delta"),
-    a: Schema.Number.annotate({ description: "First value" }),
-    b: Schema.Number.annotate({ description: "Second value" }),
-  }),
-  Schema.Struct({
-    type: Schema.Literal("age"),
-    birthDate: Schema.String.annotate({ description: "Birth date in YYYY-MM-DD or YYYY-MM-DD BC format" }),
-    currentDate: Schema.String.annotate({ description: "Current date in YYYY-MM-DD or YYYY-MM-DD BC format" }),
-  }),
-])
+  a: Schema.optional(Schema.Number.annotate({ description: "First value" })),
+  b: Schema.optional(Schema.Number.annotate({ description: "Second value" })),
+  birthDate: Schema.optional(Schema.String.annotate({ description: "Birth date in YYYY-MM-DD or YYYY-MM-DD BC format" })),
+  currentDate: Schema.optional(Schema.String.annotate({ description: "Current date in YYYY-MM-DD or YYYY-MM-DD BC format" })),
+})
 
 type CalcResult = { type: string }
 
@@ -118,8 +111,8 @@ export const CalcTool = Tool.define(
   Effect.gen(function* () {
     return {
       description: DESCRIPTION,
-      parameters: Params,
-      execute: (params: Schema.Schema.Type<typeof Params>, _ctx: Tool.Context<CalcResult>) =>
+      parameters: Parameters,
+      execute: (params: Schema.Schema.Type<typeof Parameters>, _ctx: Tool.Context<CalcResult>) =>
         Effect.gen(function* () {
           let output: string
           if (params.type === "date") output = calcDate(params.from, params.to)

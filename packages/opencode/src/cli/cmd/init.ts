@@ -11,7 +11,7 @@ type Args = {
   path?: string
 }
 
-const DIRECTORIES = ["worldview", "characters", "social", "records", "memories", "location_and_faction"]
+const DIRECTORIES = ["worldview", "characters", "social", "records", "location_and_faction"]
 
 interface RuntimeConfig {
   currentDate: string
@@ -33,6 +33,39 @@ async function ensureDirectories(targetDir: string): Promise<string[]> {
     }
   }
   return created
+}
+
+async function ensureCharacterReadme(targetDir: string): Promise<void> {
+  const readmePath = join(targetDir, "characters", "README.md")
+  if (await Filesystem.exists(readmePath)) return
+  await Filesystem.write(
+    readmePath,
+    [
+      "# Character Directories",
+      "",
+      "Each character lives in its own directory:",
+      "",
+      "```text",
+      "characters/",
+      "  your-character-dir/",
+      "    profile.yaml",
+      "    memory.yaml",
+      "    knowledge/",
+      "      social_and_world.md",
+      "      nature_and_body.md",
+      "      people/",
+      "        README.md",
+      "```",
+      "",
+      "- `profile.yaml`: role identity and self-knowledge source.",
+      "- `memory.yaml`: subjective long-term memory.",
+      "- `knowledge/`: extra role resources and character-owned long-term knowledge.",
+      "- `knowledge/social_and_world.md`: society, customs, factions, worldly judgment.",
+      "- `knowledge/nature_and_body.md`: nature, place, body, sensory, and environmental experience.",
+      "- `knowledge/people/*.md`: stable knowledge and impressions about specific other people.",
+      "",
+    ].join("\n"),
+  )
 }
 
 function generateOpenplayJson(currentDate: string): string {
@@ -168,6 +201,7 @@ export const InitCommand = cmd({
 
     try {
       const createdDirs = await ensureDirectories(targetDir)
+      await ensureCharacterReadme(targetDir)
 
       const openplayJsonPath = join(targetDir, "openplay.json")
       await Filesystem.write(openplayJsonPath, generateOpenplayJson(currentDate as string))

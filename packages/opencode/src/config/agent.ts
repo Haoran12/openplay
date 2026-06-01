@@ -58,9 +58,6 @@ const AgentSchema = Schema.StructWithRest(
     knowledgeAccess: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
       description: "Knowledge access tags for roleplay agents, e.g. ['Public', 'Condition:修行者']",
     }),
-    statePath: Schema.optional(Schema.String).annotate({
-      description: "Relative path to the character state YAML file",
-    }),
     isDirector: Schema.optional(Schema.Boolean).annotate({
       description: "Mark this agent as the Director agent for roleplay mode",
     }),
@@ -89,7 +86,6 @@ const KNOWN_KEYS = new Set([
   "senses",
   "senseTraits",
   "knowledgeAccess",
-  "statePath",
   "isDirector",
 ])
 
