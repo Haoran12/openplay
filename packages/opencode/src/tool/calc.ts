@@ -115,10 +115,10 @@ export const CalcTool = Tool.define(
       execute: (params: Schema.Schema.Type<typeof Parameters>, _ctx: Tool.Context<CalcResult>) =>
         Effect.gen(function* () {
           let output: string
-          if (params.type === "date") output = calcDate(params.from, params.to)
-          else if (params.type === "tier") output = calcTier(params.value, params.tiers as any)
-          else if (params.type === "delta") output = calcDelta(params.a, params.b)
-          else if (params.type === "age") output = calcAge(params.birthDate, params.currentDate)
+          if (params.type === "date") output = calcDate(params.from ?? "", params.to ?? "")
+          else if (params.type === "tier") output = calcTier(params.value ?? 0, params.tiers as any)
+          else if (params.type === "delta") output = calcDelta(params.a ?? 0, params.b ?? 0)
+          else if (params.type === "age") output = calcAge(params.birthDate ?? "", params.currentDate ?? "")
           else output = "Unknown calc type"
           return {
             title: `calc: ${params.type}`,

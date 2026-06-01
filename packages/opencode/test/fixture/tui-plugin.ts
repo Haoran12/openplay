@@ -98,6 +98,7 @@ type Opts = {
     config?: HostPluginApi["state"]["config"]
     provider?: HostPluginApi["state"]["provider"]
     path?: HostPluginApi["state"]["path"]
+    agent?: HostPluginApi["state"]["agent"]
     vcs?: HostPluginApi["state"]["vcs"]
     session?: Partial<HostPluginApi["state"]["session"]>
     part?: HostPluginApi["state"]["part"]
@@ -303,6 +304,9 @@ export function createTuiPluginApi(opts: Opts = {}): HostPluginApi {
       },
       get path() {
         return opts.state?.path ?? { home: "", state: "", config: "", worktree: "", directory: "" }
+      },
+      get agent() {
+        return opts.state?.agent ?? []
       },
       get vcs() {
         return opts.state?.vcs

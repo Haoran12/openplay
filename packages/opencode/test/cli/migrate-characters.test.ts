@@ -29,7 +29,7 @@ test("migrates legacy flat character files into directory-based resources", asyn
   await Filesystem.write(path.join(worldPath, "characters", "孟缘-secret.yaml"), "name: 孟缘\naccess: God Only\nnote: hidden\n")
   await Filesystem.write(path.join(worldPath, "memories", "孟缘.yaml"), "- id: 1\n  text: 旧记忆\n")
 
-  await MigrateCharactersCommand.handler({ path: worldPath })
+  await MigrateCharactersCommand.handler({ path: worldPath, _: [], $0: "test" } as any)
 
   expect(await Filesystem.readText(path.join(worldPath, "characters", "孟缘", "profile.yaml"))).toContain("name: 孟缘")
   expect(await Filesystem.readText(path.join(worldPath, "characters", "孟缘", "knowledge", "孟缘a.yaml"))).toContain(

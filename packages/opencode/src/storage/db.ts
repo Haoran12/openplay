@@ -1,6 +1,7 @@
-import { type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
+import { drizzle, type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
 import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
+import { Database } from "bun:sqlite"
 export * from "drizzle-orm"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { LocalContext } from "@/util/local-context"
@@ -14,6 +15,8 @@ import { InstallationChannel } from "@openplay-ai/core/installation/version"
 import { EffectBridge } from "@/effect/bridge"
 import { init } from "#db"
 import { Effect, Schema } from "effect"
+
+type DrizzleClient = SQLiteBunDatabase & { $client: Database }
 
 declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
 
@@ -45,7 +48,7 @@ export const getPath = (flags?: Pick<DatabaseFlags, "disableChannelDb">) => {
 
 export type Transaction = SQLiteTransaction<"sync", void>
 
-type Client = ReturnType<typeof init>
+type Client = ReturnType<typeof init> & { $client: Database }
 
 type Journal = { sql: string; timestamp: number; name: string }[]
 
@@ -56,18 +59,18 @@ type TableColumn = {
 // Drizzle's migrate overloads trigger expensive variance checks here; narrow to the journal overload we actually use.
 const migrateFromJournal = migrate as unknown as (db: SQLiteBunDatabase, entries: Journal) => void
 
-function applyMigrations(db: SQLiteBunDatabase, entries: Journal) {
+function applyMigrations(db: Client, entries: Journal) {
   migrateFromJournal(db, entries)
 }
 
-function tableColumns(db: SQLiteBunDatabase, table: string): string[] {
+function tableColumns(db: Client, table: string): string[] {
   return db.$client
     .query(`PRAGMA table_info(${table})`)
     .all()
     .map((row) => (row as TableColumn).name)
 }
 
-export function ensureSessionWorldColumns(db: SQLiteBunDatabase) {
+export function ensureSessionWorldColumns(db: Client) {
   const columns = new Set(tableColumns(db, "session"))
   const missing = ["world_id", "world_path"].filter((column) => !columns.has(column))
   if (missing.length === 0) return

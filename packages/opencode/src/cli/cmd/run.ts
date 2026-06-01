@@ -844,7 +844,7 @@ export const RunCommand = effectCmd({
         const request = new Request(input, init)
         return Server.Default().app.fetch(request)
       }) as typeof globalThis.fetch
-      const sdk = createOpenplayClient({
+      const sdk = createOpencodeClient({
         baseUrl: "http://openplay.internal",
         fetch: fetchFn,
         directory,

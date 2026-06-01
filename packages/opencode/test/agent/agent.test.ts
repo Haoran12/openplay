@@ -1,5 +1,5 @@
 import { afterEach, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Cause, Effect, Layer } from "effect"
 import path from "path"
 import { promises as fs } from "fs"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -43,7 +43,7 @@ function expectDefaultAgentError(message: string) {
     const exit = yield* load((svc) => svc.defaultAgent()).pipe(Effect.exit)
     expect(exit._tag).toBe("Failure")
     if (exit._tag !== "Failure") return
-    const text = yield* Cause.pretty(exit.cause)
+    const text = Cause.pretty(exit.cause)
     expect(text).toContain(message)
   })
 }
