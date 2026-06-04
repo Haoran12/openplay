@@ -14,30 +14,7 @@
   <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+
 
 [![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
 
@@ -111,6 +88,25 @@ Also included is a **general** subagent for complex searches and multistep tasks
 This is used internally and can be invoked using `@general` in messages.
 
 Learn more about [agents](https://opencode.ai/docs/agents).
+
+### Director Mode (Roleplay)
+
+OpenPlay extends OpenCode with a **Director Mode** for roleplay scenarios.
+
+When a directory contains `openplay.json` or `runtime.yaml`, OpenPlay enters **Roleplay Mode**. In this mode:
+
+- **Director Agent** holds the "God's eye view" (L1 truth) - full access to all YAML data
+- **Character Subagents** operate with limited perspective (L2/L3 views) - only see what their character can perceive
+- Information isolation enforced programmatically (God Only content stripped before reaching characters)
+
+Key capabilities:
+- **embody** - Dispatch character immersion with filtered context
+- **scene_update** - Update scene state and record events
+- **calc** - Deterministic calculations (dates, tiers, deltas)
+- **dice_roll** - Random/probability checks
+- **narrate** - Narrative text generation
+
+See `docs/openplay/PLAN.md` for architecture details.
 
 ### Documentation
 
