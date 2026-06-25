@@ -11,7 +11,7 @@ type Args = {
   path?: string
 }
 
-const DIRECTORIES = ["worldview", "characters", "social", "records", "location_and_faction"]
+const DIRECTORIES = ["worldview", "characters", "social", "records", "location_and_faction", "prompts"]
 
 interface RuntimeConfig {
   currentDate: string
@@ -63,6 +63,25 @@ async function ensureCharacterReadme(targetDir: string): Promise<void> {
       "- `knowledge/social_and_world.md`: society, customs, factions, worldly judgment.",
       "- `knowledge/nature_and_body.md`: nature, place, body, sensory, and environmental experience.",
       "- `knowledge/people/*.md`: stable knowledge and impressions about specific other people.",
+      "",
+    ].join("\n"),
+  )
+}
+
+async function ensurePromptsReadme(targetDir: string): Promise<void> {
+  const readmePath = join(targetDir, "prompts", "README.md")
+  if (await Filesystem.exists(readmePath)) return
+  await Filesystem.write(
+    readmePath,
+    [
+      "# Prompt Templates",
+      "",
+      "Place custom prompt templates here to override the built-in defaults:",
+      "",
+      "- `character.txt`: overrides the default character subagent prompt",
+      "- `director.txt`: overrides the default Director agent prompt",
+      "",
+      "If a file is not present, the built-in default prompt will be used automatically.",
       "",
     ].join("\n"),
   )
@@ -202,6 +221,7 @@ export const InitCommand = cmd({
     try {
       const createdDirs = await ensureDirectories(targetDir)
       await ensureCharacterReadme(targetDir)
+      await ensurePromptsReadme(targetDir)
 
       const openplayJsonPath = join(targetDir, "openplay.json")
       await Filesystem.write(openplayJsonPath, generateOpenplayJson(currentDate as string))

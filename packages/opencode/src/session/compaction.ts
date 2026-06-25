@@ -22,6 +22,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2 } from "@openplay-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionEvent } from "@openplay-ai/core/session-event"
+import { isPrimaryOutputPresentation } from "@openplay-ai/core/tool-presentation"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -38,6 +39,12 @@ export const PRUNE_MINIMUM = 20_000
 export const PRUNE_PROTECT = 40_000
 const TOOL_OUTPUT_MAX_CHARS = 2_000
 const PRUNE_PROTECTED_TOOLS = ["skill"]
+
+function protectToolOutput(part: MessageV2.ToolPart) {
+  if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) return true
+  if (part.state.status !== "completed") return false
+  return isPrimaryOutputPresentation(part.state.metadata)
+}
 const DEFAULT_TAIL_TURNS = 2
 const ROLEPLAY_DIRECTOR_MAX_RECENT_TOKENS = 64_000
 const MIN_PRESERVE_RECENT_TOKENS = 2_000
@@ -374,7 +381,7 @@ export const layer = Layer.effect(
           const part = msg.parts[partIndex]
           if (part.type !== "tool") continue
           if (part.state.status !== "completed") continue
-          if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
+          if (protectToolOutput(part)) continue
           if (part.state.time.compacted) break loop
           const estimate = Token.estimate(part.state.output)
           total += estimate

@@ -14,6 +14,7 @@ import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
 import { Skill } from "../../src/skill"
 import { Truncate } from "../../src/tool/truncate"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 
 const agentLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
   Agent.layer.pipe(
@@ -23,6 +24,7 @@ const agentLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
     Layer.provide(Config.defaultLayer),
     Layer.provide(Skill.defaultLayer),
     Layer.provide(RuntimeFlags.layer(flags)),
+    Layer.provide(AppFileSystem.defaultLayer),
   )
 
 const it = testEffect(agentLayer())

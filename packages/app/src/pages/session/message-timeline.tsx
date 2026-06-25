@@ -29,9 +29,11 @@ import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { NarrativeReader } from "@/pages/session/narrative-reader"
 import { messageAgentColor } from "@/utils/agent"
 import { sessionTitle } from "@/utils/session-title"
 import { parseCommentNote, readCommentMetadata } from "@/utils/comment-note"
+import { narrativeEntriesFromMessages } from "@/utils/roleplay"
 import { makeTimer } from "@solid-primitives/timer"
 
 type MessageComment = {
@@ -249,6 +251,8 @@ export function MessageTimeline(props: {
     if (!id) return emptyMessages
     return sync.data.message[id] ?? emptyMessages
   })
+  const narrativeEntries = createMemo(() => narrativeEntriesFromMessages(sessionMessages(), sync.data.part))
+  const [readerMode, setReaderMode] = createSignal<"all" | "narrative">("all")
   const pending = createMemo(() =>
     sessionMessages().findLast(
       (item): item is AssistantMessage => item.role === "assistant" && typeof item.time.completed !== "number",
@@ -296,6 +300,7 @@ export function MessageTimeline(props: {
 
     return undefined
   })
+  const canShowNarrativeToggle = createMemo(() => narrativeEntries().length > 0)
   const info = createMemo(() => {
     const id = sessionID()
     if (!id) return
@@ -1006,6 +1011,34 @@ export function MessageTimeline(props: {
                 "mt-0": !props.centered,
               }}
             >
+              <Show when={canShowNarrativeToggle()}>
+                <div class="w-full px-4 md:px-5 mb-4">
+                  <div class="mx-auto max-w-3xl flex items-center justify-end">
+                    <div class="inline-flex items-center rounded-lg border border-border-weaker-base bg-surface-base p-1">
+                      <button
+                        class="px-3 py-1.5 rounded-md text-12-medium transition-colors"
+                        classList={{
+                          "bg-background-stronger text-text-strong": readerMode() === "narrative",
+                          "text-text-weak hover:text-text-base": readerMode() !== "narrative",
+                        }}
+                        onClick={() => setReaderMode("narrative")}
+                      >
+                        {language.t("roleplay.reader.narrativeOnly")}
+                      </button>
+                      <button
+                        class="px-3 py-1.5 rounded-md text-12-medium transition-colors"
+                        classList={{
+                          "bg-background-stronger text-text-strong": readerMode() === "all",
+                          "text-text-weak hover:text-text-base": readerMode() !== "all",
+                        }}
+                        onClick={() => setReaderMode("all")}
+                      >
+                        {language.t("roleplay.reader.all")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Show>
               <Show when={props.turnStart > 0 || props.historyMore}>
                 <div class="w-full flex justify-center">
                   <Button
@@ -1021,94 +1054,110 @@ export function MessageTimeline(props: {
                   </Button>
                 </div>
               </Show>
-              <For each={rendered()}>
-                {(messageID) => {
-                  const active = createMemo(() => activeMessageID() === messageID)
-                  const comments = createMemo(() => messageComments(sync.data.part[messageID] ?? []), [], {
-                    equals: (a, b) =>
-                      a.length === b.length &&
-                      a.every(
-                        (c, i) =>
-                          c.path === b[i].path &&
-                          c.comment === b[i].comment &&
-                          c.selection?.startLine === b[i].selection?.startLine &&
-                          c.selection?.endLine === b[i].selection?.endLine,
-                      ),
-                  })
-                  const commentCount = createMemo(() => comments().length)
-                  return (
-                    <div
-                      id={props.anchor(messageID)}
-                      data-message-id={messageID}
-                      classList={{
-                        "min-w-0 w-full max-w-full": true,
-                        "md:max-w-200 2xl:max-w-[1000px]": props.centered,
-                      }}
-                      style={{
-                        "content-visibility": active() ? undefined : "auto",
-                        "contain-intrinsic-size": active() ? undefined : "auto 500px",
-                      }}
-                    >
-                      <Show when={commentCount() > 0}>
-                        <div class="w-full px-4 md:px-5 pb-2">
-                          <div class="ml-auto max-w-[82%] overflow-x-auto no-scrollbar">
-                            <div class="flex w-max min-w-full justify-end gap-2">
-                              <Index each={comments()}>
-                                {(commentAccessor: () => MessageComment) => {
-                                  const comment = createMemo(() => commentAccessor())
-                                  return (
-                                    <Show when={comment()}>
-                                      {(c) => (
-                                        <div class="shrink-0 max-w-[260px] rounded-[6px] border border-border-weak-base bg-background-stronger px-2.5 py-2">
-                                          <div class="flex items-center gap-1.5 min-w-0 text-11-medium text-text-strong">
-                                            <FileIcon
-                                              node={{ path: c().path, type: "file" }}
-                                              class="size-3.5 shrink-0"
-                                            />
-                                            <span class="truncate">{getFilename(c().path)}</span>
-                                            <Show when={c().selection}>
-                                              {(selection) => (
-                                                <span class="shrink-0 text-text-weak">
-                                                  {selection().startLine === selection().endLine
-                                                    ? `:${selection().startLine}`
-                                                    : `:${selection().startLine}-${selection().endLine}`}
-                                                </span>
-                                              )}
-                                            </Show>
-                                          </div>
-                                          <div class="pt-1 text-12-regular text-text-strong whitespace-pre-wrap break-words">
-                                            {c().comment}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </Show>
-                                  )
-                                }}
-                              </Index>
+              <Show
+                when={readerMode() === "narrative"}
+                fallback={
+                  <For each={rendered()}>
+                    {(messageID) => {
+                      const active = createMemo(() => activeMessageID() === messageID)
+                      const comments = createMemo(() => messageComments(sync.data.part[messageID] ?? []), [], {
+                        equals: (a, b) =>
+                          a.length === b.length &&
+                          a.every(
+                            (c, i) =>
+                              c.path === b[i].path &&
+                              c.comment === b[i].comment &&
+                              c.selection?.startLine === b[i].selection?.startLine &&
+                              c.selection?.endLine === b[i].selection?.endLine,
+                          ),
+                      })
+                      const commentCount = createMemo(() => comments().length)
+                      return (
+                        <div
+                          id={props.anchor(messageID)}
+                          data-message-id={messageID}
+                          classList={{
+                            "min-w-0 w-full max-w-full": true,
+                            "md:max-w-200 2xl:max-w-[1000px]": props.centered,
+                          }}
+                          style={{
+                            "content-visibility": active() ? undefined : "auto",
+                            "contain-intrinsic-size": active() ? undefined : "auto 500px",
+                          }}
+                        >
+                          <Show when={commentCount() > 0}>
+                            <div class="w-full px-4 md:px-5 pb-2">
+                              <div class="ml-auto max-w-[82%] overflow-x-auto no-scrollbar">
+                                <div class="flex w-max min-w-full justify-end gap-2">
+                                  <Index each={comments()}>
+                                    {(commentAccessor: () => MessageComment) => {
+                                      const comment = createMemo(() => commentAccessor())
+                                      return (
+                                        <Show when={comment()}>
+                                          {(c) => (
+                                            <div class="shrink-0 max-w-[260px] rounded-[6px] border border-border-weak-base bg-background-stronger px-2.5 py-2">
+                                              <div class="flex items-center gap-1.5 min-w-0 text-11-medium text-text-strong">
+                                                <FileIcon
+                                                  node={{ path: c().path, type: "file" }}
+                                                  class="size-3.5 shrink-0"
+                                                />
+                                                <span class="truncate">{getFilename(c().path)}</span>
+                                                <Show when={c().selection}>
+                                                  {(selection) => (
+                                                    <span class="shrink-0 text-text-weak">
+                                                      {selection().startLine === selection().endLine
+                                                        ? `:${selection().startLine}`
+                                                        : `:${selection().startLine}-${selection().endLine}`}
+                                                    </span>
+                                                  )}
+                                                </Show>
+                                              </div>
+                                              <div class="pt-1 text-12-regular text-text-strong whitespace-pre-wrap break-words">
+                                                {c().comment}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </Show>
+                                      )
+                                    }}
+                                  </Index>
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          </Show>
+                          <SessionTurn
+                            sessionID={sessionID() ?? ""}
+                            messageID={messageID}
+                            messages={sessionMessages()}
+                            actions={props.actions}
+                            active={active()}
+                            status={active() ? sessionStatus() : undefined}
+                            showReasoningSummaries={settings.general.showReasoningSummaries()}
+                            shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
+                            editToolDefaultOpen={settings.general.editToolPartsExpanded()}
+                            classes={{
+                              root: "min-w-0 w-full relative",
+                              content: "flex flex-col justify-between !overflow-visible",
+                              container: "w-full px-4 md:px-5",
+                            }}
+                          />
                         </div>
-                      </Show>
-                      <SessionTurn
-                        sessionID={sessionID() ?? ""}
-                        messageID={messageID}
-                        messages={sessionMessages()}
-                        actions={props.actions}
-                        active={active()}
-                        status={active() ? sessionStatus() : undefined}
-                        showReasoningSummaries={settings.general.showReasoningSummaries()}
-                        shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
-                        editToolDefaultOpen={settings.general.editToolPartsExpanded()}
-                        classes={{
-                          root: "min-w-0 w-full relative",
-                          content: "flex flex-col justify-between !overflow-visible",
-                          container: "w-full px-4 md:px-5",
-                        }}
-                      />
-                    </div>
-                  )
-                }}
-              </For>
+                      )
+                    }}
+                  </For>
+                }
+              >
+                <div class="w-full">
+                  <NarrativeReader
+                    entries={narrativeEntries()}
+                    activeMessageID={activeMessageID()}
+                    onJump={(messageID) => {
+                      const element = document.querySelector(`[data-message-id="${messageID}"]`)
+                      element?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }}
+                  />
+                </div>
+              </Show>
             </div>
           </div>
         </ScrollView>

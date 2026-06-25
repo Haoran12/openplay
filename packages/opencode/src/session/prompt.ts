@@ -19,8 +19,6 @@ import { Plugin } from "../plugin"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
 import MAX_STEPS from "../session/prompt/max-steps.txt"
-import PROMPT_DIRECTOR from "../session/prompt/director.txt"
-import PROMPT_CHARACTER from "../session/prompt/character.txt"
 import type * as Roleplay from "./roleplay"
 import { applyEnvironmentOverride, applyInstructionOverride, applySkillsOverride } from "./roleplay"
 import { ToolRegistry } from "@/tool/registry"
@@ -111,6 +109,22 @@ type ReferencePromptMetadata = {
 
 function stringField(record: Record<string, unknown>, key: string) {
   return typeof record[key] === "string" ? record[key] : undefined
+}
+
+function isRoleplayDirectorFirstToolBlocked(input: {
+  session: Pick<Session.Info, "worldPath">
+  agent: Pick<Agent.Info, "isDirector">
+  assistantMessageID: MessageID
+  toolID: string
+}) {
+  if (!input.session.worldPath || !input.agent.isDirector) return false
+  if (input.toolID === "scene_update") return false
+  const priorToolParts = MessageV2.parts(input.assistantMessageID).filter(
+    (part): part is MessageV2.ToolPart =>
+      part.type === "tool" &&
+      ["pending", "running", "completed"].includes(part.state.status),
+  )
+  return priorToolParts.length === 0
 }
 
 export function isRoleplayDirectorTurnComplete(input: {
@@ -613,6 +627,25 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           execute(args, options) {
             return run.promise(
               Effect.gen(function* () {
+                if (
+                  isRoleplayDirectorFirstToolBlocked({
+                    session: input.session,
+                    agent: input.agent,
+                    assistantMessageID: input.processor.message.id,
+                    toolID: item.id,
+                  })
+                ) {
+                  return {
+                    title: `${item.id} (blocked)`,
+                    output:
+                      "In Director roleplay mode, the first tool call of each turn must be scene_update. Start the turn by updating runtime.yaml or a records/* file, then continue with other tools.",
+                    metadata: {
+                      blocked: true,
+                      reason: "director_first_tool_must_be_scene_update",
+                      requiredTool: "scene_update",
+                    },
+                  }
+                }
                 const ctx = context(args, options)
                 yield* plugin.trigger(
                   "tool.execute.before",

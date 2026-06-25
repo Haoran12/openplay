@@ -69,9 +69,25 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] 更完整的迁移命令测试与 CLI 集成测试
 - [x] 清理剩余历史文档中对旧结构的零散描述
 - [x] `embody` 支持结构化当前事件输入，保留完整 speech/action 并程序级拒绝他人主观信息泄露
+- [x] Director `narrate` 主输出语义打通：metadata/UI/transcript/compaction 统一识别 player-facing narrative
+- [x] Director `narrate` 终端正文修复：CLI/TUI completed 态仅渲染真实 output，禁止回退到 tool input 伪装正文
+- [x] Director 右侧面板 `runtime.yaml` 兼容解析修复：旧式 `current_date` / 标量 `current_scene` 与 `environment.time/location` 都能正确显示时间地点和在场人物
+- [x] Director 回合强制 `scene_update`：Roleplay Director 每轮开始时首个工具调用必须是 `scene_update`
+- [x] WebUI 阅读体验增强：叙事连续阅读视图、角色最近一次代入卡片、场景变更时间线与 runtime/角色目录快捷入口
+- [x] `openplay web` 局域网便捷启动：支持 `--lan` 并继续兼容 `--hostname 0.0.0.0`
 
 ## Changelog
 
+- 2026-06-26: 修复 `packages/opencode/test/session/prompt.test.ts` 的过期 `sessions.messages` 调用签名，恢复仓库 `bun turbo typecheck` 通过。
+- 2026-06-26: WebUI 阅读体验增强：会话时间线新增“仅看叙事 / 全部”切换，`narrate` 正文可在连续阅读视图中按顺序串读；右侧角色面板新增最近一次 Character 子代理输入/输出卡片、`records/*` 场景变更时间线，以及 `runtime.yaml` / 角色目录快捷入口。
+- 2026-06-26: 网络启动便捷性补强：`openplay web` 新增 `--lan`，可直接绑定 `0.0.0.0` 并打印局域网访问地址；仍支持 `openplay web --hostname 0.0.0.0`。
+- 2026-06-25: 收紧 Director 首工具约束：Roleplay Director 现在每轮开始时首个工具调用必须是 `scene_update`；若先调用其他工具，会被程序直接拦截并要求先更新 `runtime.yaml` 或 `records/*`。保留既有 `embody` 后必须继续走到 `narrate` 或 `question` 的回合收束约束，并补充 session prompt 回归测试。
+- 2026-06-24: 修复 Director 右侧面板 `runtime.yaml` 摘要解析：`World.fromDirectory` 现兼容旧式 `current_date` + 标量 `current_scene`，并可从 `environment.time/location` 回填场景时间地点；补充 `world` 与 HTTP API 回归测试，确保右侧面板能稳定显示当前时间、地点和在场人物。
+- 2026-06-24: 修复 Director `narrate` 终端渲染回退错误：CLI/run 链路不再在 completed 且 `output` 缺失时回退展示 `input.content`，避免把工具调用参数误显示成“正文叙事”；补充回归测试覆盖该场景。
+- 2026-06-24: TUI `narrate` 对 completed 但空 `output` 的异常态改为显式提示 `Narrate completed without output`，不再误显示为仍在 `Narrating...`，便于区分真实无输出与渲染链路问题。
+- 2026-06-08: WebUI 消息展示美化：Roleplay 工具（`embody`/`calc`/`dice_roll`/`scene_update`）默认折叠为最小化审计痕迹；`narrate` 改为居中文学卡片样式，突出叙事正文；角色面板增强为卡片化布局，带在场状态指示器与快捷编辑入口。
+- 2026-06-08: 提示词模板外置（方案B）：世界目录新增 `prompts/` 子目录，`openplay init` 自动创建；Agent 系统加载时优先读取世界目录 `prompts/character.txt` 和 `prompts/director.txt`，不存在时自动回退到内置默认模板；用户可通过 WebUI 或文件编辑器直接修改，无需重新编译应用。
+- 2026-06-07: Director `narrate` 新增 `primary_output` / `narrative` presentation metadata；Web 时间线改为“正文块 + 可折叠审计痕迹”，transcript 默认按 assistant 正文导出，compaction prune 保护这类 player-facing narrative 不被当普通工具输出优先裁剪。
 - 2026-05-26: 修复 Director `calc` 年龄调用 schema 导出错误：`calc.type` 改用 `Schema.Literals([...])`，避免 JSON Schema 误退化为仅允许 `"date"`，并补充参数 schema 回归测试覆盖 `age`/`tier`/`delta` 枚举值。
 - 2026-05-25: 角色读取链路改为目录索引 + manifest/resource 驱动；Character 通过 `character_view_read` 主动读取自身资源。
 - 2026-05-25: `memory_update` 改为固定写入角色目录内 `memory.yaml`，`scene_update` 明确拒绝角色资源路径。
@@ -85,3 +101,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-05-26: Character/Director prompt 扩展知识库分工：将 episodic memory 与 durable knowledge 明确分离，Director 不再通过 `scene_update` 越权改写角色知识资源。
 - 2026-05-26: `embody` 新增结构化 `sceneEvents` 输入；Director 可把当前场景中的 speech / outward action / objective result 以 JSON 完整传给 Character，避免被摘要压扁。
 - 2026-05-26: `embody` 结构化事件隔离收紧：程序级拒绝 `inner_thought`、emotion、intent、plan 等他人主观字段进入 Character SubAgent，并对 `sceneEvents` 中残留的 God Only 字符串执行同样过滤。
+- 2026-06-04: Director 模式角色子代理 prompt 重构：收紧 `character.txt` 为角色基线约束，`embody` 改为变量化场景模板，向 Character 明确注入“你是谁、你身在何处、你此刻如何感到并会怎样反应”的临场信息；`sceneEvents` 同步改为更贴近角色感知的可读呈现，并移除“这不是什么题”一类否定式提示语。

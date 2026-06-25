@@ -81,6 +81,28 @@ describe("World.fromDirectory", () => {
     }),
   )
 
+  it.live("derives date from legacy current_date and location from scalar current_scene", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      yield* Effect.promise(() =>
+        fs.writeFile(
+          path.join(dir, "runtime.yaml"),
+          ["current_date: 1003-07-14", 'current_scene: "云梦泽"', "present_characters:", '  - "孟缘"', ""].join("\n"),
+        ),
+      )
+
+      const svc = yield* World.Service
+      const world = yield* svc.fromDirectory(dir, dir)
+
+      expect(world?.scene).toEqual({
+        date: "1003-07-14",
+        location: "云梦泽",
+      })
+      expect(world?.currentScene).toBe("云梦泽")
+      expect(world?.presentCharacters).toEqual([{ name: "孟缘" }])
+    }),
+  )
+
   it.live("reads nested current_scene.present_characters for runtime files that embed the list", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()
@@ -110,6 +132,38 @@ describe("World.fromDirectory", () => {
         { name: "许宁", age: "37" },
         { name: "沈烟", age: "14" },
       ])
+    }),
+  )
+
+  it.live("falls back to environment fields when current_scene omits date or location", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      yield* Effect.promise(() =>
+        fs.writeFile(
+          path.join(dir, "runtime.yaml"),
+          [
+            "current_scene:",
+            '  impression: "夜雨压枝"',
+            "present_characters:",
+            '  - name: "孟缘"',
+            "environment:",
+            '  location: "建木府主卧"',
+            '  time: "1003-07-14T20:30"',
+            "",
+          ].join("\n"),
+        ),
+      )
+
+      const svc = yield* World.Service
+      const world = yield* svc.fromDirectory(dir, dir)
+
+      expect(world?.scene).toEqual({
+        date: "1003-07-14T20:30",
+        location: "建木府主卧",
+        impression: "夜雨压枝",
+      })
+      expect(world?.currentScene).toBe("建木府主卧")
+      expect(world?.presentCharacters).toEqual([{ name: "孟缘" }])
     }),
   )
 })

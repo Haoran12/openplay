@@ -18,6 +18,11 @@ const options = {
     describe: "enable mDNS service discovery (defaults hostname to 0.0.0.0)",
     default: false,
   },
+  lan: {
+    type: "boolean" as const,
+    describe: "bind to 0.0.0.0 and print LAN URLs",
+    default: false,
+  },
   "mdns-domain": {
     type: "string" as const,
     describe: "custom domain name for mDNS service (default: openplay.local)",
@@ -45,18 +50,20 @@ export function resolveNetworkOptionsNoConfig(args: NetworkOptions, config?: Con
   const portExplicitlySet = process.argv.includes("--port")
   const hostnameExplicitlySet = process.argv.includes("--hostname")
   const mdnsExplicitlySet = process.argv.includes("--mdns")
+  const lanExplicitlySet = process.argv.includes("--lan")
   const mdnsDomainExplicitlySet = process.argv.includes("--mdns-domain")
   const mdns = mdnsExplicitlySet ? args.mdns : (config?.server?.mdns ?? args.mdns)
+  const lan = lanExplicitlySet ? args.lan : false
   const mdnsDomain = mdnsDomainExplicitlySet ? args["mdns-domain"] : (config?.server?.mdnsDomain ?? args["mdns-domain"])
   const port = portExplicitlySet ? args.port : (config?.server?.port ?? args.port)
   const hostname = hostnameExplicitlySet
     ? args.hostname
-    : mdns && !config?.server?.hostname
+    : (lan || mdns) && !config?.server?.hostname
       ? "0.0.0.0"
       : (config?.server?.hostname ?? args.hostname)
   const configCors = config?.server?.cors ?? []
   const argsCors = Array.isArray(args.cors) ? args.cors : args.cors ? [args.cors] : []
   const cors = [...configCors, ...argsCors]
 
-  return { hostname, port, mdns, mdnsDomain, cors }
+  return { hostname, port, mdns, mdnsDomain, lan, cors }
 }

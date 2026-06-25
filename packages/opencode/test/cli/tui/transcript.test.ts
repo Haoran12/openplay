@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { TOOL_PRESENTATION_PRIMARY_OUTPUT, TOOL_PRESENTATION_VARIANT_NARRATIVE } from "@openplay-ai/core/tool-presentation"
 import {
   formatAssistantHeader,
   formatMessage,
@@ -213,6 +214,34 @@ describe("transcript", () => {
       // Input and output should each be in their own code blocks
       expect(result).toContain("**Input:**\n```json")
       expect(result).toContain("**Output:**\n```\n```hello```\n```")
+    })
+
+    test("formats primary-output tool parts as assistant narrative", () => {
+      const part: Part = {
+        id: "part_1",
+        sessionID: "ses_123",
+        messageID: "msg_123",
+        type: "tool",
+        callID: "call_1",
+        tool: "narrate",
+        state: {
+          status: "completed",
+          input: { perspective: "third-person", style: "lyrical", content: "Moonlight spills across the courtyard." },
+          output: "Moonlight spills across the courtyard.",
+          title: "Narrate",
+          metadata: {
+            length: 39,
+            presentation: TOOL_PRESENTATION_PRIMARY_OUTPUT,
+            presentationVariant: TOOL_PRESENTATION_VARIANT_NARRATIVE,
+          },
+          time: { start: 1000, end: 1100 },
+        },
+      }
+
+      expect(formatPart(part, options)).toBe(
+        "Moonlight spills across the courtyard.\n\n_Via narrate · third-person · lyrical_\n\n",
+      )
+      expect(formatPart(part, { ...options, toolDetails: false })).toBe("Moonlight spills across the courtyard.\n\n")
     })
 
     test("formats tool part without details when disabled", () => {

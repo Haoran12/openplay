@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   buildCharacterSettingSection,
   buildCharacterSelfKnowledge,
+  buildSubagentSystemPrompt,
   detectSubjectiveLeakage,
   ensureCharacterBinding,
   formatSceneEventsSection,
@@ -143,9 +144,7 @@ cultivation:
   })
 
   test("returns undefined for non-json samples instead of throwing", () => {
-    expect(
-      tryParseCharacterSample("她只是低头抱紧遐蝶，没有说话，只把呼吸放得更轻。"),
-    ).toBeUndefined()
+    expect(tryParseCharacterSample("她只是低头抱紧遐蝶，没有说话，只把呼吸放得更轻。")).toBeUndefined()
   })
 
   test("includes explicit sensory traits in self-knowledge", () => {
@@ -307,7 +306,36 @@ sense_traits:
       },
     ])
 
-    expect(formatSceneEventsSection(sceneEvents)).toContain('"speech": "你身上还带着天道筑基的余波。"')
+    expect(formatSceneEventsSection(sceneEvents)).toContain("宋祈开口：“你身上还带着天道筑基的余波。”")
+    expect(formatSceneEventsSection(sceneEvents)).toContain("宋祈随后抬手碰了碰你的衣袖。")
+  })
+
+  test("builds an embodied subagent prompt with concrete scene placement", () => {
+    const prompt = buildSubagentSystemPrompt({
+      character: "孟缘",
+      persona: "寡言，谨慎，先观人再出手。",
+      selfKnowledgeSection: "- Name: 孟缘\n- Faction: 云梦泽",
+      visibleResourcesSection: "profile.yaml\nmemory.yaml\nknowledge/social_and_world.md",
+      objectiveEnvironmentSection: "- 夜雨刚停，竹舍檐角还在滴水\n- 屋内烛火微晃，窗纸映着浅黄光",
+      bodyStateSection: "- 左臂旧伤未愈，抬得太急会牵扯发痛",
+      baselineSensorySection: "- 对灵力扰动敏感",
+      effectiveSensorySection: "- 雨后空气潮冷，脚步声在竹阶上格外清楚",
+      situationFrame: "夜色已深，门外来人停在竹阶前，还没有立刻进门。",
+      sceneFacts: "你听见潮湿衣摆擦过门框的轻响，门外人的呼吸稳而不急。",
+      sceneEventsSection: "- 宋祈开口：“我能进来吗？”\n- 宋祈随后指节轻轻敲了两下门框",
+      focusHints: "先留意门外人的脚步、呼吸和说话时停顿的位置。",
+      playerNudge: "如果现场线索足够，可以略微多留意对方语气里的迟疑。",
+    })
+
+    expect(prompt).toContain("当前角色：孟缘")
+    expect(prompt).toContain("请立刻进入这个角色的当下处境。")
+    expect(prompt).toContain("## 先把自己放进这一刻")
+    expect(prompt).toContain("### 你所处的环境")
+    expect(prompt).toContain("### 眼前的局势")
+    expect(prompt).toContain("### 你刚刚亲历的言行")
+    expect(prompt).toContain("宋祈开口：“我能进来吗？”")
+    expect(prompt).toContain("玩家给你的轻微牵引（不是事实，只是轻推）")
+    expect(prompt).toContain("只返回一个 JSON 对象")
   })
 
   test("auto-creates starter knowledge resources and exposes them in manifest", async () => {
@@ -329,7 +357,9 @@ sense_traits:
     expect(manifest).toContain("knowledge/social_and_world.md")
     expect(manifest).toContain("knowledge/nature_and_body.md")
     expect(manifest).toContain("knowledge/people/README.md")
-    expect(await fs.readFile(path.join(characterDir, "knowledge", "social_and_world.md"), "utf-8")).toContain("对社会与世道的长期认知")
+    expect(await fs.readFile(path.join(characterDir, "knowledge", "social_and_world.md"), "utf-8")).toContain(
+      "对社会与世道的长期认知",
+    )
   })
 
   test("allows weak player nudge but blocks hard override phrasing", () => {
@@ -410,9 +440,10 @@ entries:
       others_observation: `他人 ${index}`,
       compression: 0,
     }))
-    const file = normalizeMemoryFile(`entries:\n${entries
-      .map(
-        (entry) => `  - id: ${entry.id}
+    const file = normalizeMemoryFile(
+      `entries:\n${entries
+        .map(
+          (entry) => `  - id: ${entry.id}
     created_at: ${entry.created_at}
     impression: ${entry.impression}
     summary: ${entry.summary}
@@ -422,8 +453,9 @@ entries:
     observed_people: [${entry.observed_people[0]}]
     self_observation: ${entry.self_observation}
     others_observation: ${entry.others_observation}`,
-      )
-      .join("\n")}`)
+        )
+        .join("\n")}`,
+    )
 
     const engraved = file.entries.find((item) => item.id === "m-24")
     const strong = file.entries.find((item) => item.id === "m-25")
@@ -596,7 +628,6 @@ aliases: [小蝶]
       memoryPath: "characters/遐蝶/memory.yaml",
     })
   })
-
 })
 
 describe("tool.embody bindings", () => {

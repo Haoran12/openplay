@@ -1675,6 +1675,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={props.part.tool === "skill"}>
           <Skill {...toolprops} />
         </Match>
+        <Match when={props.part.tool === "narrate"}>
+          <Narrate {...toolprops} />
+        </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
         </Match>
@@ -1726,6 +1729,52 @@ function GenericTool(props: ToolProps<any>) {
         </box>
       </BlockTool>
     </Show>
+  )
+}
+
+function Narrate(props: ToolProps<any>) {
+  const { theme, syntax } = useTheme()
+  const output = createMemo(() => props.output?.trim() ?? "")
+  const running = createMemo(() => props.part.state.status === "pending" || props.part.state.status === "running")
+  const emptyCompleted = createMemo(() => props.part.state.status === "completed" && !output())
+
+  return (
+    <Switch>
+      <Match when={output()}>
+        <box paddingLeft={3} marginTop={1} flexShrink={0}>
+          <markdown
+            syntaxStyle={syntax()}
+            streaming={false}
+            internalBlockMode="top-level"
+            content={output()}
+            tableOptions={{ style: "grid" }}
+            conceal={false}
+            fg={theme.text}
+            bg={theme.background}
+          />
+        </box>
+      </Match>
+      <Match when={running()}>
+        <InlineTool icon="✒" pending="Narrating..." complete={false} spinner={true} part={props.part}>
+          Narrating...
+        </InlineTool>
+      </Match>
+      <Match when={props.part.state.status === "error"}>
+        <InlineTool icon="✒" pending="Narrating..." complete={false} part={props.part}>
+          Narrate failed
+        </InlineTool>
+      </Match>
+      <Match when={emptyCompleted()}>
+        <InlineTool icon="✒" pending="Narrating..." complete={true} part={props.part}>
+          Narrate completed without output
+        </InlineTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool icon="✒" pending="Narrating..." complete={false} part={props.part}>
+          Narrating...
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 

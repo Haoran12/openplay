@@ -2316,7 +2316,7 @@ it.instance(
 )
 
 it.instance(
-  "roleplay director does not finish after embody alone and continues to narrate",
+  "roleplay director requires scene_update as the first tool call of the turn",
   Effect.gen(function* () {
       const { llm } = yield* useServerConfig(providerCfg)
       const prompt = yield* SessionPrompt.Service
@@ -2352,21 +2352,76 @@ it.instance(
           })
           .stop(),
       )
+      yield* llm.push(
+        reply()
+          .tool("scene_update", {
+            path: "runtime.yaml",
+            content: [
+              "scene:",
+              "  location: 竹舍",
+              "present_characters:",
+              "  - 孟缘",
+              "last_event: 门外脚步停在竹阶前，孟缘出声邀人入内。",
+            ].join("\n"),
+          })
+          .stop(),
+      )
+      yield* llm.push(
+        reply()
+          .tool("narrate", {
+            content: "门外脚步声在竹阶前一顿，屋内烛影轻晃。孟缘抬眼望向门扉，指尖在案沿轻轻一叩，声音不高，却稳稳落进夜色里：“既已到了，何不进来说话？”",
+            perspective: "third-person limited",
+            style: "dramatic",
+          })
+          .stop(),
+      )
       yield* llm.push(reply().text("收束完成。").stop())
 
-      const result = yield* prompt.prompt({
+      yield* prompt.prompt({
         sessionID: chat.id,
         agent: "director",
         parts: [{ type: "text", text: "继续这一幕。" }],
       })
 
-      expect((yield* llm.calls)).toBe(3)
+      const result = yield* prompt.loop({ sessionID: chat.id })
+
+      console.log("DEBUG: llm.calls =", yield* llm.calls)
+      console.log("DEBUG: result.role =", result.info.role)
+      console.log("DEBUG: result.parts count =", result.parts.length)
+      
+      const messages = yield* sessions.messages({ sessionID: chat.id })
+      console.log("DEBUG: messages count =", messages.length)
+      messages.forEach((msg, i) => {
+        console.log(`Message ${i}: role=${msg.info.role}, parts=${msg.parts.length}`)
+        msg.parts.forEach((part, j) => {
+          if (part.type === "tool") {
+            console.log(`  Part ${j}: tool=${part.tool}, status=${part.state.status}`)
+          }
+        })
+      })
+
+      expect((yield* llm.calls)).toBe(4)
       expect(result.info.role).toBe("assistant")
-      expect(
-        result.parts.some(
-          (part: MessageV2.Part) => part.type === "tool" && part.tool === "narrate" && part.state.status === "completed",
-        ),
-      ).toBe(true)
+      
+      const allParts = messages.flatMap((m) => m.parts)
+      const blockedNarrate = allParts.find(
+        (part: MessageV2.Part) =>
+          part.type === "tool" &&
+          part.tool === "narrate" &&
+          part.state.status === "completed" &&
+          part.state.metadata?.reason === "director_first_tool_must_be_scene_update",
+      )
+      const hasSceneUpdateCompleted = allParts.some(
+        (part: MessageV2.Part) => part.type === "tool" && part.tool === "scene_update" && part.state.status === "completed",
+      )
+      const hasNarrateCompleted = allParts.some(
+        (part: MessageV2.Part) => part.type === "tool" && part.tool === "narrate" && part.state.status === "completed",
+      )
+      expect(blockedNarrate).toBeTruthy()
+      console.log("DEBUG: hasSceneUpdateCompleted =", hasSceneUpdateCompleted)
+      console.log("DEBUG: hasNarrateCompleted =", hasNarrateCompleted)
+      expect(hasSceneUpdateCompleted).toBe(true)
+      expect(hasNarrateCompleted).toBe(true)
     }),
   { git: true },
   30_000,

@@ -339,6 +339,32 @@ describe("run entry body", () => {
     })
   })
 
+  test("does not fall back to narrate input content when completed output is missing", () => {
+    expect(
+      entryBody(
+        toolCommit({
+          tool: "narrate",
+          state: {
+            status: "completed",
+            input: {
+              content: "This should never be rendered as fake final narrative.",
+              perspective: "third-person",
+              style: "lyrical",
+            },
+            output: "",
+            title: "narrate: missing output",
+            metadata: {
+              length: 0,
+            },
+            time: { start: 1, end: 2 },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "none",
+    })
+  })
+
   test("keeps narrate errors as text failures", () => {
     expect(
       entryBody(

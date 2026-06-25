@@ -623,6 +623,43 @@ describe("HttpApi SDK", () => {
     ),
   )
 
+  serverPathParity("exposes legacy and environment-derived runtime scene fields through path.world", (serverPath) =>
+    withProject(
+      serverPath,
+      {
+        git: false,
+        setup: (dir) =>
+          Effect.promise(() =>
+            fs.writeFile(
+              path.join(dir, "runtime.yaml"),
+              [
+                "current_date: 1003-07-14",
+                'current_scene: "云梦泽"',
+                "present_characters:",
+                '  - name: "孟缘"',
+                "environment:",
+                '  location: "建木府主卧"',
+                '  time: "1003-07-14T20:30"',
+                "",
+              ].join("\n"),
+            ),
+          ),
+      },
+      ({ sdk }) =>
+        Effect.gen(function* () {
+          const paths = yield* capture(() => sdk.path.get())
+          const world = record(record(paths.data).world)
+
+          return {
+            statuses: statuses({ paths }),
+            scene: record(world.scene),
+            currentScene: world.currentScene,
+            presentCharacters: array(world.presentCharacters).map((item) => record(item)),
+          }
+        }),
+    ),
+  )
+
   serverPathParity("matches generated SDK session lifecycle routes", (serverPath) =>
     withStandardProject(serverPath, ({ sdk }) =>
       Effect.gen(function* () {

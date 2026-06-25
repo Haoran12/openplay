@@ -71,6 +71,14 @@ export const WebCommand = effectCmd({
         )
       }
 
+      if (opts.lan) {
+        UI.println(
+          UI.Style.TEXT_INFO_BOLD + "  LAN mode:          ",
+          UI.Style.TEXT_NORMAL,
+          "enabled via --lan",
+        )
+      }
+
       // Open localhost in browser
       open(localhostUrl).catch(() => {})
     } else {

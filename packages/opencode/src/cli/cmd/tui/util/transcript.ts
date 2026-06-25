@@ -1,4 +1,5 @@
 import type { AssistantMessage, Part, Provider, UserMessage } from "@openplay-ai/sdk/v2"
+import { isPrimaryOutputPresentation } from "@openplay-ai/core/tool-presentation"
 import { Locale } from "@/util/locale"
 import * as Model from "./model"
 
@@ -94,6 +95,20 @@ export function formatPart(part: Part, options: TranscriptOptions): string {
   }
 
   if (part.type === "tool") {
+    if (part.state.status === "completed" && isPrimaryOutputPresentation(part.state.metadata)) {
+      const body = part.state.output.trim()
+      const badges = [
+        typeof part.state.input?.perspective === "string" ? part.state.input.perspective : "",
+        typeof part.state.input?.style === "string" ? part.state.input.style : "",
+      ].filter(Boolean)
+      let result = body ? `${body}\n\n` : ""
+      if (options.toolDetails) {
+        const suffix = badges.length ? ` · ${badges.join(" · ")}` : ""
+        result += `_Via ${part.tool}${suffix}_\n\n`
+      }
+      return result
+    }
+
     let result = `**Tool: ${part.tool}**\n`
     if (options.toolDetails && part.state.input) {
       result += `\n**Input:**\n\`\`\`json\n${JSON.stringify(part.state.input, null, 2)}\n\`\`\`\n`

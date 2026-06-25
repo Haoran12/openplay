@@ -46,11 +46,14 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/World") {}
 
+function readObject(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined
+}
+
 function parseCurrentScene(value: unknown): string | undefined {
   if (typeof value === "string") return value
-  if (!value || typeof value !== "object") return undefined
-
-  const scene = value as Record<string, unknown>
+  const scene = readObject(value)
+  if (!scene) return undefined
   if (typeof scene.location === "string" && scene.location.trim().length > 0) {
     return scene.location
   }
@@ -64,29 +67,6 @@ function parseCurrentScene(value: unknown): string | undefined {
   return undefined
 }
 
-function parseScene(value: unknown):
-  | {
-      date?: string
-      location?: string
-      impression?: string
-    }
-  | undefined {
-  if (!value || typeof value !== "object") return undefined
-
-  const scene = value as Record<string, unknown>
-  const result = {
-    date: typeof scene.date === "string" && scene.date.trim().length > 0 ? scene.date : undefined,
-    location:
-      typeof scene.location === "string" && scene.location.trim().length > 0 ? scene.location : undefined,
-    impression:
-      typeof scene.impression === "string" && scene.impression.trim().length > 0
-        ? scene.impression
-        : undefined,
-  }
-
-  return result.date || result.location || result.impression ? result : undefined
-}
-
 function scalarToString(value: unknown): string | undefined {
   if (typeof value === "string") {
     return value.trim().length > 0 ? value : undefined
@@ -94,7 +74,55 @@ function scalarToString(value: unknown): string | undefined {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value)
   }
+
+  const record = readObject(value)
+  if (!record) return undefined
+
+  for (const key of ["current", "content", "value", "text"]) {
+    const nested = record[key]
+    if (nested === value) continue
+    const parsed = scalarToString(nested)
+    if (parsed) return parsed
+  }
+
   return undefined
+}
+
+function parseSceneObject(value: unknown):
+  | {
+      date?: string
+      location?: string
+      impression?: string
+    }
+  | undefined {
+  const scene = readObject(value)
+  if (!scene) return undefined
+
+  const result = {
+    date: scalarToString(scene.date),
+    location: scalarToString(scene.location),
+    impression: scalarToString(scene.impression),
+  }
+
+  return result.date || result.location || result.impression ? result : undefined
+}
+
+function parseRuntimeScene(runtime: Record<string, unknown>):
+  | {
+      date?: string
+      location?: string
+      impression?: string
+    }
+  | undefined {
+  const scene = parseSceneObject(runtime.current_scene)
+  const environment = readObject(runtime.environment)
+  const result = {
+    date: scene?.date ?? scalarToString(runtime.current_date) ?? scalarToString(runtime.currentDate) ?? scalarToString(runtime.date) ?? scalarToString(environment?.time),
+    location: scene?.location ?? scalarToString(runtime.current_scene) ?? scalarToString(environment?.location),
+    impression: scene?.impression,
+  }
+
+  return result.date || result.location || result.impression ? result : undefined
 }
 
 function parsePresentCharacters(value: unknown):
@@ -142,10 +170,10 @@ function parseRuntimePresentCharacters(runtime: Record<string, unknown>): Return
   const topLevel = parsePresentCharacters(runtime.present_characters)
   if (topLevel) return topLevel
 
-  const currentScene = runtime.current_scene
-  if (!currentScene || typeof currentScene !== "object") return undefined
+  const currentScene = readObject(runtime.current_scene)
+  if (!currentScene) return undefined
 
-  return parsePresentCharacters((currentScene as Record<string, unknown>).present_characters)
+  return parsePresentCharacters(currentScene.present_characters)
 }
 
 // Read roleplay.worldPath from config files directly (to avoid circular dependency with Config.Service)
@@ -225,8 +253,8 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service> = Layer.e
           try {
             const runtime = parse(runtimeContent) as Record<string, unknown>
             if (runtime && typeof runtime === "object") {
-              scene = parseScene(runtime.current_scene)
-              currentScene = parseCurrentScene(runtime.current_scene)
+              scene = parseRuntimeScene(runtime)
+              currentScene = scene?.location ?? parseCurrentScene(runtime.current_scene) ?? scene?.impression ?? scene?.date
               presentCharacters = parseRuntimePresentCharacters(runtime)
             }
           } catch {

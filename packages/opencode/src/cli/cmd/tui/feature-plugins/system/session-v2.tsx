@@ -501,6 +501,9 @@ function AssistantTool(props: { part: SessionMessageAssistantTool; sessionID: st
       <Match when={props.part.name === "task"}>
         <Task {...toolprops} />
       </Match>
+      <Match when={props.part.name === "narrate"}>
+        <Narrate {...toolprops} />
+      </Match>
       <Match when={true}>
         <GenericTool {...toolprops} />
       </Match>
@@ -549,6 +552,47 @@ function GenericTool(props: ToolProps) {
         </box>
       </BlockTool>
     </Show>
+  )
+}
+
+function Narrate(props: ToolProps) {
+  const { theme, syntax } = useTheme()
+  const output = createMemo(() => (props.output ?? "").trim())
+  const running = createMemo(() => !props.part.time.completed)
+  const emptyCompleted = createMemo(() => props.part.state.status === "completed" && !output())
+
+  return (
+    <Switch>
+      <Match when={output()}>
+        <box paddingLeft={3} marginTop={1} flexShrink={0}>
+          <markdown
+            syntaxStyle={syntax()}
+            streaming={false}
+            internalBlockMode="top-level"
+            content={output()}
+            tableOptions={{ style: "grid" }}
+            conceal={false}
+            fg={theme.text}
+            bg={theme.background}
+          />
+        </box>
+      </Match>
+      <Match when={running()}>
+        <InlineTool icon="✒" pending="Narrating..." complete={false} spinner={true} part={props.part}>
+          Narrating...
+        </InlineTool>
+      </Match>
+      <Match when={emptyCompleted()}>
+        <InlineTool icon="✒" pending="Narrating..." complete={true} part={props.part}>
+          Narrate completed without output
+        </InlineTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool icon="✒" pending="Narrating..." complete={false} part={props.part}>
+          Narrating...
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 

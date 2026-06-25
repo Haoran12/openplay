@@ -1474,11 +1474,6 @@ export function toolEntryBody(commit: StreamCommit, raw: string): RunEntryBody |
         return markdownBody(output)
       }
 
-      const content = text(ctx.input.content).trim()
-      if (content) {
-        return markdownBody(content)
-      }
-
       return undefined
     }
   }

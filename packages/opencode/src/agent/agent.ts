@@ -14,7 +14,9 @@ import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_DIRECTOR from "./prompt/director.txt"
 import PROMPT_CHARACTER from "../session/prompt/character.txt"
+import { PromptLoader } from "../session/prompt/loader"
 import { Permission } from "@/permission"
+import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@openplay-ai/core/global"
 import path from "path"
@@ -106,6 +108,7 @@ export const layer = Layer.effect(
     const skill = yield* Skill.Service
     const provider = yield* Provider.Service
     const flags = yield* RuntimeFlags.Service
+    const fs = yield* AppFileSystem.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Agent.state")(function* (ctx) {
@@ -143,6 +146,14 @@ export const layer = Layer.effect(
         })
 
         const user = Permission.fromConfig(cfg.permission ?? {})
+
+        // Load roleplay prompt templates from world directory, falling back to built-ins
+        const worldPrompts = ctx.world
+          ? {
+              character: yield* PromptLoader.loadPrompt(fs, ctx.world.rootPath, "character", PROMPT_CHARACTER),
+              director: yield* PromptLoader.loadPrompt(fs, ctx.world.rootPath, "director", PROMPT_DIRECTOR),
+            }
+          : undefined
 
         const agents: Record<string, Info> = {
           build: {
@@ -218,7 +229,7 @@ export const layer = Layer.effect(
                   mode: "subagent" as const,
                   native: true,
                   hidden: true,
-                  prompt: PROMPT_CHARACTER,
+                  prompt: worldPrompts!.character,
                 } satisfies Info,
               }
             : {}),
@@ -349,7 +360,7 @@ export const layer = Layer.effect(
                   ),
                   mode: "primary",
                   native: true,
-                  prompt: PROMPT_DIRECTOR,
+                  prompt: worldPrompts!.director,
                   isDirector: true,
                 } satisfies Info,
               }
@@ -553,6 +564,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(Skill.defaultLayer),
   Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(AppFileSystem.defaultLayer),
 )
 
 export * as Agent from "./agent"

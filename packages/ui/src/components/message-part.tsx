@@ -47,6 +47,7 @@ import { Markdown } from "./markdown"
 import { ImagePreview } from "./image-preview"
 import { getDirectory as _getDirectory, getFilename } from "@openplay-ai/core/util/path"
 import { checksum } from "@openplay-ai/core/util/encode"
+import { isPrimaryOutputPresentation, readToolPresentationMetadata } from "@openplay-ai/core/tool-presentation"
 import { Tooltip } from "./tooltip"
 import { IconButton } from "./icon-button"
 import { Spinner } from "./spinner"
@@ -818,6 +819,107 @@ function ExaOutput(props: { output?: string }) {
   )
 }
 
+function titlecaseToolName(tool: string) {
+  return tool
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+function filterPresentationMetadata(metadata: Record<string, unknown>) {
+  const next = { ...metadata }
+  delete next.presentation
+  delete next.presentationVariant
+  return next
+}
+
+function toolAuditMarkdown(input: Record<string, unknown>, metadata: Record<string, unknown>) {
+  const audit: Record<string, unknown> = {}
+  if (Object.keys(input).length > 0) audit.input = input
+  const filteredMetadata = filterPresentationMetadata(metadata)
+  if (Object.keys(filteredMetadata).length > 0) audit.metadata = filteredMetadata
+  if (Object.keys(audit).length === 0) return ""
+  return ["```json", JSON.stringify(audit, null, 2), "```"].join("\n")
+}
+
+function PrimaryOutputTool(props: ToolProps & { label?: string; badges?: string[]; pendingText?: string }) {
+  const i18n = useI18n()
+  const [copied, setCopied] = createSignal(false)
+  const running = createMemo(() => props.status === "pending" || props.status === "running")
+  const variant = createMemo(() => readToolPresentationMetadata(props.metadata).presentationVariant ?? "narrative")
+  const label = createMemo(() => props.label || titlecaseToolName(props.tool))
+  const meta = createMemo(() => {
+    const badges = (props.badges ?? []).filter(Boolean)
+    return badges.length > 0 ? `${label()} · ${badges.join(" · ")}` : label()
+  })
+  const output = createMemo(() => (props.output ?? "").trim())
+  const audit = createMemo(() => toolAuditMarkdown(props.input ?? {}, props.metadata ?? {}))
+
+  const handleCopy = async () => {
+    const value = output()
+    if (!value) return
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div data-component="narrative-part" data-variant={variant()}>
+      <div data-slot="narrative-part-header">
+        <div data-slot="narrative-part-meta" class="text-12-regular text-text-weak cursor-default">
+          {running() ? props.pendingText || i18n.t("ui.sessionTurn.status.thinking") : meta()}
+        </div>
+        <Show when={output()}>
+          <Tooltip
+            value={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+            placement="top"
+            gutter={4}
+          >
+            <IconButton
+              icon={copied() ? "check" : "copy"}
+              size="normal"
+              variant="ghost"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation()
+                void handleCopy()
+              }}
+              aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+            />
+          </Tooltip>
+        </Show>
+      </div>
+      <Show when={output()}>
+        <div data-component="narrative-output">
+          <Markdown text={output()} />
+        </div>
+      </Show>
+      <Show when={running() && !output()}>
+        <div data-component="narrative-output" data-pending="true">
+          <TextShimmer text={props.pendingText || i18n.t("ui.sessionTurn.status.thinking")} active />
+        </div>
+      </Show>
+      <Show when={!props.hideDetails && audit()}>
+        <div data-slot="narrative-part-audit">
+          <BasicTool
+            icon="mcp"
+            status={props.status}
+            trigger={{
+              title: `Via ${label()}`,
+              subtitle: (props.badges ?? []).filter(Boolean).join(" · ") || undefined,
+            }}
+          >
+            <div data-component="tool-output" data-scrollable>
+              <Markdown text={audit()} />
+            </div>
+          </BasicTool>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
 export function registerPartComponent(type: string, component: PartComponent) {
   PART_MAPPING[type] = component
 }
@@ -1357,8 +1459,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     if (typeof value === "string" && value) return value
     return taskId()
   })
+  const hasPrimaryOutput = createMemo(() => isPrimaryOutputPresentation(partMetadata()))
 
-  const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
+  const render = createMemo(() => ToolRegistry.render(part().tool) ?? (hasPrimaryOutput() ? PrimaryOutputTool : GenericTool))
 
   return (
     <Show when={!hideQuestion()}>
@@ -2364,15 +2467,16 @@ ToolRegistry.register({
     const running = createMemo(() => props.status === "pending" || props.status === "running")
 
     return (
-      <BasicTool
-        {...props}
-        hideDetails
-        icon="user"
-        trigger={{
-          title: `Embody: ${character()}`,
-          subtitle: running() ? undefined : `${character()} sample captured`,
-        }}
-      />
+      <div data-component="embody-wrapper" data-roleplay="embody">
+        <BasicTool
+          {...props}
+          hideDetails
+          icon="user"
+          trigger={{
+            title: running() ? `Embody: ${character()}...` : `${character()} sample`,
+          }}
+        />
+      </div>
     )
   },
 })
@@ -2380,8 +2484,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "narrate",
   render(props) {
-    const i18n = useI18n()
-    const running = createMemo(() => props.status === "pending" || props.status === "running")
     const perspective = createMemo(() => {
       const val = props.input.perspective
       return typeof val === "string" ? val : undefined
@@ -2394,28 +2496,12 @@ ToolRegistry.register({
       const parts: string[] = []
       if (perspective()) parts.push(perspective()!)
       if (style()) parts.push(style()!)
-      return parts.length > 0 ? parts.join(" · ") : undefined
-    })
-    const meta = createMemo(() => {
-      if (running()) return "Narrating..."
-      return badges() ? `Narrate · ${badges()}` : "Narrate"
+      return parts
     })
 
     return (
-      <div data-component="narrative-part">
-        <div data-slot="narrative-part-meta" class="text-12-regular text-text-weak cursor-default">
-          {meta()}
-        </div>
-        <Show when={props.output}>
-          <div data-component="narrative-output">
-            <Markdown text={props.output!} />
-          </div>
-        </Show>
-        <Show when={running() && !props.output}>
-          <div data-component="narrative-output" data-pending="true">
-            <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} active />
-          </div>
-        </Show>
+      <div data-component="narrate-wrapper" data-roleplay="narrate">
+        <PrimaryOutputTool {...props} label="Narrate" badges={badges()} pendingText="Narrating..." />
       </div>
     )
   },
@@ -2428,6 +2514,7 @@ ToolRegistry.register({
     return (
       <BasicTool
         {...props}
+        hideDetails
         icon="dice"
         trigger={{
           title: running() ? "Rolling dice..." : (props.metadata?.title as string) || "Dice Roll",
@@ -2454,6 +2541,7 @@ ToolRegistry.register({
     return (
       <BasicTool
         {...props}
+        hideDetails
         icon="calculator"
         trigger={{
           title: running() ? `Calculating ${type()}...` : `Calc: ${type()}`,
@@ -2480,6 +2568,7 @@ ToolRegistry.register({
     return (
       <BasicTool
         {...props}
+        hideDetails
         icon="file-edit"
         trigger={{
           title: running() ? "Updating scene..." : `Scene: ${path()}`,

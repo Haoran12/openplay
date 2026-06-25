@@ -34,6 +34,7 @@ import { InstanceRef } from "@/effect/instance-ref"
 import type { InstanceContext } from "@/project/instance-context"
 import { ProjectID } from "@/project/schema"
 import { WorldID } from "@/world/schema"
+import { TOOL_PRESENTATION_PRIMARY_OUTPUT, TOOL_PRESENTATION_VARIANT_NARRATIVE } from "@openplay-ai/core/tool-presentation"
 
 void Log.init({ print: false })
 
@@ -811,6 +812,99 @@ describe("session.compaction.prune", () => {
             role: "user",
             sessionID: info.id,
             agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: msg.id,
+            sessionID: info.id,
+            type: "text",
+            text,
+          })
+        }
+
+        yield* compact.prune({ sessionID: info.id })
+
+        const msgs = yield* ssn.messages({ sessionID: info.id })
+        const part = msgs.flatMap((msg) => msg.parts).find((part) => part.type === "tool")
+        expect(part?.type).toBe("tool")
+        if (part?.type === "tool" && part.state.status === "completed") {
+          expect(part.state.time.compacted).toBeUndefined()
+        }
+      }),
+    ),
+  )
+
+  it.live(
+    "skips primary-output narrative tool output",
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        const compact = yield* SessionCompaction.Service
+        const ssn = yield* SessionNs.Service
+        const info = yield* ssn.create({})
+        const a = yield* ssn.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          sessionID: info.id,
+          agent: "director",
+          model: ref,
+          time: { created: Date.now() },
+        })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: a.id,
+          sessionID: info.id,
+          type: "text",
+          text: "first",
+        })
+        const b: MessageV2.Assistant = {
+          id: MessageID.ascending(),
+          role: "assistant",
+          sessionID: info.id,
+          mode: "build",
+          agent: "director",
+          path: { cwd: dir, root: dir },
+          cost: 0,
+          tokens: {
+            output: 0,
+            input: 0,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          modelID: ref.modelID,
+          providerID: ref.providerID,
+          parentID: a.id,
+          time: { created: Date.now() },
+          finish: "end_turn",
+        }
+        yield* ssn.updateMessage(b)
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: b.id,
+          sessionID: info.id,
+          type: "tool",
+          callID: crypto.randomUUID(),
+          tool: "narrate",
+          state: {
+            status: "completed",
+            input: { content: "x".repeat(200_000) },
+            output: "x".repeat(200_000),
+            title: "done",
+            metadata: {
+              length: 200_000,
+              presentation: TOOL_PRESENTATION_PRIMARY_OUTPUT,
+              presentationVariant: TOOL_PRESENTATION_VARIANT_NARRATIVE,
+            },
+            time: { start: Date.now(), end: Date.now() },
+          },
+        })
+        for (const text of ["second", "third"]) {
+          const msg = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "director",
             model: ref,
             time: { created: Date.now() },
           })

@@ -1,16 +1,30 @@
-Generate narrative text for the roleplay world.
+生成角色扮演世界的叙事文本。
 
-This tool is used by the Director to produce narrative descriptions, scene transitions, atmospheric passages, and character voice lines. It marks the output as formal narrative content, distinguishing it from tool calls and meta-discussion.
+此工具供导演使用，产出场景描写、场景转换、氛围渲染、角色对话等叙事内容。输出的文本标记为正式叙事内容，与工具调用和元讨论区分开来。
 
-## Parameters
+## 参数
 
-- `content`: The narrative text to produce.
-- `style` (optional): A style hint such as "suspenseful", "lyrical", "terse", "dramatic".
-- `perspective` (optional): Narrative perspective: "third-person", "first-person", "omniscient".
+- `content`：叙事文本内容。
+- `style`（可选）：风格提示词，如"紧张"、"舒缓"、"简洁"、"戏剧化"。
+- `perspective`（可选）：叙事视角，如"第三人称"、"第一人称"、"全知视角"。
 
-## When to use
+## 文风指南
 
-- Describing a new scene or location
-- Narrating character actions or dialogue
-- Creating atmospheric transitions between scenes
-- Producing internal monologue or sensory descriptions
+遵循中国古典小说风格：
+
+- **动词驱动**：以动作动词为主，让人物动起来、说起来、做起来。
+- **节奏明快**：句子简短有力，避免冗长的从句嵌套。
+- **避免欧式语法**：少用被动句式，不用复杂句嵌套，少用"是"作主要动词。
+- **避免形容词堆叠**：一个形容词足矣，或干脆不用。以动作和细节传达氛围。
+
+示例：
+
+✓ 仗剑起身，推门而出。月光如水，洒满庭院。
+✗ 他缓慢地拿着剑站起来，走出了门。美丽银白的月光正明亮地照耀着安静祥和的庭院。
+
+## 使用场景
+
+- 描写新场景或地点
+- 叙述角色行动或对话
+- 创建场景间的氛围转换
+- 产出内心独白或感官描写
