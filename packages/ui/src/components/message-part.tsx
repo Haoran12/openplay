@@ -843,6 +843,52 @@ function toolAuditMarkdown(input: Record<string, unknown>, metadata: Record<stri
   return ["```json", JSON.stringify(audit, null, 2), "```"].join("\n")
 }
 
+function toolOutputMarkdown(output: string) {
+  const trimmed = output.trim()
+  if (!trimmed) return ""
+  if ((trimmed.startsWith("{") || trimmed.startsWith("[")) && (trimmed.endsWith("}") || trimmed.endsWith("]"))) {
+    try {
+      JSON.parse(trimmed)
+      return ["```json", trimmed, "```"].join("\n")
+    } catch {
+      // Fall through to plain text output.
+    }
+  }
+  return ["```text", trimmed, "```"].join("\n")
+}
+
+function RoleplayToolDetails(props: {
+  input?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+  output?: string
+  outputLabel?: string
+}) {
+  const audit = createMemo(() => toolAuditMarkdown(props.input ?? {}, props.metadata ?? {}))
+  const output = createMemo(() => (props.output ?? "").trim())
+  const outputMarkdown = createMemo(() => toolOutputMarkdown(output()))
+
+  return (
+    <div data-component="roleplay-tool-details">
+      <Show when={audit()}>
+        <section data-slot="roleplay-tool-section">
+          <div data-slot="roleplay-tool-section-label">Input</div>
+          <div data-component="tool-output" data-scrollable>
+            <Markdown text={audit()} />
+          </div>
+        </section>
+      </Show>
+      <Show when={outputMarkdown()}>
+        <section data-slot="roleplay-tool-section">
+          <div data-slot="roleplay-tool-section-label">{props.outputLabel ?? "Output"}</div>
+          <div data-component="tool-output" data-scrollable>
+            <Markdown text={outputMarkdown()} />
+          </div>
+        </section>
+      </Show>
+    </div>
+  )
+}
+
 function PrimaryOutputTool(props: ToolProps & { label?: string; badges?: string[]; pendingText?: string }) {
   const i18n = useI18n()
   const [copied, setCopied] = createSignal(false)
@@ -901,20 +947,17 @@ function PrimaryOutputTool(props: ToolProps & { label?: string; badges?: string[
         </div>
       </Show>
       <Show when={!props.hideDetails && audit()}>
-        <div data-slot="narrative-part-audit">
-          <BasicTool
-            icon="mcp"
-            status={props.status}
-            trigger={{
-              title: `Via ${label()}`,
-              subtitle: (props.badges ?? []).filter(Boolean).join(" · ") || undefined,
-            }}
-          >
-            <div data-component="tool-output" data-scrollable>
-              <Markdown text={audit()} />
-            </div>
-          </BasicTool>
-        </div>
+        <details data-slot="narrative-part-audit">
+          <summary>
+            <span data-slot="narrative-part-audit-label">via {label().toLowerCase()}</span>
+            <Show when={(props.badges ?? []).length > 0}>
+              <span data-slot="narrative-part-audit-badges">{(props.badges ?? []).filter(Boolean).join(" · ")}</span>
+            </Show>
+          </summary>
+          <div data-component="tool-output" data-scrollable>
+            <Markdown text={audit()} />
+          </div>
+        </details>
       </Show>
     </div>
   )
@@ -2470,12 +2513,19 @@ ToolRegistry.register({
       <div data-component="embody-wrapper" data-roleplay="embody">
         <BasicTool
           {...props}
-          hideDetails
           icon="user"
+          defaultOpen={props.defaultOpen}
           trigger={{
             title: running() ? `Embody: ${character()}...` : `${character()} sample`,
           }}
-        />
+        >
+          <RoleplayToolDetails
+            input={props.input}
+            metadata={props.metadata}
+            output={props.output}
+            outputLabel="Sample"
+          />
+        </BasicTool>
       </div>
     )
   },
@@ -2512,20 +2562,18 @@ ToolRegistry.register({
   render(props) {
     const running = createMemo(() => props.status === "pending" || props.status === "running")
     return (
-      <BasicTool
-        {...props}
-        hideDetails
-        icon="dice"
-        trigger={{
-          title: running() ? "Rolling dice..." : (props.metadata?.title as string) || "Dice Roll",
-        }}
-      >
-        <Show when={props.output}>
-          <div data-component="tool-output">
-            <Markdown text={props.output!} />
-          </div>
-        </Show>
-      </BasicTool>
+      <div data-component="roleplay-tool-wrapper" data-roleplay="audit">
+        <BasicTool
+          {...props}
+          icon="dice"
+          defaultOpen={props.defaultOpen}
+          trigger={{
+            title: running() ? "Rolling dice..." : (props.metadata?.title as string) || "Dice Roll",
+          }}
+        >
+          <RoleplayToolDetails input={props.input} metadata={props.metadata} output={props.output} />
+        </BasicTool>
+      </div>
     )
   },
 })
@@ -2539,20 +2587,18 @@ ToolRegistry.register({
     })
     const running = createMemo(() => props.status === "pending" || props.status === "running")
     return (
-      <BasicTool
-        {...props}
-        hideDetails
-        icon="calculator"
-        trigger={{
-          title: running() ? `Calculating ${type()}...` : `Calc: ${type()}`,
-        }}
-      >
-        <Show when={props.output}>
-          <div data-component="tool-output">
-            <Markdown text={props.output!} />
-          </div>
-        </Show>
-      </BasicTool>
+      <div data-component="roleplay-tool-wrapper" data-roleplay="audit">
+        <BasicTool
+          {...props}
+          icon="calculator"
+          defaultOpen={props.defaultOpen}
+          trigger={{
+            title: running() ? `Calculating ${type()}...` : `Calc: ${type()}`,
+          }}
+        >
+          <RoleplayToolDetails input={props.input} metadata={props.metadata} output={props.output} />
+        </BasicTool>
+      </div>
     )
   },
 })
@@ -2566,21 +2612,19 @@ ToolRegistry.register({
     })
     const running = createMemo(() => props.status === "pending" || props.status === "running")
     return (
-      <BasicTool
-        {...props}
-        hideDetails
-        icon="file-edit"
-        trigger={{
-          title: running() ? "Updating scene..." : `Scene: ${path()}`,
-          subtitle: running() ? undefined : getFilename(path()),
-        }}
-      >
-        <Show when={props.output}>
-          <div data-component="tool-output">
-            <Markdown text={props.output!} />
-          </div>
-        </Show>
-      </BasicTool>
+      <div data-component="roleplay-tool-wrapper" data-roleplay="audit">
+        <BasicTool
+          {...props}
+          icon="file-edit"
+          defaultOpen={props.defaultOpen}
+          trigger={{
+            title: running() ? "Updating scene..." : `Scene: ${path()}`,
+            subtitle: running() ? undefined : getFilename(path()),
+          }}
+        >
+          <RoleplayToolDetails input={props.input} metadata={props.metadata} output={props.output} />
+        </BasicTool>
+      </div>
     )
   },
 })

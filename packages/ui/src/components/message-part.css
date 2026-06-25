@@ -324,11 +324,22 @@
     width: 100%;
     min-width: 0;
 
+    .shiki,
     pre {
       margin: 0;
       padding: 0;
       background-color: transparent !important;
       border: none !important;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    code {
+      white-space: inherit;
+      overflow-wrap: inherit;
+      word-break: inherit;
     }
   }
 
@@ -336,6 +347,9 @@
     margin: 0;
     padding: 0;
     background: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   &[data-scrollable] {
@@ -447,6 +461,45 @@
 
 [data-slot="narrative-part-audit"] {
   width: 100%;
+  margin-top: -2px;
+  color: var(--text-weaker);
+
+  > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.72;
+  }
+
+  > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  > summary:hover {
+    opacity: 1;
+    color: var(--text-weak);
+  }
+
+  [data-slot="narrative-part-audit-label"] {
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+  }
+
+  [data-slot="narrative-part-audit-badges"] {
+    color: var(--text-weaker);
+  }
+
+  > [data-component="tool-output"] {
+    margin-top: 8px;
+    margin-bottom: 0;
+    border-left: 1px solid color-mix(in srgb, var(--border-weaker-base) 80%, transparent);
+    padding-left: 12px;
+  }
 }
 
 [data-component="narrative-output"][data-pending="true"] {
@@ -832,10 +885,40 @@
   }
 }
 
+[data-component="roleplay-tool-wrapper"] {
+  width: 100%;
+}
+
+[data-component="roleplay-tool-details"] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 10px;
+}
+
+[data-slot="roleplay-tool-section"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  > [data-component="tool-output"] {
+    margin-bottom: 0;
+  }
+}
+
+[data-slot="roleplay-tool-section-label"] {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-weaker);
+}
+
 /* Roleplay tool group: calc, dice_roll, scene_update */
 [data-component="tool-part-wrapper"]
   > [data-component="collapsible"]
-  > [data-slot="collapsible-trigger"][data-hide-details="true"] {
+  > [data-slot="collapsible-trigger"] {
   padding: 2px 0;
 
   [data-slot="basic-tool-tool-title"] {
@@ -846,6 +929,14 @@
   [data-slot="basic-tool-tool-subtitle"] {
     font-size: 12px;
     color: var(--text-weaker);
+  }
+}
+
+[data-component="tool-part-wrapper"]
+  > [data-component="collapsible"]
+  > [data-slot="collapsible-trigger"][aria-expanded="true"] {
+  [data-slot="basic-tool-tool-title"] {
+    color: var(--text-base);
   }
 }
 

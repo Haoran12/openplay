@@ -72,12 +72,17 @@ function tableColumns(db: Client, table: string): string[] {
 
 export function ensureSessionWorldColumns(db: Client) {
   const columns = new Set(tableColumns(db, "session"))
-  const missing = ["world_id", "world_path"].filter((column) => !columns.has(column))
+  const missing = ["world_id", "world_path", "roleplay_character", "roleplay_scene_key", "roleplay_purpose"].filter(
+    (column) => !columns.has(column),
+  )
   if (missing.length === 0) return
 
   log.warn("repairing session schema drift", { missing })
   if (missing.includes("world_id")) db.$client.run("ALTER TABLE session ADD COLUMN world_id TEXT")
   if (missing.includes("world_path")) db.$client.run("ALTER TABLE session ADD COLUMN world_path TEXT")
+  if (missing.includes("roleplay_character")) db.$client.run("ALTER TABLE session ADD COLUMN roleplay_character TEXT")
+  if (missing.includes("roleplay_scene_key")) db.$client.run("ALTER TABLE session ADD COLUMN roleplay_scene_key TEXT")
+  if (missing.includes("roleplay_purpose")) db.$client.run("ALTER TABLE session ADD COLUMN roleplay_purpose TEXT")
 }
 
 function time(tag: string) {

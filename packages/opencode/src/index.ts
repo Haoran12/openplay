@@ -32,7 +32,6 @@ import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { InitCommand } from "./cli/cmd/init"
-import { MigrateCharactersCommand } from "./cli/cmd/migrate-characters"
 import path from "path"
 import { Global } from "@openplay-ai/core/global"
 import { JsonMigration } from "@/storage/json-migration"
@@ -195,7 +194,6 @@ const cli = yargs(args)
   .command(PluginCommand)
   .command(DbCommand)
   .command(InitCommand)
-  .command(MigrateCharactersCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

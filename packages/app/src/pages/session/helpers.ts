@@ -18,6 +18,15 @@ type TabsInput = {
   hasReview?: Accessor<boolean>
 }
 
+export const isDesktopReviewPanelOpen = (input: {
+  roleplayMode: boolean
+  reviewPanelOpened: boolean
+  hasVisibleFileTabs: boolean
+}) => {
+  if (!input.roleplayMode) return input.reviewPanelOpened
+  return input.reviewPanelOpened && input.hasVisibleFileTabs
+}
+
 export const getSessionKey = (dir: string | undefined, id: string | undefined) => `${dir ?? ""}${id ? `/${id}` : ""}`
 
 export const createSessionTabs = (input: TabsInput) => {

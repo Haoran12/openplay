@@ -115,7 +115,7 @@ function generateOpenplayJson(currentDate: string): string {
   )
 }
 
-function generateRuntimeYaml(config: RuntimeConfig): string {
+export function generateRuntimeYaml(config: RuntimeConfig): string {
   const lines = ["# OpenPlay 运行时状态", "", `current_date: ${config.currentDate}`, ""]
 
   if (config.presentCharacters.length > 0) {
@@ -129,9 +129,13 @@ function generateRuntimeYaml(config: RuntimeConfig): string {
 
   lines.push("")
   if (config.currentScene) {
-    lines.push(`current_scene: ${config.currentScene}`)
+    lines.push("current_scene:")
+    lines.push(`  date: ${config.currentDate}`)
+    lines.push(`  location: ${config.currentScene}`)
   } else {
-    lines.push("current_scene: null")
+    lines.push("current_scene:")
+    lines.push(`  date: ${config.currentDate}`)
+    lines.push("  location: null")
   }
   lines.push("")
 

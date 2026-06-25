@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun is required to run openplay-ui from this checkout." >&2
+  exit 1
+fi
+
+ROOT="/home/refzhu/app/openplay"
+APP_DIR="$ROOT/packages/app"
+BACKEND_DIR="$ROOT/packages/opencode"
+BACKEND_PORT="${OPENPLAY_UI_BACKEND_PORT:-4096}"
+FRONTEND_PORT="${OPENPLAY_UI_FRONTEND_PORT:-3000}"
+FRONTEND_HOST="${OPENPLAY_UI_FRONTEND_HOST:-127.0.0.1}"
+FRONTEND_URL="http://${FRONTEND_HOST}:${FRONTEND_PORT}"
+
+cleanup() {
+  local code=$?
+  trap - EXIT INT TERM
+  if [ -n "${frontend_pid:-}" ] && kill -0 "$frontend_pid" >/dev/null 2>&1; then
+    kill "$frontend_pid" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${backend_pid:-}" ] && kill -0 "$backend_pid" >/dev/null 2>&1; then
+    kill "$backend_pid" >/dev/null 2>&1 || true
+  fi
+  wait >/dev/null 2>&1 || true
+  exit "$code"
+}
+
+wait_for_http() {
+  local url="$1"
+  local attempts="${2:-120}"
+  local i
+  for ((i = 0; i < attempts; i++)); do
+    if bun --silent --eval '
+      const url = process.argv[1]
+      try {
+        const res = await fetch(url)
+        process.exit(res.ok ? 0 : 1)
+      } catch {
+        process.exit(1)
+      }
+    ' "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+open_browser() {
+  local url="$1"
+  if command -v open >/dev/null 2>&1; then
+    open "$url" >/dev/null 2>&1 || true
+    return
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1 || true
+    return
+  fi
+  if command -v start >/dev/null 2>&1; then
+    start "$url" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+echo "openplay-ui: starting backend on http://127.0.0.1:${BACKEND_PORT}" >&2
+(cd "$BACKEND_DIR" && exec bun run --conditions=browser ./src/index.ts serve --hostname 127.0.0.1 --port "$BACKEND_PORT") &
+backend_pid=$!
+
+echo "openplay-ui: starting roleplay UI on ${FRONTEND_URL}" >&2
+(
+  cd "$APP_DIR" && \
+    exec env \
+      VITE_OPENCODE_SERVER_HOST=127.0.0.1 \
+      VITE_OPENCODE_SERVER_PORT="$BACKEND_PORT" \
+      bun dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+) &
+frontend_pid=$!
+
+if ! wait_for_http "${FRONTEND_URL}" 120; then
+  echo "openplay-ui: frontend did not become ready at ${FRONTEND_URL}" >&2
+  exit 1
+fi
+
+open_browser "${FRONTEND_URL}"
+echo "openplay-ui: opened ${FRONTEND_URL}" >&2
+
+wait "$backend_pid" "$frontend_pid"

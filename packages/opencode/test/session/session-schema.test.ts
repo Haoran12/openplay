@@ -25,13 +25,18 @@ const info = {
   },
   permission: undefined,
   revert: undefined,
+  worldID: undefined,
+  worldPath: undefined,
+  roleplayCharacter: undefined,
+  roleplaySceneKey: undefined,
+  roleplayPurpose: undefined,
 } satisfies Session.Info
 
 describe("Session schema", () => {
   test("encodes undefined optional session fields as omitted keys", () => {
     const encoded = Schema.encodeUnknownSync(Session.Info)(info) as Record<string, unknown>
 
-    for (const key of ["workspaceID", "parentID", "summary", "share", "permission", "revert"]) {
+    for (const key of ["workspaceID", "parentID", "summary", "share", "permission", "revert", "worldID", "worldPath", "roleplayCharacter", "roleplaySceneKey", "roleplayPurpose"]) {
       expect(Object.hasOwn(encoded, key)).toBe(false)
     }
     expect(Object.hasOwn(encoded.time as Record<string, unknown>, "compacting")).toBe(false)
@@ -74,5 +79,47 @@ describe("Session schema", () => {
     for (const key of ["partID", "snapshot", "diff"]) {
       expect(Object.hasOwn(encoded.revert as Record<string, unknown>, key)).toBe(false)
     }
+  })
+
+  test("normalizes null roleplay session columns to undefined", () => {
+    const decoded = Session.fromRow({
+      id: SessionID.descending(),
+      slug: "row-session",
+      project_id: ProjectID.global,
+      workspace_id: null,
+      directory: "/tmp/opencode",
+      path: null,
+      parent_id: null,
+      title: "Row session",
+      agent: null,
+      model: null,
+      version: "1.0.0",
+      share_url: null,
+      summary_additions: null,
+      summary_deletions: null,
+      summary_files: null,
+      summary_diffs: null,
+      cost: 0,
+      tokens_input: 0,
+      tokens_output: 0,
+      tokens_reasoning: 0,
+      tokens_cache_read: 0,
+      tokens_cache_write: 0,
+      revert: null,
+      permission: null,
+      world_id: null,
+      world_path: null,
+      roleplay_character: null,
+      roleplay_scene_key: null,
+      roleplay_purpose: null,
+      time_created: 1,
+      time_updated: 2,
+      time_compacting: null,
+      time_archived: null,
+    })
+
+    expect(decoded.roleplayCharacter).toBeUndefined()
+    expect(decoded.roleplaySceneKey).toBeUndefined()
+    expect(decoded.roleplayPurpose).toBeUndefined()
   })
 })

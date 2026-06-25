@@ -248,6 +248,27 @@ export function SessionSidePanel(props: {
                           onCleanup(stop)
                         }}
                       >
+                        <Show when={platform.platform === "web"}>
+                          <div class="bg-background-stronger h-full shrink-0 sticky left-0 z-10 flex items-center justify-center pl-3">
+                            <TooltipKeybind
+                              title={language.t("common.close")}
+                              keybind={command.keybind("sidebar.toggle")}
+                              class="flex items-center"
+                            >
+                              <IconButton
+                                icon="close-small"
+                                variant="ghost"
+                                iconSize="large"
+                                class="!rounded-md"
+                                onClick={() => {
+                                  view().reviewPanel.close()
+                                  layout.fileTree.close()
+                                }}
+                                aria-label={language.t("common.close")}
+                              />
+                            </TooltipKeybind>
+                          </div>
+                        </Show>
                         <Show when={reviewTab() && props.canReview()}>
                           <Tabs.Trigger value="review">
                             <div class="flex items-center gap-1.5">

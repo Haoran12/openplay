@@ -13,6 +13,9 @@ Use this tool to persist narrative changes, event records, and state updates to 
 - Always write the complete file content — this tool overwrites the existing file.
 - The path is resolved relative to the world root directory (where openplay.json is located).
 - Use this for updating runtime.yaml and writing event records.
+- When you overwrite `runtime.yaml`, OpenPlay keeps the current internal scene key by default, even if `date` or `location` changes slightly.
+- If the narrative truly cuts to a new scene, add a top-line comment `# openplay: scene_transition=switch` in the YAML you write this turn; the program will then rotate the internal scene key.
+- Starting a brand-new Director session also rotates the internal scene key automatically, even if the runtime content is otherwise similar.
 - This tool cannot write character resource paths, absolute paths, or parent-relative paths.
 - Subjective character memory must be updated through the dedicated character-memory flow, not through `scene_update`.
 - Treat `runtime.yaml` as the authoritative live state for the roleplay side panel. If scene facts or present-character facts changed, persist them here in the same turn.

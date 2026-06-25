@@ -7,6 +7,7 @@ import {
   createSessionTabs,
   focusTerminalById,
   getTabReorderIndex,
+  isDesktopReviewPanelOpen,
   shouldFocusTerminalOnKeyDown,
 } from "./helpers"
 
@@ -177,5 +178,27 @@ describe("createSessionTabs", () => {
       expect(result.closableTab()).toBeUndefined()
       dispose()
     })
+  })
+})
+
+describe("isDesktopReviewPanelOpen", () => {
+  test("requires an open review panel in roleplay sessions even if file tabs remain", () => {
+    expect(
+      isDesktopReviewPanelOpen({
+        roleplayMode: true,
+        reviewPanelOpened: false,
+        hasVisibleFileTabs: true,
+      }),
+    ).toBe(false)
+  })
+
+  test("keeps coding sessions bound to the explicit review panel toggle", () => {
+    expect(
+      isDesktopReviewPanelOpen({
+        roleplayMode: false,
+        reviewPanelOpened: true,
+        hasVisibleFileTabs: false,
+      }),
+    ).toBe(true)
   })
 })

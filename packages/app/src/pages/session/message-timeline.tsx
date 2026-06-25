@@ -231,6 +231,8 @@ export function MessageTimeline(props: {
   onLoadEarlier: () => void
   renderedUserMessages: UserMessage[]
   anchor: (id: string) => string
+  readerMode: "all" | "narrative"
+  onReaderModeChange: (mode: "all" | "narrative") => void
 }) {
   let touchGesture: number | undefined
 
@@ -252,7 +254,6 @@ export function MessageTimeline(props: {
     return sync.data.message[id] ?? emptyMessages
   })
   const narrativeEntries = createMemo(() => narrativeEntriesFromMessages(sessionMessages(), sync.data.part))
-  const [readerMode, setReaderMode] = createSignal<"all" | "narrative">("all")
   const pending = createMemo(() =>
     sessionMessages().findLast(
       (item): item is AssistantMessage => item.role === "assistant" && typeof item.time.completed !== "number",
@@ -819,7 +820,31 @@ export function MessageTimeline(props: {
                   </div>
                   <Show when={sessionID()} keyed>
                     {(id) => (
-                      <div class="shrink-0 flex items-center gap-3">
+                      <div class="shrink-0 flex items-center gap-2 min-w-0">
+                        <Show when={canShowNarrativeToggle()}>
+                          <div class="inline-flex items-center rounded-lg border border-border-weaker-base bg-surface-base p-0.5 shrink-0 max-w-[clamp(140px,18vw,200px)] overflow-hidden">
+                            <button
+                              class="h-6 px-2 rounded-md text-11-medium leading-none whitespace-nowrap transition-colors shrink-0"
+                              classList={{
+                                "bg-background-stronger text-text-strong": props.readerMode === "narrative",
+                                "text-text-weak hover:text-text-base": props.readerMode !== "narrative",
+                              }}
+                              onClick={() => props.onReaderModeChange("narrative")}
+                            >
+                              {language.t("roleplay.reader.narrativeOnly")}
+                            </button>
+                            <button
+                              class="h-6 px-2 rounded-md text-11-medium leading-none whitespace-nowrap transition-colors shrink-0"
+                              classList={{
+                                "bg-background-stronger text-text-strong": props.readerMode === "all",
+                                "text-text-weak hover:text-text-base": props.readerMode !== "all",
+                              }}
+                              onClick={() => props.onReaderModeChange("all")}
+                            >
+                              {language.t("roleplay.reader.all")}
+                            </button>
+                          </div>
+                        </Show>
                         <SessionContextUsage placement="bottom" />
                         <Show when={!parentID()}>
                           <DropdownMenu
@@ -1011,34 +1036,6 @@ export function MessageTimeline(props: {
                 "mt-0": !props.centered,
               }}
             >
-              <Show when={canShowNarrativeToggle()}>
-                <div class="w-full px-4 md:px-5 mb-4">
-                  <div class="mx-auto max-w-3xl flex items-center justify-end">
-                    <div class="inline-flex items-center rounded-lg border border-border-weaker-base bg-surface-base p-1">
-                      <button
-                        class="px-3 py-1.5 rounded-md text-12-medium transition-colors"
-                        classList={{
-                          "bg-background-stronger text-text-strong": readerMode() === "narrative",
-                          "text-text-weak hover:text-text-base": readerMode() !== "narrative",
-                        }}
-                        onClick={() => setReaderMode("narrative")}
-                      >
-                        {language.t("roleplay.reader.narrativeOnly")}
-                      </button>
-                      <button
-                        class="px-3 py-1.5 rounded-md text-12-medium transition-colors"
-                        classList={{
-                          "bg-background-stronger text-text-strong": readerMode() === "all",
-                          "text-text-weak hover:text-text-base": readerMode() !== "all",
-                        }}
-                        onClick={() => setReaderMode("all")}
-                      >
-                        {language.t("roleplay.reader.all")}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Show>
               <Show when={props.turnStart > 0 || props.historyMore}>
                 <div class="w-full flex justify-center">
                   <Button
@@ -1055,7 +1052,7 @@ export function MessageTimeline(props: {
                 </div>
               </Show>
               <Show
-                when={readerMode() === "narrative"}
+                when={props.readerMode === "narrative"}
                 fallback={
                   <For each={rendered()}>
                     {(messageID) => {

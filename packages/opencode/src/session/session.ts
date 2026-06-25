@@ -44,6 +44,7 @@ const log = Log.create({ service: "session" })
 
 const parentTitlePrefix = "New session - "
 const childTitlePrefix = "Child session - "
+const ROLEPLAY_PURPOSES = new Set(["embody", "memory_reflect", "knowledge_reflect"] as const)
 
 function createDefaultTitle(isChild = false) {
   return (isChild ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString()
@@ -69,6 +70,9 @@ export function fromRow(row: SessionRow): Info {
       : undefined
   const share = row.share_url ? { url: row.share_url } : undefined
   const revert = row.revert ?? undefined
+  const roleplayPurpose = ROLEPLAY_PURPOSES.has(row.roleplay_purpose as any)
+    ? (row.roleplay_purpose as Info["roleplayPurpose"])
+    : undefined
   return {
     id: row.id,
     slug: row.slug,
@@ -103,6 +107,9 @@ export function fromRow(row: SessionRow): Info {
     permission: row.permission ?? undefined,
     worldID: row.world_id ?? undefined,
     worldPath: row.world_path ?? undefined,
+    roleplayCharacter: row.roleplay_character ?? undefined,
+    roleplaySceneKey: row.roleplay_scene_key ?? undefined,
+    roleplayPurpose,
     time: {
       created: row.time_created,
       updated: row.time_updated,
@@ -140,6 +147,9 @@ export function toRow(info: Info) {
     permission: info.permission,
     world_id: info.worldID ?? null,
     world_path: info.worldPath ?? null,
+    roleplay_character: info.roleplayCharacter ?? null,
+    roleplay_scene_key: info.roleplaySceneKey ?? null,
+    roleplay_purpose: info.roleplayPurpose ?? null,
     time_created: info.time.created,
     time_updated: info.time.updated,
     time_compacting: info.time.compacting,
@@ -229,6 +239,9 @@ export const Info = Schema.Struct({
   revert: optionalOmitUndefined(Revert),
   worldID: optionalOmitUndefined(Schema.String),
   worldPath: optionalOmitUndefined(Schema.String),
+  roleplayCharacter: optionalOmitUndefined(Schema.String),
+  roleplaySceneKey: optionalOmitUndefined(Schema.String),
+  roleplayPurpose: optionalOmitUndefined(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
 }).annotate({ identifier: "Session" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -253,6 +266,9 @@ export const CreateInput = Schema.optional(
     model: Schema.optional(Model),
     permission: Schema.optional(Permission.Ruleset),
     workspaceID: Schema.optional(WorkspaceID),
+    roleplayCharacter: Schema.optional(Schema.String),
+    roleplaySceneKey: Schema.optional(Schema.String),
+    roleplayPurpose: Schema.optional(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -328,6 +344,13 @@ const UpdatedInfo = Schema.Struct({
   time: Schema.optional(UpdatedTime),
   permission: Schema.optional(Schema.NullOr(Permission.Ruleset)),
   revert: Schema.optional(Schema.NullOr(Revert)),
+  worldID: Schema.optional(Schema.NullOr(Schema.String)),
+  worldPath: Schema.optional(Schema.NullOr(Schema.String)),
+  roleplayCharacter: Schema.optional(Schema.NullOr(Schema.String)),
+  roleplaySceneKey: Schema.optional(Schema.NullOr(Schema.String)),
+  roleplayPurpose: Schema.optional(
+    Schema.NullOr(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
+  ),
 })
 
 const UpdatedEventSchema = Schema.Struct({
@@ -464,6 +487,9 @@ export interface Interface {
     model?: Schema.Schema.Type<typeof Model>
     permission?: Permission.Ruleset
     workspaceID?: WorkspaceID
+    roleplayCharacter?: string
+    roleplaySceneKey?: string
+    roleplayPurpose?: Info["roleplayPurpose"]
   }) => Effect.Effect<Info>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
@@ -535,6 +561,9 @@ export const layer: Layer.Layer<
       directory: string
       path?: string
       permission?: Permission.Ruleset
+      roleplayCharacter?: string
+      roleplaySceneKey?: string
+      roleplayPurpose?: Info["roleplayPurpose"]
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -558,6 +587,9 @@ export const layer: Layer.Layer<
         },
         worldID: ctx.world?.id,
         worldPath: ctx.world?.rootPath,
+        roleplayCharacter: input.roleplayCharacter,
+        roleplaySceneKey: input.roleplaySceneKey,
+        roleplayPurpose: input.roleplayPurpose,
       }
       log.info("created", result)
 
@@ -668,6 +700,9 @@ export const layer: Layer.Layer<
       model?: Schema.Schema.Type<typeof Model>
       permission?: Permission.Ruleset
       workspaceID?: WorkspaceID
+      roleplayCharacter?: string
+      roleplaySceneKey?: string
+      roleplayPurpose?: Info["roleplayPurpose"]
     }) {
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
@@ -680,6 +715,9 @@ export const layer: Layer.Layer<
         model: input?.model,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
+        roleplayCharacter: input?.roleplayCharacter,
+        roleplaySceneKey: input?.roleplaySceneKey,
+        roleplayPurpose: input?.roleplayPurpose,
       })
     })
 

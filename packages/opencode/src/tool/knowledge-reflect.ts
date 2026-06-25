@@ -115,6 +115,8 @@ const init: Effect.Effect<Tool.DefWithoutID<typeof Parameters, KnowledgeReflectM
           parentAgent,
           subagent: characterSubagent,
         }),
+        roleplayCharacter: params.character,
+        roleplayPurpose: "knowledge_reflect",
       }).pipe(Effect.orDie)
 
       const subagentSessionID = subagentSession.id

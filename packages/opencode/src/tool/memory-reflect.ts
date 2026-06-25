@@ -115,6 +115,8 @@ const init: Effect.Effect<Tool.DefWithoutID<typeof Parameters, MemoryReflectMeta
               parentAgent,
               subagent: characterSubagent,
             }),
+            roleplayCharacter: params.character,
+            roleplayPurpose: "memory_reflect",
           }).pipe(Effect.orDie)
 
           const subagentSessionID = subagentSession.id

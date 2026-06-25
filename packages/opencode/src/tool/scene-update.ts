@@ -7,6 +7,7 @@ import { File } from "@/file"
 import { FileWatcher } from "@/file/watcher"
 import * as Tool from "./tool"
 import DESCRIPTION from "./scene-update.txt"
+import { parseSceneTransitionDirective, syncRoleplaySceneState } from "./roleplay-scene-state"
 
 const Parameters = Schema.Struct({
   path: Schema.String.annotate({
@@ -83,6 +84,15 @@ export const SceneUpdateTool = Tool.define(
           }
 
           yield* fs.writeFileString(fullPath, params.content).pipe(Effect.orDie)
+          if (relativePath === "runtime.yaml" || relativePath === "runtime.yml") {
+            yield* syncRoleplaySceneState({
+              fs,
+              worldRoot,
+              runtimeContent: params.content,
+              transition: parseSceneTransitionDirective(params.content),
+              sessionID: ctx.sessionID,
+            })
+          }
           yield* bus.publish(File.Event.Edited, { file: fullPath })
           yield* bus.publish(FileWatcher.Event.Updated, {
             file: fullPath,

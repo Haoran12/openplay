@@ -48,6 +48,7 @@ import {
   createSessionTabs,
   createSizing,
   focusTerminalById,
+  isDesktopReviewPanelOpen,
   shouldFocusTerminalOnKeyDown,
 } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/message-timeline"
@@ -68,6 +69,7 @@ import { same } from "@/utils/same"
 import { formatServerError } from "@/utils/server-errors"
 
 const emptyUserMessages: UserMessage[] = []
+const ROLEPLAY_PANEL_WIDTH = "clamp(340px, 30vw, 460px)"
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
 const emptyFollowups: FollowupItem[] = []
@@ -402,15 +404,7 @@ export default function Page() {
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
-  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
-  const desktopFileTreeOpen = createMemo(() => isDesktop() && layout.fileTree.opened())
-  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen() || desktopFileTreeOpen())
-  const sessionPanelWidth = createMemo(() => {
-    if (!desktopSidePanelOpen()) return "100%"
-    if (desktopReviewOpen()) return `${layout.session.width()}px`
-    return `calc(100% - ${layout.fileTree.width()}px)`
-  })
-  const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
+  const roleplayMode = createMemo(() => isRoleplayMode(sync.data.path.world))
 
   function normalizeTab(tab: string) {
     if (!tab.startsWith("file://")) return tab
@@ -447,6 +441,28 @@ export default function Page() {
   })
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
+  const hasVisibleFileTabs = createMemo(() => {
+    if (!isDesktop()) return false
+    return !!activeFileTab()
+  })
+  const desktopReviewOpen = createMemo(() => {
+    if (!isDesktop()) return false
+    return isDesktopReviewPanelOpen({
+      roleplayMode: roleplayMode(),
+      reviewPanelOpened: view().reviewPanel.opened(),
+      hasVisibleFileTabs: hasVisibleFileTabs(),
+    })
+  })
+  const desktopFileTreeOpen = createMemo(() => isDesktop() && layout.fileTree.opened())
+  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen() || desktopFileTreeOpen())
+  const showRoleplayPanel = createMemo(() => roleplayMode() && !desktopSidePanelOpen())
+  const sessionPanelWidth = createMemo(() => {
+    if (showRoleplayPanel()) return `calc(100% - ${ROLEPLAY_PANEL_WIDTH})`
+    if (!desktopSidePanelOpen()) return "100%"
+    if (desktopReviewOpen()) return `${layout.session.width()}px`
+    return `calc(100% - ${layout.fileTree.width()}px)`
+  })
+  const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
   const revertMessageID = createMemo(() => info()?.revert?.messageID)
   const messages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
   const messagesReady = createMemo(() => {
@@ -519,6 +535,7 @@ export default function Page() {
     changes: "git" as ChangeMode,
     newSessionWorktree: "main",
     deferRender: false,
+    readerMode: "all" as "all" | "narrative",
   })
 
   const [followup, setFollowup] = persisted(
@@ -843,6 +860,7 @@ export default function Page() {
       () => {
         setStore("messageId", undefined)
         setStore("changes", "git")
+        setStore("readerMode", "all")
         setUi("pendingMessage", undefined)
       },
       { defer: true },
@@ -1868,11 +1886,13 @@ export default function Page() {
                     turnStart={historyWindow.turnStart()}
                     historyMore={historyMore()}
                     historyLoading={historyLoading()}
-                    onLoadEarlier={() => {
+                  onLoadEarlier={() => {
                       void historyWindow.loadAndReveal()
                     }}
                     renderedUserMessages={historyWindow.renderedUserMessages()}
                     anchor={anchor}
+                    readerMode={store.readerMode}
+                    onReaderModeChange={(mode) => setStore("readerMode", mode)}
                   />
                 </Show>
               </Match>
@@ -1949,7 +1969,7 @@ export default function Page() {
         </div>
 
         <Show
-          when={isRoleplayMode(sync.data.path.world)}
+          when={showRoleplayPanel()}
           fallback={
             <SessionSidePanel
               canReview={canReview}

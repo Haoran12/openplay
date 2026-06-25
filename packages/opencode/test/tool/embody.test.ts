@@ -5,20 +5,31 @@ import {
   buildSubagentSystemPrompt,
   detectSubjectiveLeakage,
   ensureCharacterBinding,
+  matchReusableRoleplaySession,
   formatSceneEventsSection,
   inferCharacterBindingsFromFiles,
+  EmbodyTool,
+  resolveRuntimeSceneKey,
   sanitizeSceneEvents,
   tryParseCharacterSample,
 } from "@/tool/embody"
 import { readManifest, resolveForCharacter } from "@/tool/character-directory"
 import { filterL2View, type ForbiddenSet } from "@/tool/god-only-filter"
+import { GodOnlyFilter } from "@/tool/god-only-filter"
 import { characterMemoryPath } from "@/tool/memory-update"
 import { formatMemoryEntry, normalizeMemoryFile } from "@/tool/memory-schema"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
+import { Session } from "@/session/session"
 import fs from "fs/promises"
 import path from "path"
 import { tmpdir, tmpdirScoped } from "../fixture/fixture"
-import { Effect } from "effect"
+import { Context, Effect, Layer } from "effect"
+import type { TaskPromptOps } from "@/tool/task"
+import { Agent } from "@/agent/agent"
+import { Config } from "@/config/config"
+import { MessageID, SessionID } from "@/session/schema"
+import { Truncate } from "@/tool/truncate"
+import { InstanceRef } from "@/effect/instance-ref"
 
 describe("tool.embody", () => {
   const forbiddenSet: ForbiddenSet = {
@@ -334,7 +345,7 @@ sense_traits:
     expect(prompt).toContain("### 眼前的局势")
     expect(prompt).toContain("### 你刚刚亲历的言行")
     expect(prompt).toContain("宋祈开口：“我能进来吗？”")
-    expect(prompt).toContain("玩家给你的轻微牵引（不是事实，只是轻推）")
+    expect(prompt).toContain("### 玩家给你的引导")
     expect(prompt).toContain("只返回一个 JSON 对象")
   })
 
@@ -661,4 +672,311 @@ role: 云梦泽的大妖长老
 
     await dir[Symbol.asyncDispose]()
   })
+})
+
+test("resolves stable scene keys and fails open when runtime is malformed", () => {
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: {
+        current_scene: {
+          scene_id: "scene-bamboo-night",
+          date: "1003-07-14",
+          location: "竹舍",
+        },
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("scene:scene-bamboo-night")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: {
+        current_scene: {
+          date: "1003-07-14",
+          location: "竹舍",
+        },
+      },
+      storedScene: {
+        key: "scene:internal-key",
+        date: "1003-07-13",
+        location: "前庭",
+        ownerSessionID: "ses_parent",
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("scene:internal-key")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: {
+        current_scene: {
+          date: "1003-07-14",
+          location: "竹舍",
+        },
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("legacy:1003-07-14|竹舍")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: {
+        current_scene: {
+          date: "1003-07-15",
+          location: "前庭",
+        },
+      },
+      storedScene: {
+        key: "scene:stale-key",
+        date: "1003-07-14",
+        location: "竹舍",
+        ownerSessionID: "ses_parent",
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("scene:stale-key")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: undefined,
+      storedScene: {
+        key: "scene:internal-key",
+        date: "1003-07-14",
+        location: "竹舍",
+        ownerSessionID: "ses_parent",
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("scene:internal-key")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: {
+        current_scene: {
+          date: "1003-07-14",
+          location: "竹舍",
+        },
+      },
+      storedScene: {
+        key: "scene:previous-session",
+        date: "1003-07-14",
+        location: "竹舍",
+        ownerSessionID: "ses_other",
+      },
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("session:ses_parent")
+
+  expect(
+    resolveRuntimeSceneKey({
+      runtime: undefined,
+      parentSessionID: "ses_parent",
+      character: "孟缘",
+    }),
+  ).toBe("ephemeral:ses_parent:孟缘")
+})
+
+test("matches reusable roleplay sessions by character, scene key, and purpose", () => {
+  const children = [
+    {
+      id: "ses_child_1",
+      slug: "a",
+      projectID: "proj_1",
+      directory: "/tmp",
+      title: "Character: 孟缘",
+      version: "1",
+      time: { created: 1, updated: 1 },
+      roleplayCharacter: "孟缘",
+      roleplaySceneKey: "scene:scene-bamboo-night",
+      roleplayPurpose: "embody" as const,
+    },
+    {
+      id: "ses_child_2",
+      slug: "b",
+      projectID: "proj_1",
+      directory: "/tmp",
+      title: "Character: 孟缘",
+      version: "1",
+      time: { created: 1, updated: 1 },
+      roleplayCharacter: "孟缘",
+      roleplaySceneKey: "scene:other-scene",
+      roleplayPurpose: "embody" as const,
+    },
+  ] as unknown as Session.Info[]
+
+  expect(
+    matchReusableRoleplaySession({
+      children,
+      character: "孟缘",
+      sceneKey: "scene:scene-bamboo-night",
+      purpose: "embody",
+    })?.id,
+  ).toBe(SessionID.make("ses_child_1"))
+
+  expect(
+    matchReusableRoleplaySession({
+      children,
+      character: "孟缘",
+      sceneKey: "scene:scene-bamboo-night",
+      purpose: "memory_reflect",
+    }),
+  ).toBeUndefined()
+})
+
+test("embody sampling falls back to a fresh child session when continuity lookup fails", async () => {
+  const fakeSessions: Session.Interface = {
+    get: (id: SessionID) =>
+      Effect.succeed({
+        id,
+        slug: "parent",
+        projectID: "proj_1" as any,
+        directory: "/tmp/world",
+        title: "Director Session",
+        version: "1",
+        time: { created: 1, updated: 1 },
+        permission: [],
+      } as Session.Info),
+    create: () =>
+      Effect.succeed({
+        id: SessionID.make("ses_fresh_character"),
+        slug: "child",
+        projectID: "proj_1" as any,
+        directory: "/tmp/world",
+        parentID: SessionID.make("ses_parent"),
+        title: "Character: 孟缘",
+        agent: "character",
+        version: "1",
+        time: { created: 1, updated: 1 },
+        roleplayCharacter: "孟缘",
+        roleplaySceneKey: "ephemeral:ses_parent:孟缘",
+        roleplayPurpose: "embody",
+      } as Session.Info),
+    children: (_parentID: SessionID) => Effect.fail(new Error("children lookup exploded")),
+  } as unknown as Session.Interface
+
+  const fakeAgents: Agent.Interface = {
+    get: (name: string) =>
+      Effect.succeed(
+        name === "character"
+          ? ({
+              name: "character",
+              mode: "subagent",
+              permission: [],
+              options: {},
+            } as unknown as Agent.Info)
+          : undefined,
+      ),
+  } as unknown as Agent.Interface
+
+  const fakeConfig: Config.Interface = {
+    get: () =>
+      Effect.succeed({
+        model: "openai/gpt-5",
+      } as any),
+  } as unknown as Config.Interface
+
+  const promptOps: TaskPromptOps = {
+    cancel: () => Effect.void,
+    resolvePromptParts: () => Effect.succeed([]),
+    loop: () => Effect.die("unused"),
+    prompt: (input) =>
+      Effect.succeed({
+        info: {
+          id: MessageID.make("msg_character_reply"),
+          sessionID: input.sessionID,
+          role: "assistant",
+          time: { created: 1, completed: 2 },
+          providerID: "openai",
+          modelID: "gpt-5",
+          mode: "default",
+          agent: "character",
+          path: { cwd: "/tmp/world", root: "/tmp/world" },
+          cost: 0,
+          tokens: {
+            input: 1,
+            output: 1,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          finish: "stop",
+        },
+        parts: [
+          {
+            id: "part_character_reply",
+            sessionID: input.sessionID,
+            messageID: MessageID.make("msg_character_reply"),
+            type: "text",
+            text: '{"inner_thought":"test","speech":"","action_intent":"","outward_action":""}',
+          },
+        ],
+      } as any),
+  }
+
+  const tool = await Effect.runPromise(
+    Effect.gen(function* () {
+      const info = yield* EmbodyTool
+      return yield* info.init()
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          AppFileSystem.defaultLayer,
+          GodOnlyFilter.defaultLayer,
+          Truncate.defaultLayer,
+          Layer.succeed(Session.Service, fakeSessions),
+          Layer.succeed(Agent.Service, fakeAgents),
+          Layer.succeed(Config.Service, fakeConfig),
+          Layer.succeed(InstanceRef, {
+            directory: "/tmp/world",
+            worktree: "/tmp/world",
+            project: { id: "proj_1", worktree: "/tmp/world", vcs: false },
+          } as any),
+        ),
+      ),
+    ),
+  )
+
+  const result = await Effect.runPromise(
+    tool.execute(
+      {
+        character: "孟缘",
+        sceneFacts: "门外有脚步声。",
+        situationFrame: "夜里，有人停在门前。",
+      },
+      {
+        sessionID: SessionID.make("ses_parent"),
+        messageID: MessageID.make("msg_parent"),
+        agent: "director",
+        abort: new AbortController().signal,
+        extra: { promptOps },
+        messages: [],
+        metadata: () => Effect.void,
+        ask: () => Effect.void,
+      },
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          AppFileSystem.defaultLayer,
+          GodOnlyFilter.defaultLayer,
+          Truncate.defaultLayer,
+          Layer.succeed(Session.Service, fakeSessions),
+          Layer.succeed(Agent.Service, fakeAgents),
+          Layer.succeed(Config.Service, fakeConfig),
+          Layer.succeed(InstanceRef, {
+            directory: "/tmp/world",
+            worktree: "/tmp/world",
+            project: { id: "proj_1", worktree: "/tmp/world", vcs: false },
+          } as any),
+        ),
+      ),
+    ),
+  )
+
+  expect(result.metadata.subagentSessionID).toBe(SessionID.make("ses_fresh_character"))
+  expect(result.output).toContain('"inner_thought": "test"')
 })

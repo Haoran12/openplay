@@ -12,7 +12,7 @@ import type { ForbiddenSet } from "./god-only-filter"
 import { Session } from "@/session/session"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
-import { MessageID } from "@/session/schema"
+import { MessageID, SessionID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import type { TaskPromptOps } from "./task"
 import { deriveSubagentSessionPermission } from "@/agent/subagent-permissions"
@@ -23,6 +23,7 @@ import {
     resolveForCharacter,
     readManifest as readCharacterManifest,
 } from "./character-directory"
+import { extractRuntimeSceneDescriptor, parseRuntimeData, readRoleplaySceneState, resolveSceneKeyFromState } from "./roleplay-scene-state"
 
 const Parameters = Schema.Struct({
     character: Schema.String.annotate({
@@ -903,17 +904,6 @@ function parseModelString(modelStr: string): { modelID: string; providerID: stri
     return { providerID: parts[0], modelID: parts[1] }
 }
 
-function parseRuntimeData(content: string | undefined): RuntimeData | undefined {
-    if (!content) return
-    try {
-        const parsed = parse(content)
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return
-        return parsed as RuntimeData
-    } catch {
-        return
-    }
-}
-
 function readObject(record: unknown): Record<string, unknown> | undefined {
     return typeof record === "object" && record !== null && !Array.isArray(record)
         ? (record as Record<string, unknown>)
@@ -927,6 +917,132 @@ function readRuntimeCharacter(runtime: RuntimeData | undefined, character: strin
         return name === character
     })
 }
+
+export function resolveRuntimeSceneKey(input: {
+    runtime: RuntimeData | undefined
+    parentSessionID: string
+    character: string
+    storedScene?: {
+        key: string
+        sceneID?: string
+        date?: string
+        location?: string
+        ownerSessionID?: string
+    }
+}): string {
+    const storedKey = resolveSceneKeyFromState({
+        stored: input.storedScene,
+        sessionID: input.parentSessionID,
+    })
+    if (storedKey) return storedKey
+
+    const descriptor = extractRuntimeSceneDescriptor(input.runtime)
+    if (input.storedScene?.ownerSessionID && input.storedScene.ownerSessionID !== input.parentSessionID) {
+        return `session:${input.parentSessionID}`
+    }
+    const rawSceneID = descriptor?.sceneID
+    if (rawSceneID) return `scene:${rawSceneID}`
+
+    const date = descriptor?.date
+    const location = descriptor?.location
+    if (date || location) {
+        return `legacy:${date ?? ""}|${location ?? ""}`
+    }
+
+    // Fail open when runtime.yaml is missing or malformed. This avoids blocking roleplay
+    // while still giving the current turn a deterministic lookup key.
+    return `ephemeral:${input.parentSessionID}:${input.character}`
+}
+
+export function matchReusableRoleplaySession(input: {
+    children: Session.Info[]
+    character: string
+    sceneKey: string
+    purpose: NonNullable<Session.Info["roleplayPurpose"]>
+}) {
+    return input.children.find(
+        (item) =>
+            item.roleplayCharacter === input.character &&
+            item.roleplaySceneKey === input.sceneKey &&
+            item.roleplayPurpose === input.purpose,
+    )
+}
+
+function createCharacterSubagentSession(input: {
+    sessions: Session.Interface
+    parentSessionID: SessionID
+    character: string
+    characterSubagent: Agent.Info
+    parentSessionPermission: Session.Info["permission"]
+    parentAgent: Agent.Info | undefined
+    sceneKey: string
+}) {
+    return input.sessions
+        .create({
+            parentID: input.parentSessionID,
+            title: `Character: ${input.character}`,
+            agent: input.characterSubagent.name,
+            permission: deriveSubagentSessionPermission({
+                parentSessionPermission: input.parentSessionPermission ?? [],
+                parentAgent: input.parentAgent,
+                subagent: input.characterSubagent,
+            }),
+            roleplayCharacter: input.character,
+            roleplaySceneKey: input.sceneKey,
+            roleplayPurpose: "embody",
+        })
+        .pipe(Effect.orDie)
+}
+
+const resolveReusableCharacterSubagentSession = Effect.fn("Embody.resolveReusableCharacterSubagentSession")(function* (
+    input: {
+        sessions: Session.Interface
+        parentSessionID: SessionID
+        character: string
+        characterSubagent: Agent.Info
+        parentSessionPermission: Session.Info["permission"]
+        parentAgent: Agent.Info | undefined
+        sceneKey: string
+    },
+) {
+    const fresh = () =>
+        createCharacterSubagentSession({
+            sessions: input.sessions,
+            parentSessionID: input.parentSessionID,
+            character: input.character,
+            characterSubagent: input.characterSubagent,
+            parentSessionPermission: input.parentSessionPermission,
+            parentAgent: input.parentAgent,
+            sceneKey: input.sceneKey,
+        })
+
+    const children = yield* input.sessions
+        .children(SessionID.make(input.parentSessionID))
+        .pipe(Effect.catchCause(() => Effect.succeed<Session.Info[]>([])))
+    const reusable = matchReusableRoleplaySession({
+        children,
+        character: input.character,
+        sceneKey: input.sceneKey,
+        purpose: "embody",
+    })
+    if (reusable) return reusable
+    return yield* fresh().pipe(
+        Effect.catchCause(() =>
+            // Roleplay continuity must never block the current embody sampling.
+            // If continuity metadata or session lookup/creation misbehaves, fall back
+            // to a plain fresh child session and continue the turn.
+            createCharacterSubagentSession({
+                sessions: input.sessions,
+                parentSessionID: input.parentSessionID,
+                character: input.character,
+                characterSubagent: input.characterSubagent,
+                parentSessionPermission: input.parentSessionPermission,
+                parentAgent: input.parentAgent,
+                sceneKey: `ephemeral:${input.parentSessionID}:${input.character}`,
+            }),
+        ),
+    )
+})
 
 function buildObjectiveEnvironmentLines(input: {
     runtime: RuntimeData | undefined
@@ -1419,7 +1535,10 @@ export const EmbodyTool = Tool.define(
                 const runtimeContent = worldPath
                     ? yield* fs.readFileStringSafe(path.join(worldPath, "runtime.yaml")).pipe(Effect.orDie)
                     : undefined
-                const runtime = parseRuntimeData(runtimeContent)
+                const runtime = parseRuntimeData(runtimeContent) as RuntimeData | undefined
+                const sceneState = worldPath
+                    ? yield* readRoleplaySceneState({ fs, worldRoot: worldPath }).pipe(Effect.orDie)
+                    : undefined
                 const runtimeCharacter = readRuntimeCharacter(runtime, params.character)
                 const selfKnowledgeLines = buildCharacterSelfKnowledge({
                     character: params.character,
@@ -1531,18 +1650,21 @@ export const EmbodyTool = Tool.define(
                     model = parseModelString(cfg.model ?? "anthropic/claude-sonnet-4-20250514")!
                 }
 
-                const subagentSession = yield* sessions
-                    .create({
-                        parentID: ctx.sessionID,
-                        title: `Character: ${params.character}`,
-                        agent: characterSubagent.name,
-                        permission: deriveSubagentSessionPermission({
-                            parentSessionPermission: parentSession.permission ?? [],
-                            parentAgent,
-                            subagent: characterSubagent,
-                        }),
-                    })
-                    .pipe(Effect.orDie)
+                const sceneKey = resolveRuntimeSceneKey({
+                    runtime,
+                    parentSessionID: ctx.sessionID,
+                    character: params.character,
+                    storedScene: sceneState?.current,
+                })
+                const subagentSession = yield* resolveReusableCharacterSubagentSession({
+                    sessions,
+                    parentSessionID: ctx.sessionID,
+                    character: params.character,
+                    characterSubagent,
+                    parentSessionPermission: parentSession.permission,
+                    parentAgent,
+                    sceneKey,
+                })
 
                 const subagentSessionID = subagentSession.id
                 const systemPrompt = buildSubagentSystemPrompt({

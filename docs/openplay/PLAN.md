@@ -74,7 +74,7 @@ Director Agent (持有 L1 真相)
   │
   ├── 用 read 工具读取所有 YAML（看到一切，包括 God Only）
   │
-  ├── 用 calc 工具做确定性计算
+├── 用 calc 工具做确定性计算
   │   calc date "966-03-17" "1003-07-17"  →  年龄
   │   calc tier 2500                        →  "Master 级别"
   │   calc delta 2500 1500                  →  "差距显著"
@@ -85,13 +85,13 @@ Director Agent (持有 L1 真相)
   │   - 看到 "access: self" → 仅角色本人可见
   │   - 数值翻译为体感描述
   │
-  ├── 调用 embody(character="孟缘", sceneFacts=..., situationFrame=..., sceneEvents=[...])
-  │   │  embody 内部：
-  │   │  1. 构建角色 Agent 配置
-  │   │  2. 程序化过滤 sceneFacts / situationFrame / sceneEvents 中的 God Only 内容
-  │   │  3. 创建 Subagent Session（受限权限：只有 question）
-  │   │  4. 传入 roleplay 覆盖（禁用真实 env/instructions/skills）
-  │   │  5. 返回 L3 输出
+├── 调用 embody(character="孟缘", sceneFacts=..., situationFrame=..., sceneEvents=[...])
+│   │  embody 内部：
+│   │  1. 构建角色 Agent 配置
+│   │  2. 程序化过滤 sceneFacts / situationFrame / sceneEvents 中的 God Only 内容
+│   │  3. 同角色同场景优先复用已有 Character Subagent Session；否则创建新 Session
+│   │  4. 传入 roleplay 覆盖（禁用真实 env/instructions/skills）
+│   │  5. 返回 L3 输出
   │   │
   │   └── Character Subagent 只看到：
   │       ├── 角色卡 + 输出格式约束（system prompt）

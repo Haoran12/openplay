@@ -34,6 +34,7 @@ describe("World.fromDirectory", () => {
           path.join(dir, "runtime.yaml"),
           [
             "current_scene:",
+            '  scene_id: "scene-yunmeng-001"',
             '  date: "1003-07-14"',
             '  location: "今庭 - 荆州 - 云梦泽 - 建木府 - 主卧"',
             '  impression: "夜间, 阴凉惬意的房间"',
@@ -50,7 +51,9 @@ describe("World.fromDirectory", () => {
       const svc = yield* World.Service
       const world = yield* svc.fromDirectory(dir, dir)
 
+      expect(world?.scene?.sceneID).toBe("scene-yunmeng-001")
       expect(world?.scene).toEqual({
+        sceneID: "scene-yunmeng-001",
         date: "1003-07-14",
         location: "今庭 - 荆州 - 云梦泽 - 建木府 - 主卧",
         impression: "夜间, 阴凉惬意的房间",

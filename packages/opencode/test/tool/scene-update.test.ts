@@ -100,6 +100,85 @@ describe("tool.scene_update", () => {
     }),
   )
 
+  it.instance("keeps internal continuity state across short date/location updates unless explicitly switched", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sceneStatePath = path.join(test.directory, ".openplay", "scene-state.json")
+
+      yield* run({
+        path: "runtime.yaml",
+        content: ["current_scene:", "  date: 1003-07-14", "  location: 云梦泽 建木府 主卧", ""].join("\n"),
+      })
+      const first = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      yield* run({
+        path: "runtime.yaml",
+        content: ["current_scene:", "  date: 1003-07-14", "  location: 云梦泽 建木府 主卧", "  impression: 夜深", ""].join(
+          "\n",
+        ),
+      })
+      const second = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      yield* run({
+        path: "runtime.yaml",
+        content: ["current_scene:", "  date: 1003-07-15", "  location: 云梦泽 建木府 前庭", ""].join("\n"),
+      })
+      const third = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      yield* run({
+        path: "runtime.yaml",
+        content: [
+          "# openplay: scene_transition=switch",
+          "current_scene:",
+          "  date: 1003-07-15",
+          "  location: 云梦泽 山门外",
+          "",
+        ].join("\n"),
+      })
+      const fourth = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      expect(first.current?.key).toEqual(second.current?.key)
+      expect(second.current?.key).toEqual(third.current?.key)
+      expect(third.current).toMatchObject({
+        date: "1003-07-15",
+        location: "云梦泽 建木府 前庭",
+      })
+      expect(third.current?.key).not.toEqual(fourth.current?.key)
+      expect(fourth.current).toMatchObject({
+        date: "1003-07-15",
+        location: "云梦泽 山门外",
+      })
+    }),
+  )
+
+  it.instance("rotates internal continuity state when a new parent session writes runtime.yaml", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sceneStatePath = path.join(test.directory, ".openplay", "scene-state.json")
+
+      yield* run({
+        path: "runtime.yaml",
+        content: ["current_scene:", "  date: 1003-07-14", "  location: 云梦泽 建木府 主卧", ""].join("\n"),
+      })
+      const first = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      yield* run(
+        {
+          path: "runtime.yaml",
+          content: ["current_scene:", "  date: 1003-07-14", "  location: 云梦泽 建木府 主卧", ""].join("\n"),
+        },
+        {
+          ...ctx,
+          sessionID: SessionID.make("ses_test-scene-update-session-2"),
+        },
+      )
+      const second = JSON.parse(yield* Effect.promise(() => fs.readFile(sceneStatePath, "utf-8")))
+
+      expect(first.current?.key).not.toEqual(second.current?.key)
+      expect(second.current?.ownerSessionID).toBe("ses_test-scene-update-session-2")
+    }),
+  )
+
   it.instance("blocks writes to character resource paths", () =>
     Effect.gen(function* () {
       const result = yield* run({

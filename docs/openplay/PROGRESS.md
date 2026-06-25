@@ -54,7 +54,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 | 2026-05-21 | Character 目录化重构：角色改为 `characters/<dir>/profile.yaml + memory.yaml + knowledge/` 结构，共用目录索引按 `profile.yaml` 解析真实名 |
 | 2026-05-21 | Character 自主读取链路：新增 `character_view_read`，Character 子代理从资源清单主动读取自身资源，Director 不再注入完整设定/记忆正文 |
 | 2026-05-21 | Character prompt 重构：Character system prompt 与 `embody`/`memory_reflect` 改为 manifest/resource 驱动，保持正向信息边界 |
-| 2026-05-21 | 角色迁移工具：新增 `openplay migrate-characters`，可将旧平铺角色文件与顶层 memories 迁移为目录化结构并输出报告 |
+| 2026-05-21 | 角色迁移工具：曾新增 `openplay migrate-characters`，用于将旧平铺角色文件与顶层 memories 迁移为目录化结构；该命令已于 2026-06-26 退役 |
 | 2026-05-21 | `openplay init` 更新：不再创建顶层 `memories/`，改为生成角色目录结构说明 |
 
 ---
@@ -65,8 +65,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `embody` / `memory_reflect` / `memory_update` 切换到角色目录结构
 - [x] Character / Director prompt 改为角色自主读取资源
 - [x] `openplay init` 切换到目录化角色结构
-- [x] `openplay migrate-characters` 迁移命令
-- [x] 更完整的迁移命令测试与 CLI 集成测试
+- [x] 退役 `openplay migrate-characters`：移除会将角色目录名收缩为角色名的旧迁移命令与其测试
 - [x] 清理剩余历史文档中对旧结构的零散描述
 - [x] `embody` 支持结构化当前事件输入，保留完整 speech/action 并程序级拒绝他人主观信息泄露
 - [x] Director `narrate` 主输出语义打通：metadata/UI/transcript/compaction 统一识别 player-facing narrative
@@ -75,11 +74,39 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director 回合强制 `scene_update`：Roleplay Director 每轮开始时首个工具调用必须是 `scene_update`
 - [x] WebUI 阅读体验增强：叙事连续阅读视图、角色最近一次代入卡片、场景变更时间线与 runtime/角色目录快捷入口
 - [x] `openplay web` 局域网便捷启动：支持 `--lan` 并继续兼容 `--hostname 0.0.0.0`
+- [x] `openplay-ui` 一键同时打开 OpenPlay 与 Roleplay WebUI
+- [x] Roleplay WebUI 右侧状态面板人物卡片排版调整：在场人物字段改为单行 inline 展示，仅对字段名做弱强调，避免字段名与内容分行。
+- [x] Roleplay WebUI 右侧状态面板在场人物 name 支持弹出只读 `profile.yaml` 预览，使用对话框和高亮代码块展示。
+- [x] Director 同场景人物连续性修复：`embody` 复用同角色同场景 Character 子会话，保留完整子会话历史；场景连续性锚点改由内部 scene-state 维护，不再依赖 `runtime.yaml.current_scene.scene_id`，并对用户手改/损坏 `runtime.yaml` 保持 fail-open 降级。
+- [x] Director 人物连续性止血修复：修复 `SessionID is not defined` 运行时错误；连续性查找/复用失败时 `embody` 自动降级为 fresh Character 子会话，不能阻断当次采样；`scene_update(runtime.yaml)` 现自动刷新内部场景连续性状态，`openplay init` 不再默认写 `current_scene.scene_id`。
+- [x] Director 场景连续性锚点内置化：`scene_update` 全量覆盖 `runtime.yaml` 时，内部 scene-state 会按 `current_scene.date/location` 自动保留或切换场景 key，避免 `scene_id` 被覆盖后人物连续性丢失。
+- [x] Director 场景切换判定收紧：短时/短距导致的 `date/location` 变化不再自动切场；只有显式 `# openplay: scene_transition=switch` 才会轮换内部 scene key。
+- [x] Director 会话边界接入场景边界：新建 Director 会话会自动轮换内部 scene key，不再复用旧会话的场景连续性。
 
 ## Changelog
 
+- 2026-06-26: 退役 `openplay migrate-characters` CLI 迁移命令，并删除对应测试。该命令会在迁移旧平铺角色文件时按解析出的角色名重建目录，导致用户原本带“所属+名字”语义的目录名被收缩为“名字”。
+- 2026-06-26: 将 Director 会话边界并入场景边界规则：`.openplay/scene-state.json` 现记录写入该场景 key 的父会话；新建 Director 会话后首次写 `runtime.yaml` 会自动切到新 scene key，即使场景内容相同也不继承旧会话连续性。
+- 2026-06-26: 收紧 Director 场景切换规则：`.openplay/scene-state.json` 现默认保留当前内部 scene key，`current_scene.date/location` 的短时或短距离变化不会自动断开人物连续性；只有在 `scene_update(runtime.yaml)` 内容首行显式写入 `# openplay: scene_transition=switch` 时，程序才切换到新场景。
+- 2026-06-26: 调整 Director 场景连续性设计：人物连续性锚点不再存放在 `runtime.yaml.current_scene.scene_id`；`scene_update(runtime.yaml)` 现自动维护内部 `.openplay/scene-state.json`，按 `current_scene.date/location` 保留同场景 key 或在换场时切新 key。同步移除 `openplay init` 默认生成的 `scene_id`，并更新 Director prompt / runtime 文档口径。
+- 2026-06-26: 调整 Roleplay WebUI 右侧状态面板人物卡片排版：在场人物字段改为同一行展示，字段名仅保留弱强调样式，避免字段名与内容拆行。
+- 2026-06-26: 增强 Roleplay WebUI 右侧状态面板交互：点击在场人物 name 会以只读悬浮对话框打开对应 `profile.yaml`，并用高亮代码块预览内容。
+- 2026-06-26: 修复 Director 人物连续性回归：`embody` 连续性路径补上缺失的 `SessionID` 依赖与 effect API 修正，避免 `SessionID is not defined` / 连续性查找异常打断角色采样；当复用子会话失败时自动回退为 fresh Character 子会话继续采样。同步更新 `openplay init`，新建世界的 `runtime.yaml` 默认写入结构化 `current_scene.scene_id/date/location`，为同场景连续性提供稳定初始锚点。
+- 2026-06-26: 修复 Director 模式人物连续性：`embody` 现按“同父 Director 会话 + 同角色 + 同场景”复用 Character 子会话，默认保留完整角色历史与已读取资源；新增 `runtime.yaml.current_scene.scene_id` 推荐边界字段，并在 `runtime.yaml` 缺失、损坏或被用户手改时自动 fail-open 降级，避免角色扮演因 runtime 问题卡住。
+- 2026-06-26: 重构本地开发版 `openplay-ui` 启动器：不再打开 `openplay web` 的 4096 内嵌页，而是直接启动 4096 后端与 3000 Vite 开发页，并将浏览器打开到 3000 的 Roleplay 专用 UI，确保本地调试落在实际的特殊 WebUI 上。
+- 2026-06-26: 修复 Roleplay WebUI 工具审计展开区代码块长行截断：`embody` sample、`scene_update`、`calc`、`dice_roll` 与 `via_narrate` 审计内容中的代码块现启用自动换行，避免超长单行 JSON / 文本在消息流中显示不全。
+- 2026-06-26: 调整 Roleplay WebUI 消息流审计展示：`narrate` 下方冗余 `via_narrate` 痕迹降为低权重可折叠行；`embody` sample、`scene_update`、`calc`、`dice_roll` 等工具调用改为默认收起但可点击展开查看输入/输出过程，减少正文干扰同时保留审计可读性。
+- 2026-06-26: 调整 Roleplay WebUI 右下角开发帧率面板显示条件：改为按 Director Agent 模式判断，在 Director 会话中不再渲染 `DebugBar`，避免 roleplay 界面右下角出现 FPS/性能诊断面板。
+- 2026-06-26: 修复 Roleplay WebUI 右侧文件内容面板关闭后的残留占位：主消息区宽度回退现在同时依赖“右栏已开启”和“当前确有文件标签”，避免关闭文件查看后因残留 tab 状态导致左侧消息区继续被挤压。
+- 2026-06-26: 修复 Roleplay WebUI 状态面板布局回归：主会话区在状态面板可见时不再占满整行，而是显式预留右栏宽度，避免场景状态面板虽然已渲染却被挤出视口外。
+- 2026-06-26: 修复 Roleplay WebUI 状态面板显示条件错误：不再把全局默认 `reviewPanel.opened=true` 误判成“文件侧栏已显式打开”，恢复场景状态面板默认可见；仅当真正打开文件标签或文件树时，才临时让位给文件侧栏。
+- 2026-06-26: 修复 Roleplay WebUI 状态面板可达性回归：文件/Review 侧栏打开后新增可见的关闭入口，允许用户直接返回右侧场景/角色状态面板，避免 `date/location` 等场景信息“消失”后无路切回。
+- 2026-06-26: 修复 Roleplay WebUI 右侧面板交互：桌面端角色/场景侧栏改为稳定宽度；当点击“编辑 runtime.yaml”或“打开角色目录”时，roleplay 侧栏会正确让位给可见的文件/Review 侧栏；目录快捷入口默认切到 `All files`，避免落在 `Changes` 标签下看似无效。
+- 2026-06-26: 修复 WebUI 启动时的残留品牌导入：`packages/app/src/index.css` 从已不存在的 `@opencode-ai/ui/styles/tailwind` 切换到 `@openplay-ai/ui/styles/tailwind`，恢复 Vite/Tailwind 样式入口解析。
 - 2026-06-26: 修复 `packages/opencode/test/session/prompt.test.ts` 的过期 `sessions.messages` 调用签名，恢复仓库 `bun turbo typecheck` 通过。
 - 2026-06-26: WebUI 阅读体验增强：会话时间线新增“仅看叙事 / 全部”切换，`narrate` 正文可在连续阅读视图中按顺序串读；右侧角色面板新增最近一次 Character 子代理输入/输出卡片、`records/*` 场景变更时间线，以及 `runtime.yaml` / 角色目录快捷入口。
+- 2026-06-26: WebUI 阅读体验调整：会话时间线的“仅看叙事 / 全部”切换移到固定标题卡区域，避免用户必须滚动消息列表顶部才能找到阅读模式开关。
+- 2026-06-26: WebUI 阅读体验再调整：阅读模式切换并入会话标题行右侧动作区，避免额外占用一整行并压缩消息内容区域。
 - 2026-06-26: 网络启动便捷性补强：`openplay web` 新增 `--lan`，可直接绑定 `0.0.0.0` 并打印局域网访问地址；仍支持 `openplay web --hostname 0.0.0.0`。
 - 2026-06-25: 收紧 Director 首工具约束：Roleplay Director 现在每轮开始时首个工具调用必须是 `scene_update`；若先调用其他工具，会被程序直接拦截并要求先更新 `runtime.yaml` 或 `records/*`。保留既有 `embody` 后必须继续走到 `narrate` 或 `question` 的回合收束约束，并补充 session prompt 回归测试。
 - 2026-06-24: 修复 Director 右侧面板 `runtime.yaml` 摘要解析：`World.fromDirectory` 现兼容旧式 `current_date` + 标量 `current_scene`，并可从 `environment.time/location` 回填场景时间地点；补充 `world` 与 HTTP API 回归测试，确保右侧面板能稳定显示当前时间、地点和在场人物。
@@ -91,8 +118,8 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-05-26: 修复 Director `calc` 年龄调用 schema 导出错误：`calc.type` 改用 `Schema.Literals([...])`，避免 JSON Schema 误退化为仅允许 `"date"`，并补充参数 schema 回归测试覆盖 `age`/`tier`/`delta` 枚举值。
 - 2026-05-25: 角色读取链路改为目录索引 + manifest/resource 驱动；Character 通过 `character_view_read` 主动读取自身资源。
 - 2026-05-25: `memory_update` 改为固定写入角色目录内 `memory.yaml`，`scene_update` 明确拒绝角色资源路径。
-- 2026-05-25: `openplay init` 不再创建顶层 `memories/`，新增 `openplay migrate-characters` 迁移命令与报告输出。
-- 2026-05-26: 补齐 `openplay migrate-characters` 迁移命令测试，覆盖旧平铺角色文件、顶层 `memories/`、gm notes 与知识资源迁移。
+- 2026-05-25: `openplay init` 不再创建顶层 `memories/`；当时曾新增 `openplay migrate-characters` 迁移命令与报告输出，该命令已于 2026-06-26 退役。
+- 2026-05-26: 当时补齐 `openplay migrate-characters` 迁移命令测试，覆盖旧平铺角色文件、顶层 `memories/`、gm notes 与知识资源迁移；对应命令与测试已于 2026-06-26 删除。
 - 2026-05-26: 收紧 `runtime.yaml` 文档措辞，去掉仍显旧式的“玩家不应直接编辑”表述。
 - 2026-05-26: 手工完成 `/home/refzhu/airp/xdworld` 剩余角色目录化迁移，补齐 `孟缘`、`沈烟`、`李昀` 的 `profile.yaml`，为缺失角色补建 `memory.yaml`，并将绑定表统一切到 `characters/<dir>/{profile,memory}.yaml`。
 - 2026-05-26: 清理 `/home/refzhu/airp/xdworld` 的旧平铺角色文件、顶层 `memories/*.yaml` 与冗余 `遐蝶_Hidden/` 目录，仅保留目录化角色资源结构。

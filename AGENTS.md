@@ -4,6 +4,6 @@
 
 ## OpenPlay Transformation
 
-- **MUST READ** `docs/openplay/PLAN.md` before making any changes to OpenPlay-related code (world detection, agent system, roleplay tools, prompt isolation, session schema, etc.).
 - **MUST UPDATE** `docs/openplay/PROGRESS.md` after completing each task — mark items as `[x]` and add a changelog entry.
+- **MUST UPDATE** git commit
 - When committing OpenPlay changes, include the phase/task identifier in the commit message (e.g. `feat(openplay): P0-1 add world detection service`).

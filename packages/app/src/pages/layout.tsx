@@ -65,6 +65,7 @@ import { Titlebar } from "@/components/titlebar"
 import { useServer } from "@/context/server"
 import { useLanguage, type Locale } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
+import { getDirectorAgent } from "@/utils/roleplay"
 import {
   displayName,
   effectiveWorkspaceOrder,
@@ -149,6 +150,16 @@ export default function Layout(props: ParentProps) {
   }
   const colorSchemeLabel = (scheme: ColorScheme) => language.t(colorSchemeKey[scheme])
   const currentDir = createMemo(() => route().dir)
+  const currentStore = createMemo(() => {
+    const dir = currentDir()
+    if (!dir) return
+    return globalSync.peek(dir, { bootstrap: false })
+  })
+  const directorMode = createMemo(() => {
+    const store = currentStore()
+    if (!store) return false
+    return getDirectorAgent(store[0].agent) !== undefined
+  })
 
   const [state, setState] = createStore({
     autoselect: !initialDirectory,
@@ -2513,7 +2524,7 @@ export default function Layout(props: ParentProps) {
             </div>
           </div>
         </div>
-        {import.meta.env.DEV && <DebugBar />}
+        {import.meta.env.DEV && !directorMode() && <DebugBar />}
       </div>
       <Toast.Region />
     </div>

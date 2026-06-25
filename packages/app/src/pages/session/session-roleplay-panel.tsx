@@ -1,15 +1,19 @@
 import { createResource, createMemo, createSignal, For, Show, type Component } from "solid-js"
 import type { Agent, Message, Part, ToolPart, UserMessage, WorldInfo } from "@openplay-ai/sdk/v2/client"
+import { Dialog } from "@openplay-ai/ui/dialog"
+import { Markdown } from "@openplay-ai/ui/markdown"
 import { useLanguage } from "@/context/language"
 import { useSync } from "@/context/sync"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useLayout } from "@/context/layout"
+import { useDialog } from "@openplay-ai/ui/context/dialog"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { agentDisplayName } from "@/utils/roleplay"
 import { agentColor } from "@/utils/agent"
 
 type RuntimeCharacter = NonNullable<WorldInfo["presentCharacters"]>[number]
+const ROLEPLAY_PANEL_WIDTH = "clamp(340px, 30vw, 460px)"
 
 type CharacterReplay = {
   input?: string
@@ -26,6 +30,12 @@ type SceneHistoryItem = {
   impression?: string
   presentCharacters: string[]
   raw: string
+}
+
+type ProfilePreview = {
+  title: string
+  path: string
+  content?: string
 }
 
 function readObject(value: unknown): Record<string, unknown> | undefined {
@@ -125,6 +135,36 @@ function parseCharacterReplayOutput(text: string | undefined) {
   }
 }
 
+function profilePathFromStatePath(statePath: string | undefined) {
+  if (!statePath) return undefined
+  if (statePath.endsWith("/profile.yaml")) return statePath
+  if (statePath.endsWith("/profile.yml")) return statePath.replace(/\.yml$/, ".yaml")
+  const i = statePath.lastIndexOf("/")
+  if (i < 0) return undefined
+  return `${statePath.slice(0, i)}/profile.yaml`
+}
+
+const CharacterProfileDialog: Component<{
+  profile: ProfilePreview
+}> = (props) => {
+  return (
+    <Dialog
+      title={props.profile.title}
+      description={props.profile.path}
+      size="x-large"
+      fit
+      class="w-[min(calc(100vw-40px),920px)] h-[min(calc(100vh-40px),760px)] overflow-hidden"
+    >
+      <div class="h-full min-h-0 overflow-auto rounded-lg border border-border-weaker-base bg-background-base p-4">
+        <Markdown
+          text={`\`\`\`yaml\n${props.profile.content?.trim() || "（空文件）"}\n\`\`\``}
+          class="text-13-regular"
+        />
+      </div>
+    </Dialog>
+  )
+}
+
 const CharacterFacts: Component<{ character: RuntimeCharacter }> = (props) => {
   const rows = () =>
     [
@@ -142,9 +182,9 @@ const CharacterFacts: Component<{ character: RuntimeCharacter }> = (props) => {
       <div class="mt-2 flex flex-col gap-2">
         <For each={rows()}>
           {(row) => (
-            <div>
-              <div class="text-12-medium text-text-weak mb-0.5">{row.label}</div>
-              <p class="text-13-regular text-text-base whitespace-pre-wrap">{row.value}</p>
+            <div class="flex gap-2 text-13-regular leading-5">
+              <span class="shrink-0 text-12-medium text-text-weak whitespace-nowrap">{row.label}:</span>
+              <p class="min-w-0 text-text-base whitespace-pre-wrap">{row.value}</p>
             </div>
           )}
         </For>
@@ -165,6 +205,7 @@ const RuntimeCharacterCard: Component<{ character: RuntimeCharacter }> = (props)
 const CharacterCard: Component<{
   agent: Agent
   replay?: CharacterReplay
+  onOpenProfile?: () => void
   onEdit?: () => void
   onOpenDirectory?: () => void
 }> = (props) => {
@@ -183,10 +224,7 @@ const CharacterCard: Component<{
 
   return (
     <div class="border-b border-border-weaker-base last:border-b-0">
-      <button
-        class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background-weaker-base transition-colors"
-        onClick={() => setExpanded(!expanded())}
-      >
+      <div class="w-full flex items-center gap-3 px-3 py-2.5">
         <div class="relative shrink-0">
           <span
             class="block w-3 h-3 rounded-full ring-2 ring-offset-1 ring-offset-background-base"
@@ -195,38 +233,55 @@ const CharacterCard: Component<{
           <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--color-success)] border border-background-base" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-14-medium text-text-strong truncate">{name()}</div>
+          <button
+            class="block max-w-full text-14-medium text-text-strong truncate text-left hover:text-text-interactive-base transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              props.onOpenProfile?.()
+            }}
+          >
+            {name()}
+          </button>
           <Show when={props.agent.persona}>
             <div class="text-12-regular text-text-weak truncate">{props.agent.persona!.split("\n")[0]?.trim()}</div>
           </Show>
         </div>
-        <svg
-          class="shrink-0 text-text-weak transition-transform"
-          classList={{ "rotate-90": expanded() }}
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <button
+          class="shrink-0 text-text-weak hover:text-text-strong transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded(!expanded())
+          }}
+          aria-label={expanded() ? "Collapse character details" : "Expand character details"}
         >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </button>
+          <svg
+            class="transition-transform"
+            classList={{ "rotate-90": expanded() }}
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
       <Show when={expanded()}>
         <div class="px-3 pb-3 flex flex-col gap-3">
           <Show when={persona()}>
-            <div>
-              <div class="text-12-medium text-text-weak mb-0.5">Persona</div>
-              <p class="text-13-regular text-text-base whitespace-pre-wrap">{persona()}</p>
+            <div class="flex gap-2 text-13-regular leading-5">
+              <span class="shrink-0 text-12-medium text-text-weak whitespace-nowrap">Persona:</span>
+              <p class="min-w-0 text-text-base whitespace-pre-wrap">{persona()}</p>
             </div>
           </Show>
           <Show when={senses() && Object.keys(senses()!).length > 0}>
-            <div>
-              <div class="text-12-medium text-text-weak mb-0.5">Senses</div>
-              <p class="text-13-regular text-text-base">
+            <div class="flex gap-2 text-13-regular leading-5">
+              <span class="shrink-0 text-12-medium text-text-weak whitespace-nowrap">Senses:</span>
+              <p class="min-w-0 text-text-base">
                 {Object.entries(senses()!)
                   .map(([k, v]) => `${k}: ${v}`)
                   .join(", ")}
@@ -234,15 +289,15 @@ const CharacterCard: Component<{
             </div>
           </Show>
           <Show when={knowledgeAccess() && knowledgeAccess()!.length > 0}>
-            <div>
-              <div class="text-12-medium text-text-weak mb-0.5">Knowledge</div>
-              <p class="text-13-regular text-text-base">{knowledgeAccess()!.join(", ")}</p>
+            <div class="flex gap-2 text-13-regular leading-5">
+              <span class="shrink-0 text-12-medium text-text-weak whitespace-nowrap">Knowledge:</span>
+              <p class="min-w-0 text-text-base">{knowledgeAccess()!.join(", ")}</p>
             </div>
           </Show>
           <Show when={statePath()}>
-            <div>
-              <div class="text-12-medium text-text-weak mb-0.5">State</div>
-              <p class="text-13-regular text-text-base font-mono">{statePath()}</p>
+            <div class="flex gap-2 text-13-regular leading-5">
+              <span class="shrink-0 text-12-medium text-text-weak whitespace-nowrap">State:</span>
+              <p class="min-w-0 text-text-base font-mono">{statePath()}</p>
             </div>
           </Show>
           <Show when={props.replay}>
@@ -317,17 +372,13 @@ const CharacterWithRuntimeCard: Component<{
   agent: Agent
   character: RuntimeCharacter
   replay?: CharacterReplay
+  onOpenProfile?: () => void
   onEdit?: () => void
   onOpenDirectory?: () => void
 }> = (props) => {
   return (
     <div>
-      <CharacterCard
-        agent={props.agent}
-        replay={props.replay}
-        onEdit={props.onEdit}
-        onOpenDirectory={props.onOpenDirectory}
-      />
+      <CharacterCard agent={props.agent} replay={props.replay} onOpenProfile={props.onOpenProfile} onEdit={props.onEdit} onOpenDirectory={props.onOpenDirectory} />
       <div class="px-3 pb-1">
         <CharacterFacts character={props.character} />
       </div>
@@ -341,6 +392,7 @@ export const SessionRoleplayPanel: Component = () => {
   const sdk = useSDK()
   const file = useFile()
   const layout = useLayout()
+  const dialog = useDialog()
   const { params, tabs, view } = useSessionLayout()
 
   const world = () => sync.data.path.world
@@ -367,6 +419,7 @@ export const SessionRoleplayPanel: Component = () => {
   }
 
   const revealDirectory = async (path: string) => {
+    layout.fileTree.setTab("all")
     if (!layout.fileTree.opened()) layout.fileTree.open()
     const parts = path.split("/").filter(Boolean)
     let current = ""
@@ -382,6 +435,24 @@ export const SessionRoleplayPanel: Component = () => {
     const match = path.match(/^(characters\/[^/]+)/)
     if (!match) return
     void revealDirectory(match[1]!)
+  }
+
+  const openCharacterProfile = (statePath: string | undefined, name: string) => {
+    const profilePath = profilePathFromStatePath(statePath)
+    if (!profilePath) return
+    void (async () => {
+      const content = await sdk.client.file.read({ path: profilePath }).then((response) => response.data).catch(() => undefined)
+      if (!content || content.type !== "text") return
+      dialog.show(() => (
+        <CharacterProfileDialog
+          profile={{
+            title: name,
+            path: profilePath,
+            content: content.content,
+          }}
+        />
+      ))
+    })()
   }
 
   const sceneRows = createMemo(() => {
@@ -489,7 +560,14 @@ export const SessionRoleplayPanel: Component = () => {
   )
 
   return (
-    <aside class="h-full flex flex-col bg-background-base border-l border-border-weaker-base overflow-hidden">
+    <aside
+      class="h-full flex flex-col bg-background-base border-l border-border-weaker-base overflow-hidden md:shrink-0"
+      style={{
+        width: ROLEPLAY_PANEL_WIDTH,
+        "min-width": "340px",
+        "max-width": "460px",
+      }}
+    >
       <div class="flex-1 min-h-0 overflow-y-auto">
         <div class="p-4 border-b border-border-weaker-base">
           <div class="flex items-center justify-between gap-3 mb-3">
@@ -578,6 +656,9 @@ export const SessionRoleplayPanel: Component = () => {
                           agent={agent()}
                           character={item.runtime}
                           replay={item.replay}
+                          onOpenProfile={
+                            agent().statePath ? () => openCharacterProfile(agent().statePath, agent().name) : undefined
+                          }
                           onEdit={agent().statePath ? () => openFile(agent().statePath!) : undefined}
                           onOpenDirectory={agent().statePath ? () => openCharacterDirectory(agent().statePath) : undefined}
                         />

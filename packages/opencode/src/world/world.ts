@@ -14,6 +14,7 @@ export const WorldInfo = Schema.Struct({
   configPath: Schema.String,
   scene: Schema.optional(
     Schema.Struct({
+      sceneID: Schema.optional(Schema.String),
       date: Schema.optional(Schema.String),
       location: Schema.optional(Schema.String),
       impression: Schema.optional(Schema.String),
@@ -90,6 +91,7 @@ function scalarToString(value: unknown): string | undefined {
 
 function parseSceneObject(value: unknown):
   | {
+      sceneID?: string
       date?: string
       location?: string
       impression?: string
@@ -99,16 +101,18 @@ function parseSceneObject(value: unknown):
   if (!scene) return undefined
 
   const result = {
+    sceneID: scalarToString(scene.scene_id),
     date: scalarToString(scene.date),
     location: scalarToString(scene.location),
     impression: scalarToString(scene.impression),
   }
 
-  return result.date || result.location || result.impression ? result : undefined
+  return result.sceneID || result.date || result.location || result.impression ? result : undefined
 }
 
 function parseRuntimeScene(runtime: Record<string, unknown>):
   | {
+      sceneID?: string
       date?: string
       location?: string
       impression?: string
@@ -117,12 +121,13 @@ function parseRuntimeScene(runtime: Record<string, unknown>):
   const scene = parseSceneObject(runtime.current_scene)
   const environment = readObject(runtime.environment)
   const result = {
+    sceneID: scene?.sceneID,
     date: scene?.date ?? scalarToString(runtime.current_date) ?? scalarToString(runtime.currentDate) ?? scalarToString(runtime.date) ?? scalarToString(environment?.time),
     location: scene?.location ?? scalarToString(runtime.current_scene) ?? scalarToString(environment?.location),
     impression: scene?.impression,
   }
 
-  return result.date || result.location || result.impression ? result : undefined
+  return result.sceneID || result.date || result.location || result.impression ? result : undefined
 }
 
 function parsePresentCharacters(value: unknown):

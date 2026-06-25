@@ -238,9 +238,22 @@ scene_update(
 )
 ```
 
+如需明确告诉程序“这里发生了真正的换场”，可在该次写入内容第一行加：
+
+```yaml
+# openplay: scene_transition=switch
+```
+
+默认不写时，程序会保留当前内部场景 key；仅更新时间、地点、氛围等字段不会自动切场。
+如果这是一个全新的 Director 会话，程序也会自动切换到新的内部场景 key，不需要额外标记。
+
 ## 注意事项
 
-- 此文件由 Director Agent 维护，玩家通常不直接编辑
+- 此文件由 Director Agent 维护，但用户手动修改也是允许的
+- 用户手工编辑后即使出现缺字段或临时 YAML 错误，系统也应尽量降级继续运行，而不是因为 `runtime.yaml` 问题卡住角色扮演
 - 所有字段都是可选的，缺失字段由 Director 推断
+- 场景连续性由 OpenPlay 在内部状态中维护；默认保持当前场景连续，只有显式写入 `# openplay: scene_transition=switch` 时才切换内部场景 key
+- 新建 Director 会话也会自动视为新的场景边界
+- 旧世界如果仍保留 `current_scene.scene_id`，系统会继续兼容读取，但新流程不再依赖它
 - `present_characters` 中的角色名应与 `characters/` 目录中的角色文件对应
 - `environment.inferred: true` 表示环境由 Director 推断，非玩家指定

@@ -72,6 +72,11 @@ describe("Session.Info", () => {
         snapshot: "snap-1",
         diff: "diff-1",
       },
+      worldID: "wld_test",
+      worldPath: "/tmp/world",
+      roleplayCharacter: "孟缘",
+      roleplaySceneKey: "scene:yunmeng-night-1",
+      roleplayPurpose: "embody" as const,
     }
     expect(decode(input)).toEqual(input)
   })
@@ -159,6 +164,9 @@ describe("Session input schemas", () => {
       title: "child",
       permission: [{ action: "ask" as const, pattern: "*", permission: "bash" }],
       workspaceID,
+      roleplayCharacter: "孟缘",
+      roleplaySceneKey: "scene:yunmeng-night-1",
+      roleplayPurpose: "embody" as const,
     }
     expect(decode(populated)).toEqual(populated)
   })
