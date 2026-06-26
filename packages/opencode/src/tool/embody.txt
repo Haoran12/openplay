@@ -21,11 +21,12 @@ The Director calls this tool to collect structured character output. You (the Di
    - The system will add current body state from `runtime.yaml` and available state data.
    - The system will add baseline sensory profile and current effective sensory state when possible.
 
-4. **Use `playerNudge` only for weak steer**
-   - `playerNudge` is optional.
-   - It may bias attention or lean, but it is not a fact and must not be phrased as an already-finished inner conclusion.
-   - If the player did not explicitly ask for directional influence, leave `playerNudge` empty.
-   - Do not use `focusHints` to inject conclusions like `she is testing you` or `he means no harm`. Keep hints sensory and external.
+ 4. **Use `playerNudge` for player-guided subjective direction**
+    - `playerNudge` is optional.
+    - It can pass subjective thoughts, judgments, or conclusions that the player wants the character to adopt.
+    - Unlike other fields, `playerNudge` bypasses subjective leakage checks, allowing phrases like "you realize", "you suspect", "你意识到", etc.
+    - If the player did not explicitly ask for directional influence, leave `playerNudge` empty.
+    - Do not use `focusHints` to inject conclusions like `she is testing you` or `he means no harm`. Keep hints sensory and external.
 
 5. **Translate raw numbers into perceptible experience when needed**
    - Do not write `power level 2500`.

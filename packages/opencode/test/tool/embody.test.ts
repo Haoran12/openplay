@@ -373,7 +373,7 @@ sense_traits:
     )
   })
 
-  test("allows weak player nudge but blocks hard override phrasing", () => {
+  test("allows player nudge to pass subjective thoughts without restriction", () => {
     expect(
       detectSubjectiveLeakage({
         sceneFacts: "门外脚步停在竹阶前，烛影轻轻一晃。",
@@ -388,7 +388,7 @@ sense_traits:
         situationFrame: "门外的人停在门前，没有立刻出声。",
         playerNudge: "你已经意识到她在试探你。",
       }),
-    ).toContain("playerNudge must remain a weak external steer")
+    ).toBeUndefined()
 
     expect(
       detectSubjectiveLeakage({
@@ -396,7 +396,7 @@ sense_traits:
         situationFrame: "门外的人停在门前，没有立刻出声。",
         playerNudge: "先把她认定为带着敌意而来。",
       }),
-    ).toContain("playerNudge must remain a weak external steer")
+    ).toBeUndefined()
   })
 
   test("uses fixed per-character memory path", () => {

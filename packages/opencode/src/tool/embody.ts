@@ -232,12 +232,7 @@ const SUBJECTIVE_LEAKAGE_RULES = [
     /(?:他|她|它|对方).{0,8}(?:显然|明显|分明|似乎|像是|仿佛|看来|带着|透着|满是).{0,10}(?:试探|敌意|善意|警惕|戒备|不耐|轻蔑|犹豫|迟疑|紧张|害怕|悲伤|愤怒|心虚|算计|盘算|企图|打算|挑衅|安抚|安慰|威胁|撒谎|隐瞒)/,
     /(?:他|她|它|对方).{0,8}(?:试图|想要|打算|企图|故意|存心).{0,10}(?:试探|误导|欺骗|隐瞒|撒谎|安抚|挑衅|威胁|施压|激怒|拖延)/,
 ]
-const PLAYER_NUDGE_HARD_OVERRIDE_RULES = [
-    /你(?:已经|其实)?(?:意识到|明白|认定|确定|知道)/,
-    /\b(?:you now realize|you know that|this means that)\b/i,
-    /(?:默认|先|直接)(?:把|将).{0,12}(?:视为|当成|认定为)/,
-    /(?:更倾向于|倾向于|优先)(?:认为|认定|判断|怀疑|确信)/,
-]
+
 const SCENE_EVENT_SUBJECTIVE_KEYS = new Set([
     "innerthought",
     "innermonologue",
@@ -1328,13 +1323,6 @@ export function detectSubjectiveLeakage(input: {
         if (issue) return issue
     }
 
-    if (input.playerNudge) {
-        for (const rule of PLAYER_NUDGE_HARD_OVERRIDE_RULES) {
-            if (rule.test(input.playerNudge)) {
-                return "playerNudge must remain a weak external steer, not a completed inner conclusion or asserted fact."
-            }
-        }
-    }
     return undefined
 }
 

@@ -47,6 +47,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 | 2026-05-20 | Character-owned memory flow：新增 `memory_reflect`，由 Director 触发、Character subagent 决定并调用 `memory_update` 写入主观记忆 |
 | 2026-05-21 | Director/Character 边界修复：`embody` 改为 objective-first 契约，新增 `sceneFacts`/`situationFrame`/`playerNudge`/`focusHints`，拦截 Director 代写角色认知/心理/意图 |
 | 2026-05-21 | Director 越权收紧：扩展 `embody` 主观泄漏拦截，新增对情绪/立场/意图标签化表述的程序级拒绝；明确 `playerNudge` 默认留空，未获玩家明确要求时不得替角色预置主观倾向 |
+| 2026-06-27 | `playerNudge` 主观传递放开：移除 `playerNudge` 的主观拦截限制，允许通过该字段传递主观想法、判断或结论，绕过 `sceneFacts`/`situationFrame` 等字段的主观用词拦截 |
 | 2026-05-21 | Embody 自动注入增强：从 `runtime.yaml` 与角色状态自动注入客观环境、当前身体状态、基线感官能力与当前有效感知状态 |
 | 2026-05-21 | Runtime schema 补强：`present_characters` 新增可选结构化身体/携带/束缚/感官受损字段，兼容旧文本字段 |
 | 2026-05-21 | runtime.yaml 兼容修复：`current_scene.present_characters` 也会被解析，避免嵌套写法导致 Director 右侧面板名单缺失 |
