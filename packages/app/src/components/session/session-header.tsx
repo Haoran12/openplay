@@ -553,19 +553,6 @@ export function SessionHeader() {
                     </Button>
                   </TooltipKeybind>
 
-                  <Show when={roleplaySession()}>
-                    <Tooltip placement="bottom" value={language.t("roleplay.audit.open")}>
-                      <Button
-                        variant="ghost"
-                        class="titlebar-icon w-8 h-6 p-0 box-border"
-                        onClick={openTraceDialog}
-                        aria-label={language.t("roleplay.audit.open")}
-                      >
-                        <Icon size="small" name="bubble-5" />
-                      </Button>
-                    </Tooltip>
-                  </Show>
-
                   <Show when={tree()}>
                     <TooltipKeybind
                       title={language.t("command.fileTree.toggle")}
