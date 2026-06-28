@@ -4,7 +4,6 @@ import { Markdown } from "@openplay-ai/ui/markdown"
 import { createMemo, createResource, createSignal, For, Match, Show, Switch, type Component } from "solid-js"
 import type { Message, Part, Session } from "@openplay-ai/sdk/v2/client"
 import { useLanguage } from "@/context/language"
-import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 
 type AuditScope = "main" | "subagent" | "tool"
@@ -25,6 +24,8 @@ type AuditCard = {
   responseText?: string
   toolName?: string
 }
+
+const INITIAL_VISIBLE_CARD_LIMIT = 160
 
 function trimText(value: string | undefined) {
   const next = value?.trim()
@@ -218,8 +219,8 @@ export const SessionRoleplayAuditDialog: Component<{
 }> = (props) => {
   const language = useLanguage()
   const sync = useSync()
-  const sdk = useSDK()
   const [selectedID, setSelectedID] = createSignal<string>()
+  const [loadingMore, setLoadingMore] = createSignal(false)
 
   const rootSession = createMemo(() => sync.session.get(props.sessionID))
 
@@ -232,22 +233,30 @@ export const SessionRoleplayAuditDialog: Component<{
     return root ? [root, ...childSessions()] : childSessions()
   })
 
+  const knownSessionKey = createMemo(() =>
+    knownSessions()
+      .map((session) => session.id)
+      .sort()
+      .join("\n"),
+  )
+
   const [loading] = createResource(
-    () => knownSessions().map((session) => session.id),
-    async (sessionIDs) => {
+    knownSessionKey,
+    async (sessionKey) => {
+      const sessionIDs = sessionKey
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean)
       await Promise.all(
         sessionIDs.map(async (sessionID) => {
-          await sync.session.sync(sessionID, { force: true })
-          while (sync.session.history.more(sessionID)) {
-            await sync.session.history.loadMore(sessionID, 200)
-          }
+          await sync.session.sync(sessionID)
         }),
       )
       return true
     },
   )
 
-  const cards = createMemo(() => {
+  const allCards = createMemo(() => {
     const list = knownSessions().flatMap((session) => {
       const messages = sync.data.message[session.id] ?? []
       return messages.flatMap((message) => buildMessageCards(session, message, sync.data.part[message.id]))
@@ -257,6 +266,25 @@ export const SessionRoleplayAuditDialog: Component<{
       return a.id.localeCompare(b.id)
     })
   })
+
+  const cards = createMemo(() => allCards().slice(0, INITIAL_VISIBLE_CARD_LIMIT))
+
+  const hasMoreHistory = createMemo(() => knownSessions().some((session) => sync.session.history.more(session.id)))
+
+  const loadOlderHistory = async () => {
+    if (loadingMore()) return
+    setLoadingMore(true)
+    try {
+      await Promise.all(
+        knownSessions().map(async (session) => {
+          if (!sync.session.history.more(session.id)) return
+          await sync.session.history.loadMore(session.id, 120)
+        }),
+      )
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const selected = createMemo(() => {
     const current = selectedID()
@@ -269,12 +297,24 @@ export const SessionRoleplayAuditDialog: Component<{
       description={language.t("roleplay.audit.description")}
       size="x-large"
       fit
-      class="w-[min(calc(100vw-40px),1180px)] h-[min(calc(100vh-40px),820px)] overflow-hidden"
+      class="w-[min(calc(100vw-32px),1240px)] h-[min(calc(100vh-24px),920px)] overflow-hidden"
     >
-      <div class="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-4">
+      <div
+        class="grid h-full min-h-0 grid-cols-[400px_minmax(0,1fr)] gap-4"
+        style={{
+          "--roleplay-audit-wrap": "break-word",
+        }}
+      >
         <div class="min-h-0 overflow-hidden rounded-xl border border-border-weaker-base bg-surface-panel">
           <div class="border-b border-border-weaker-base px-4 py-3">
-            <div class="text-12-medium uppercase tracking-wider text-text-weak">{language.t("roleplay.audit.entries")}</div>
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-12-medium uppercase tracking-wider text-text-weak">{language.t("roleplay.audit.entries")}</div>
+              <Show when={hasMoreHistory()}>
+                <Button variant="ghost" size="small" onClick={loadOlderHistory} disabled={loadingMore()}>
+                  {loadingMore() ? language.t("roleplay.audit.loadingMore") : language.t("roleplay.audit.loadOlder")}
+                </Button>
+              </Show>
+            </div>
           </div>
           <div class="h-full min-h-0 overflow-y-auto p-3">
             <Show
@@ -315,6 +355,14 @@ export const SessionRoleplayAuditDialog: Component<{
                       </button>
                     )}
                   </For>
+                  <Show when={allCards().length > cards().length}>
+                    <div class="px-2 py-1 text-12-regular text-text-weak">
+                      {language.t("roleplay.audit.showingRecent", {
+                        count: String(cards().length),
+                        total: String(allCards().length),
+                      })}
+                    </div>
+                  </Show>
                 </div>
               </Show>
             </Show>
@@ -346,13 +394,34 @@ export const SessionRoleplayAuditDialog: Component<{
                   </div>
                 </div>
                 <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                  <Markdown text={detailMarkdown(card(), language)} class="text-13-regular leading-6" />
+                  <Markdown
+                    text={detailMarkdown(card(), language)}
+                    class="text-13-regular leading-6"
+                    data-roleplay-audit-detail
+                  />
                 </div>
               </div>
             )}
           </Show>
         </div>
       </div>
+      <style>{`
+        [data-component="dialog"] [data-component="markdown"][data-roleplay-audit-detail] {
+          min-width: 0;
+        }
+
+        [data-component="dialog"] [data-component="markdown"][data-roleplay-audit-detail] pre,
+        [data-component="dialog"] [data-component="markdown"][data-roleplay-audit-detail] code,
+        [data-component="dialog"] [data-component="markdown"][data-roleplay-audit-detail] .shiki {
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        [data-component="dialog"] [data-component="markdown"][data-roleplay-audit-detail] pre {
+          overflow-x: hidden;
+        }
+      `}</style>
     </Dialog>
   )
 }

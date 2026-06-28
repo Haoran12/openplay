@@ -88,6 +88,8 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-29: 修复 Roleplay WebUI “模型轨迹”弹窗卡死：不再在打开时强制拉取主会话与全部 Character 子会话的完整历史，改为先加载已缓存/首屏消息并仅渲染最近一批卡片；更早历史改为用户手动按需加载。同时将资源加载键从不稳定数组改为稳定字符串，避免响应式反复触发重复同步与重渲染。
+- 2026-06-29: 调整 Roleplay WebUI “模型轨迹”弹窗可读性：增大弹窗宽高与详情区可视高度；对详情中的 Markdown / 代码块启用强制换行，避免长 JSON、长目录或单行文本横向溢出。
 - 2026-06-29: Roleplay WebUI 右上角新增“模型轨迹”入口，位于“切换文件树”左侧。弹窗会补拉主会话与 Character 子会话完整历史，并按“主会话 / SubAgent / 工具调用”整理为卡片；详情页用分段代码块展示真实发送给模型的文本、角色子代理往返内容，以及工具调用的输入/输出，提升长回合审计可读性。
 - 2026-06-29: 收紧 `embody` 对人物子代理的场景锚点注入：除客观环境摘要外，现额外把 `runtime.yaml` 中当前场景的时间/地点作为独立固定段落与 `environmentOverride` 明确传给 Character 子代理；优先读取 `current_scene.date/location`，缺失时回退 `environment.time/location`，并补充回归测试覆盖 `"1003-07-14 上午"` / `"今庭-荆州-襄陵县"` 这类格式。
 - 2026-06-29: 人物子代理连续会话链路排查：确认 `embody` 自 2026-06-26 起按“同父 Director 会话 + 同角色 + 同 sceneKey”复用 Character 子会话；新的场景 prompt 每轮都会追加进同一子会话历史，旧轮次中角色先前的 `inner_thought` / `action_intent` / `outward_action` 也持续保留。当前实现没有按轮裁剪或总结旧场景历史，且 scene-state 默认 `keep` 仅靠显式 `scene_transition=switch` 轮换 key，因此在 runtime 已明显推进但未切 key 时，旧场景残留更容易干扰当前人物输出。
