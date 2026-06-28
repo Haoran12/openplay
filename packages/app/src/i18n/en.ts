@@ -985,6 +985,8 @@ export const dict = {
   "roleplay.audit.loadingMore": "Loading...",
   "roleplay.audit.showingRecent": "Showing the most recent {{count}} of {{total}} entries",
   "roleplay.audit.empty": "No trace entries found yet",
+  "roleplay.audit.defaultWindow": "Showing the most recent 7 days by default.",
+  "roleplay.audit.retentionWindow": "This viewer currently shows up to the most recent 30 days and does not delete actual session history.",
   "roleplay.audit.request": "Request",
   "roleplay.audit.response": "Response",
   "roleplay.audit.directory": "Working directory",

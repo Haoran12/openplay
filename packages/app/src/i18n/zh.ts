@@ -936,6 +936,8 @@ export const dict = {
   "roleplay.audit.loadingMore": "加载中...",
   "roleplay.audit.showingRecent": "当前显示最近 {{count}} / {{total}} 条轨迹",
   "roleplay.audit.empty": "暂无可查看的轨迹",
+  "roleplay.audit.defaultWindow": "默认仅显示最近 7 天轨迹。",
+  "roleplay.audit.retentionWindow": "该查看入口当前最多展示最近 30 天轨迹；不删除真实会话历史。",
   "roleplay.audit.request": "请求",
   "roleplay.audit.response": "响应",
   "roleplay.audit.directory": "工作目录",

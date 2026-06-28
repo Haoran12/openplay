@@ -915,6 +915,8 @@ export const dict = {
   "roleplay.audit.loadingMore": "載入中...",
   "roleplay.audit.showingRecent": "目前顯示最近 {{count}} / {{total}} 筆軌跡",
   "roleplay.audit.empty": "目前沒有可查看的軌跡",
+  "roleplay.audit.defaultWindow": "預設僅顯示最近 7 天軌跡。",
+  "roleplay.audit.retentionWindow": "此查看入口目前最多展示最近 30 天軌跡；不刪除真實工作階段歷史。",
   "roleplay.audit.request": "請求",
   "roleplay.audit.response": "回應",
   "roleplay.audit.directory": "工作目錄",

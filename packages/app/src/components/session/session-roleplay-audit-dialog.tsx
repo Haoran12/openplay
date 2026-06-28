@@ -19,25 +19,18 @@ type AuditCard = {
   kind: AuditCardKind
   actor: string
   label: string
-  summary?: string
   requestText?: string
   responseText?: string
   toolName?: string
 }
 
 const INITIAL_VISIBLE_CARD_LIMIT = 160
+const DEFAULT_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_VISIBLE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 
 function trimText(value: string | undefined) {
   const next = value?.trim()
   return next ? next : undefined
-}
-
-function firstLine(value: string | undefined, max = 120) {
-  const text = trimText(value)
-  if (!text) return undefined
-  const line = text.split(/\r?\n/, 1)[0]?.trim() ?? ""
-  if (!line) return undefined
-  return line.length > max ? `${line.slice(0, max - 1)}…` : line
 }
 
 function readTextParts(parts: Part[] | undefined) {
@@ -105,12 +98,16 @@ function inferSessionScope(session: Session, toolName?: string): AuditScope {
   return "main"
 }
 
+function messageTimestamp(message: Message) {
+  return message.role === "assistant" ? (message.time.completed ?? message.time.created) : message.time.created
+}
+
 function buildMessageCards(session: Session, message: Message, parts: Part[] | undefined): AuditCard[] {
   if (message.role !== "user" && message.role !== "assistant") return []
 
   const scope = inferSessionScope(session)
   const directory = session.directory
-  const timestamp = message.role === "assistant" ? (message.time.completed ?? message.time.created) : message.time.created
+  const timestamp = messageTimestamp(message)
   const actor = session.parentID
     ? session.title.replace(/^Character:\s*/, "").trim() || session.title
     : (message.agent || session.agent || "Director")
@@ -129,7 +126,6 @@ function buildMessageCards(session: Session, message: Message, parts: Part[] | u
         kind: "request",
         actor,
         label: scopeLabel(scope, session),
-        summary: firstLine(requestText),
         requestText,
       },
     ]
@@ -137,7 +133,6 @@ function buildMessageCards(session: Session, message: Message, parts: Part[] | u
 
   const responseText = readTextParts(parts)
   const reasoning = readReasoningParts(parts)
-  const summary = firstLine(responseText) ?? firstLine(reasoning)
   const cards: AuditCard[] = []
 
   if (responseText || reasoning) {
@@ -151,7 +146,6 @@ function buildMessageCards(session: Session, message: Message, parts: Part[] | u
       kind: "response",
       actor,
       label: scopeLabel(scope, session),
-      summary,
       responseText: [responseText, reasoning ? `## Reasoning\n\n${reasoning}` : undefined].filter(Boolean).join("\n\n"),
     })
   }
@@ -178,7 +172,6 @@ function buildMessageCards(session: Session, message: Message, parts: Part[] | u
       kind: "response",
       actor,
       label: scopeLabel("tool", session, toolName),
-      summary: firstLine(outputText) ?? firstLine(inputText),
       requestText: inputText,
       responseText: outputText,
       toolName,
@@ -267,9 +260,32 @@ export const SessionRoleplayAuditDialog: Component<{
     })
   })
 
-  const cards = createMemo(() => allCards().slice(0, INITIAL_VISIBLE_CARD_LIMIT))
+  const retainedCards = createMemo(() => {
+    const cutoff = Date.now() - MAX_VISIBLE_WINDOW_MS
+    return allCards().filter((card) => card.timestamp >= cutoff)
+  })
 
-  const hasMoreHistory = createMemo(() => knownSessions().some((session) => sync.session.history.more(session.id)))
+  const recentCards = createMemo(() => {
+    const cutoff = Date.now() - DEFAULT_RECENT_WINDOW_MS
+    const withinRecentWindow = retainedCards().filter((card) => card.timestamp >= cutoff)
+    return withinRecentWindow.length > 0 ? withinRecentWindow : retainedCards()
+  })
+
+  const cards = createMemo(() => recentCards().slice(0, INITIAL_VISIBLE_CARD_LIMIT))
+
+  const hasMoreHistory = createMemo(() => {
+    const retentionCutoff = Date.now() - MAX_VISIBLE_WINDOW_MS
+    return knownSessions().some((session) => {
+      if (!sync.session.history.more(session.id)) return false
+      const messages = sync.data.message[session.id] ?? []
+      if (messages.length === 0) return true
+      const oldestLoadedTimestamp = messages.reduce(
+        (oldest, message) => Math.min(oldest, messageTimestamp(message)),
+        Number.POSITIVE_INFINITY,
+      )
+      return oldestLoadedTimestamp >= retentionCutoff
+    })
+  })
 
   const loadOlderHistory = async () => {
     if (loadingMore()) return
@@ -297,10 +313,10 @@ export const SessionRoleplayAuditDialog: Component<{
       description={language.t("roleplay.audit.description")}
       size="x-large"
       fit
-      class="w-[min(calc(100vw-32px),1240px)] h-[min(calc(100vh-24px),920px)] overflow-hidden"
+      class="w-[min(calc(100vw-32px),1240px)] h-[min(calc(100vh-16px),960px)] overflow-hidden"
     >
       <div
-        class="grid h-full min-h-0 grid-cols-[400px_minmax(0,1fr)] gap-4"
+        class="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]"
         style={{
           "--roleplay-audit-wrap": "break-word",
         }}
@@ -314,6 +330,10 @@ export const SessionRoleplayAuditDialog: Component<{
                   {loadingMore() ? language.t("roleplay.audit.loadingMore") : language.t("roleplay.audit.loadOlder")}
                 </Button>
               </Show>
+            </div>
+            <div class="mt-2 space-y-1 text-12-regular text-text-weak">
+              <div>{language.t("roleplay.audit.defaultWindow")}</div>
+              <div>{language.t("roleplay.audit.retentionWindow")}</div>
             </div>
           </div>
           <div class="h-full min-h-0 overflow-y-auto p-3">
@@ -339,7 +359,7 @@ export const SessionRoleplayAuditDialog: Component<{
                       >
                         <div class="flex items-start justify-between gap-3">
                           <div class="min-w-0">
-                            <div class="text-13-medium text-text-strong">{card.label}</div>
+                            <div class="text-13-medium text-text-strong [overflow-wrap:anywhere]">{card.label}</div>
                             <div class="mt-1 text-12-regular text-text-weak">{formatTimestamp(card.timestamp)}</div>
                           </div>
                           <span class="shrink-0 rounded-full bg-surface-weak px-2 py-0.5 text-11-medium text-text-weak">
@@ -348,18 +368,15 @@ export const SessionRoleplayAuditDialog: Component<{
                               : language.t("roleplay.audit.response")}
                           </span>
                         </div>
-                        <div class="mt-2 text-12-regular text-text-weak">{card.directory}</div>
-                        <Show when={card.summary}>
-                          <p class="mt-3 line-clamp-3 text-13-regular text-text-base">{card.summary}</p>
-                        </Show>
+                        <div class="mt-2 text-12-regular text-text-weak [overflow-wrap:anywhere]">{card.directory}</div>
                       </button>
                     )}
                   </For>
-                  <Show when={allCards().length > cards().length}>
+                  <Show when={recentCards().length > cards().length}>
                     <div class="px-2 py-1 text-12-regular text-text-weak">
                       {language.t("roleplay.audit.showingRecent", {
                         count: String(cards().length),
-                        total: String(allCards().length),
+                        total: String(recentCards().length),
                       })}
                     </div>
                   </Show>
@@ -379,8 +396,8 @@ export const SessionRoleplayAuditDialog: Component<{
                 <div class="border-b border-border-weaker-base px-5 py-4">
                   <div class="flex items-start justify-between gap-4">
                     <div class="min-w-0">
-                      <div class="text-15-medium text-text-strong">{card().label}</div>
-                      <div class="mt-1 text-12-regular text-text-weak">
+                      <div class="text-15-medium text-text-strong [overflow-wrap:anywhere]">{card().label}</div>
+                      <div class="mt-1 text-12-regular text-text-weak [overflow-wrap:anywhere]">
                         {formatTimestamp(card().timestamp)} · {card().sessionTitle}
                       </div>
                     </div>
