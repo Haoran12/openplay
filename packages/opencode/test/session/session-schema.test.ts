@@ -112,6 +112,7 @@ describe("Session schema", () => {
       roleplay_character: null,
       roleplay_scene_key: null,
       roleplay_purpose: null,
+      trace: null,
       time_created: 1,
       time_updated: 2,
       time_compacting: null,

@@ -5,6 +5,7 @@ import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
+import { SessionTrace } from "@/session/trace"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -32,6 +33,7 @@ import {
   RevertPayload,
   ShellPayload,
   SummarizePayload,
+  TraceQuery,
   UpdatePayload,
 } from "../groups/session"
 import * as SessionError from "./session-errors"
@@ -46,6 +48,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
   Effect.gen(function* () {
     const session = yield* Session.Service
     const shareSvc = yield* SessionShare.Service
+    const traceSvc = yield* SessionTrace.Service
     const promptSvc = yield* SessionPrompt.Service
     const revertSvc = yield* SessionRevert.Service
     const compactSvc = yield* SessionCompaction.Service
@@ -85,6 +88,21 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const children = Effect.fn("SessionHttpApi.children")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
       return yield* session.children(ctx.params.sessionID)
+    })
+
+    const trace = Effect.fn("SessionHttpApi.trace")(function* (ctx: {
+      params: { sessionID: SessionID }
+      query: typeof TraceQuery.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* traceSvc.list({
+        sessionID: ctx.params.sessionID,
+        cursor: ctx.query.cursor,
+        limit: ctx.query.limit,
+        source: ctx.query.source,
+        kind: ctx.query.kind,
+        includeSubagents: ctx.query.includeSubagents ?? true,
+      })
     })
 
     const todo = Effect.fn("SessionHttpApi.todo")(function* (ctx: { params: { sessionID: SessionID } }) {
@@ -182,6 +200,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         yield* session.setPermission({
           sessionID: ctx.params.sessionID,
           permission: Permission.merge(current.permission ?? [], ctx.payload.permission),
+        })
+      }
+      if (ctx.payload.trace !== undefined) {
+        yield* session.setTrace({
+          sessionID: ctx.params.sessionID,
+          trace: ctx.payload.trace,
         })
       }
       if (ctx.payload.time?.archived !== undefined) {
@@ -392,6 +416,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("status", status)
       .handle("get", get)
       .handle("children", children)
+      .handle("trace", trace)
       .handle("todo", todo)
       .handle("diff", diff)
       .handle("messages", messages)

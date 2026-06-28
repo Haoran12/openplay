@@ -110,6 +110,7 @@ export function fromRow(row: SessionRow): Info {
     roleplayCharacter: row.roleplay_character ?? undefined,
     roleplaySceneKey: row.roleplay_scene_key ?? undefined,
     roleplayPurpose,
+    trace: row.trace ?? undefined,
     time: {
       created: row.time_created,
       updated: row.time_updated,
@@ -150,6 +151,7 @@ export function toRow(info: Info) {
     roleplay_character: info.roleplayCharacter ?? null,
     roleplay_scene_key: info.roleplaySceneKey ?? null,
     roleplay_purpose: info.roleplayPurpose ?? null,
+    trace: info.trace ?? null,
     time_created: info.time.created,
     time_updated: info.time.updated,
     time_compacting: info.time.compacting,
@@ -218,6 +220,10 @@ const Model = Schema.Struct({
   variant: optionalOmitUndefined(Schema.String),
 })
 
+const Trace = Schema.Struct({
+  enabled: Schema.Boolean,
+})
+
 export const Info = Schema.Struct({
   id: SessionID,
   slug: Schema.String,
@@ -242,6 +248,7 @@ export const Info = Schema.Struct({
   roleplayCharacter: optionalOmitUndefined(Schema.String),
   roleplaySceneKey: optionalOmitUndefined(Schema.String),
   roleplayPurpose: optionalOmitUndefined(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
+  trace: optionalOmitUndefined(Trace),
 }).annotate({ identifier: "Session" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
@@ -269,6 +276,7 @@ export const CreateInput = Schema.optional(
     roleplayCharacter: Schema.optional(Schema.String),
     roleplaySceneKey: Schema.optional(Schema.String),
     roleplayPurpose: Schema.optional(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
+    trace: Schema.optional(Trace),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -288,6 +296,10 @@ export const SetArchivedInput = Schema.Struct({
 export const SetPermissionInput = Schema.Struct({
   sessionID: SessionID,
   permission: Permission.Ruleset,
+})
+export const SetTraceInput = Schema.Struct({
+  sessionID: SessionID,
+  trace: Schema.optional(Trace),
 })
 export const SetRevertInput = Schema.Struct({
   sessionID: SessionID,
@@ -351,6 +363,7 @@ const UpdatedInfo = Schema.Struct({
   roleplayPurpose: Schema.optional(
     Schema.NullOr(Schema.Literals(["embody", "memory_reflect", "knowledge_reflect"])),
   ),
+  trace: Schema.optional(Schema.NullOr(Trace)),
 })
 
 const UpdatedEventSchema = Schema.Struct({
@@ -490,6 +503,7 @@ export interface Interface {
     roleplayCharacter?: string
     roleplaySceneKey?: string
     roleplayPurpose?: Info["roleplayPurpose"]
+    trace?: Info["trace"]
   }) => Effect.Effect<Info>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
@@ -497,6 +511,7 @@ export interface Interface {
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
+  readonly setTrace: (input: { sessionID: SessionID; trace?: Info["trace"] }) => Effect.Effect<void>
   readonly setRevert: (input: {
     sessionID: SessionID
     revert: Info["revert"]
@@ -564,8 +579,12 @@ export const layer: Layer.Layer<
       roleplayCharacter?: string
       roleplaySceneKey?: string
       roleplayPurpose?: Info["roleplayPurpose"]
+      trace?: Info["trace"]
     }) {
       const ctx = yield* InstanceState.context
+      const inheritedTrace = input.parentID
+        ? (yield* get(input.parentID).pipe(Effect.map((parent) => parent.trace), Effect.orElseSucceed(() => undefined)))
+        : undefined
       const result: Info = {
         id: SessionID.descending(input.id),
         slug: Slug.create(),
@@ -590,6 +609,7 @@ export const layer: Layer.Layer<
         roleplayCharacter: input.roleplayCharacter,
         roleplaySceneKey: input.roleplaySceneKey,
         roleplayPurpose: input.roleplayPurpose,
+        trace: input.trace ?? inheritedTrace,
       }
       log.info("created", result)
 
@@ -703,6 +723,7 @@ export const layer: Layer.Layer<
       roleplayCharacter?: string
       roleplaySceneKey?: string
       roleplayPurpose?: Info["roleplayPurpose"]
+      trace?: Info["trace"]
     }) {
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
@@ -718,6 +739,7 @@ export const layer: Layer.Layer<
         roleplayCharacter: input?.roleplayCharacter,
         roleplaySceneKey: input?.roleplaySceneKey,
         roleplayPurpose: input?.roleplayPurpose,
+        trace: input?.trace,
       })
     })
 
@@ -782,6 +804,13 @@ export const layer: Layer.Layer<
       permission: Permission.Ruleset
     }) {
       yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
+    })
+
+    const setTrace = Effect.fn("Session.setTrace")(function* (input: {
+      sessionID: SessionID
+      trace?: Info["trace"]
+    }) {
+      yield* patch(input.sessionID, { trace: input.trace ?? null, time: { updated: Date.now() } })
     })
 
     const setRevert = Effect.fn("Session.setRevert")(function* (input: {
@@ -890,6 +919,7 @@ export const layer: Layer.Layer<
       setTitle,
       setArchived,
       setPermission,
+      setTrace,
       setRevert,
       clearRevert,
       setSummary,

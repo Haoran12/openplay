@@ -138,6 +138,8 @@ import type {
   SessionForkResponses,
   SessionGetErrors,
   SessionGetResponses,
+  SessionTraceErrors,
+  SessionTraceResponses,
   SessionInitErrors,
   SessionInitResponses,
   SessionListResponses,
@@ -3151,6 +3153,9 @@ export class Session2 extends HeyApiClient {
       workspace?: string
       title?: string
       permission?: PermissionRuleset
+      trace?: {
+        enabled: boolean
+      }
       time?: {
         archived?: number
       }
@@ -3167,6 +3172,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "title" },
             { in: "body", key: "permission" },
+            { in: "body", key: "trace" },
             { in: "body", key: "time" },
           ],
         },
@@ -3211,6 +3217,48 @@ export class Session2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<SessionChildrenResponses, SessionChildrenErrors, ThrowOnError>({
       url: "/session/{sessionID}/children",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get session trace
+   *
+   * Retrieve high-fidelity model trace entries for a session, optionally including subagent sessions.
+   */
+  public trace<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      cursor?: string
+      limit?: number
+      source?: "main" | "subagent" | "tool" | "model"
+      kind?: string
+      includeSubagents?: boolean | "true" | "false"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "cursor" },
+            { in: "query", key: "limit" },
+            { in: "query", key: "source" },
+            { in: "query", key: "kind" },
+            { in: "query", key: "includeSubagents" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionTraceResponses, SessionTraceErrors, ThrowOnError>({
+      url: "/session/{sessionID}/trace",
       ...options,
       ...params,
     })

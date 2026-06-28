@@ -11,6 +11,7 @@ import { useDialog } from "@openplay-ai/ui/context/dialog"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { agentDisplayName } from "@/utils/roleplay"
 import { agentColor } from "@/utils/agent"
+import { SessionTraceDialog } from "@/components/session/session-trace-dialog"
 
 type RuntimeCharacter = NonNullable<WorldInfo["presentCharacters"]>[number]
 const ROLEPLAY_PANEL_WIDTH = "clamp(340px, 30vw, 460px)"
@@ -404,6 +405,7 @@ export const SessionRoleplayPanel: Component = () => {
     const id = sessionID()
     return id ? sync.session.get(id) : undefined
   })
+  const traceEnabled = createMemo(() => session()?.trace?.enabled === true)
   const worldRoot = createMemo(() => world()?.rootPath)
   const worldConfigPath = createMemo(() => world()?.configPath)
 
@@ -578,15 +580,46 @@ export const SessionRoleplayPanel: Component = () => {
                   {presentCharacters().length} present
                 </span>
               </Show>
-            </div>
-            <Show when={worldConfigPath()}>
-              <button
-                class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"
-                onClick={() => openFile(worldConfigPath()!)}
+              <span
+                class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-11-medium"
+                classList={{
+                  "bg-[color:color-mix(in_srgb,var(--color-success)_12%,transparent)] text-[var(--color-success)]":
+                    traceEnabled(),
+                  "bg-surface-weak text-text-weak": !traceEnabled(),
+                }}
               >
-                {language.t("roleplay.panel.editRuntime")}
-              </button>
-            </Show>
+                <span
+                  class="inline-block h-1.5 w-1.5 rounded-full"
+                  classList={{
+                    "bg-[var(--color-success)]": traceEnabled(),
+                    "bg-border-strong": !traceEnabled(),
+                  }}
+                />
+                {traceEnabled() ? language.t("trace.status.on") : language.t("trace.status.off")}
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <Show when={sessionID()}>
+                <button
+                  class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"
+                  onClick={() => {
+                    const id = sessionID()
+                    if (!id) return
+                    dialog.show(() => <SessionTraceDialog sessionID={id} />)
+                  }}
+                >
+                  {language.t("trace.header.openButton")}
+                </button>
+              </Show>
+              <Show when={worldConfigPath()}>
+                <button
+                  class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"
+                  onClick={() => openFile(worldConfigPath()!)}
+                >
+                  {language.t("roleplay.panel.editRuntime")}
+                </button>
+              </Show>
+            </div>
           </div>
           <Show
             when={sceneRows().length > 0}

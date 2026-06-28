@@ -785,6 +785,36 @@ export type Session = {
   }
   worldID?: string
   worldPath?: string
+  roleplayCharacter?: string
+  roleplaySceneKey?: string
+  roleplayPurpose?: "embody" | "memory_reflect" | "knowledge_reflect"
+  trace?: {
+    enabled: boolean
+  }
+}
+
+export type SessionTraceEntry = {
+  id: string
+  sessionID: string
+  rootSessionID: string
+  timestamp: number
+  source: "main" | "subagent" | "tool" | "model"
+  kind: string
+  turn?: number
+  title?: string
+  agent?: string
+  parentSessionID?: string
+  toolName?: string
+  payload?: unknown
+}
+
+export type SessionTraceList = {
+  items: Array<SessionTraceEntry>
+  cursor?: string
+  meta: {
+    available: boolean
+    retentionDays: number
+  }
 }
 
 export type Prompt = {
@@ -5726,6 +5756,9 @@ export type SessionUpdateData = {
   body?: {
     title?: string
     permission?: PermissionRuleset
+    trace?: {
+      enabled: boolean
+    }
     time?: {
       archived?: number
     }
@@ -5795,6 +5828,36 @@ export type SessionChildrenResponses = {
 }
 
 export type SessionChildrenResponse = SessionChildrenResponses[keyof SessionChildrenResponses]
+
+export type SessionTraceData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    cursor?: string
+    limit?: number
+    source?: "main" | "subagent" | "tool" | "model"
+    kind?: string
+    includeSubagents?: boolean | "true" | "false"
+  }
+  url: "/session/{sessionID}/trace"
+}
+
+export type SessionTraceErrors = {
+  400: BadRequestError
+  404: NotFoundError
+}
+
+export type SessionTraceError = SessionTraceErrors[keyof SessionTraceErrors]
+
+export type SessionTraceResponses = {
+  200: SessionTraceList
+}
+
+export type SessionTraceResponse = SessionTraceResponses[keyof SessionTraceResponses]
 
 export type SessionTodoData = {
   body?: never

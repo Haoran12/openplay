@@ -632,6 +632,72 @@ export const SettingsGeneral: Component = () => {
     </div>
   )
 
+  const traceViewOptions = createMemo(() => [
+    { value: "readable" as const, label: language.t("settings.trace.option.readable") },
+    { value: "raw" as const, label: language.t("settings.trace.option.raw") },
+  ])
+
+  const TraceSection = () => (
+    <div class="flex flex-col gap-1">
+      <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.general.section.trace")}</h3>
+
+      <SettingsList>
+        <SettingsRow
+          title={language.t("settings.trace.row.showSessionToggle.title")}
+          description={language.t("settings.trace.row.showSessionToggle.description")}
+        >
+          <div data-action="settings-trace-show-session-toggle">
+            <Switch
+              checked={settings.trace.showSessionToggle()}
+              onChange={(checked) => settings.trace.setShowSessionToggle(checked)}
+            />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.trace.row.defaultView.title")}
+          description={language.t("settings.trace.row.defaultView.description")}
+        >
+          <Select
+            data-action="settings-trace-default-view"
+            options={traceViewOptions()}
+            current={traceViewOptions().find((item) => item.value === settings.trace.defaultView())}
+            value={(item) => item.value}
+            label={(item) => item.label}
+            onSelect={(item) => item && settings.trace.setDefaultView(item.value)}
+            variant="secondary"
+            size="small"
+            triggerVariant="settings"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.trace.row.defaultReadableSections.title")}
+          description={language.t("settings.trace.row.defaultReadableSections.description")}
+        >
+          <div data-action="settings-trace-default-readable-sections">
+            <Switch
+              checked={settings.trace.defaultReadableSections()}
+              onChange={(checked) => settings.trace.setDefaultReadableSections(checked)}
+            />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.trace.row.includeSubagentsByDefault.title")}
+          description={language.t("settings.trace.row.includeSubagentsByDefault.description")}
+        >
+          <div data-action="settings-trace-include-subagents-by-default">
+            <Switch
+              checked={settings.trace.includeSubagentsByDefault()}
+              onChange={(checked) => settings.trace.setIncludeSubagentsByDefault(checked)}
+            />
+          </div>
+        </SettingsRow>
+      </SettingsList>
+    </div>
+  )
+
   const SoundsSection = () => (
     <div class="flex flex-col gap-1">
       <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.general.section.sounds")}</h3>
@@ -740,6 +806,8 @@ export const SettingsGeneral: Component = () => {
 
       <div class="flex flex-col gap-8 w-full">
         <GeneralSection />
+
+        <TraceSection />
 
         <AppearanceSection />
 

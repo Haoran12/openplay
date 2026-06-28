@@ -46,6 +46,12 @@ export interface Settings {
   permissions: {
     autoApprove: boolean
   }
+  trace: {
+    showSessionToggle: boolean
+    defaultView: "readable" | "raw"
+    defaultReadableSections: boolean
+    includeSubagentsByDefault: boolean
+  }
   notifications: NotificationSettings
   sounds: SoundSettings
 }
@@ -130,6 +136,12 @@ const defaultSettings: Settings = {
   keybinds: {},
   permissions: {
     autoApprove: false,
+  },
+  trace: {
+    showSessionToggle: true,
+    defaultView: "readable",
+    defaultReadableSections: true,
+    includeSubagentsByDefault: true,
   },
   notifications: {
     agent: true,
@@ -282,6 +294,33 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         autoApprove: withFallback(() => store.permissions?.autoApprove, defaultSettings.permissions.autoApprove),
         setAutoApprove(value: boolean) {
           setStore("permissions", "autoApprove", value)
+        },
+      },
+      trace: {
+        showSessionToggle: withFallback(
+          () => store.trace?.showSessionToggle,
+          defaultSettings.trace.showSessionToggle,
+        ),
+        setShowSessionToggle(value: boolean) {
+          setStore("trace", "showSessionToggle", value)
+        },
+        defaultView: withFallback(() => store.trace?.defaultView, defaultSettings.trace.defaultView),
+        setDefaultView(value: "readable" | "raw") {
+          setStore("trace", "defaultView", value)
+        },
+        defaultReadableSections: withFallback(
+          () => store.trace?.defaultReadableSections,
+          defaultSettings.trace.defaultReadableSections,
+        ),
+        setDefaultReadableSections(value: boolean) {
+          setStore("trace", "defaultReadableSections", value)
+        },
+        includeSubagentsByDefault: withFallback(
+          () => store.trace?.includeSubagentsByDefault,
+          defaultSettings.trace.includeSubagentsByDefault,
+        ),
+        setIncludeSubagentsByDefault(value: boolean) {
+          setStore("trace", "includeSubagentsByDefault", value)
         },
       },
       notifications: {

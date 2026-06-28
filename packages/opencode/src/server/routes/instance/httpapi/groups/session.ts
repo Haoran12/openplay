@@ -2,6 +2,7 @@ import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { Session } from "@/session/session"
+import { SessionTrace, TraceListResult, TraceSource } from "@/session/trace"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
@@ -46,6 +47,11 @@ export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   permission: Schema.optional(Permission.Ruleset),
+  trace: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.Boolean,
+    }),
+  ),
   time: Schema.optional(
     Schema.Struct({
       archived: Schema.optional(Session.ArchivedTimestamp),
@@ -70,12 +76,21 @@ export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput
 export const PermissionResponsePayload = Schema.Struct({
   response: Permission.Reply,
 })
+export const TraceQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.NumberFromString),
+  source: Schema.optional(TraceSource),
+  kind: Schema.optional(Schema.String),
+  includeSubagents: Schema.optional(QueryBoolean),
+})
 
 export const SessionPaths = {
   list: root,
   status: `${root}/status`,
   get: `${root}/:sessionID`,
   children: `${root}/:sessionID/children`,
+  trace: `${root}/:sessionID/trace`,
   todo: `${root}/:sessionID/todo`,
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
@@ -147,6 +162,19 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.children",
             summary: "Get session children",
             description: "Retrieve all child sessions that were forked from the specified parent session.",
+          }),
+        ),
+        HttpApiEndpoint.get("trace", SessionPaths.trace, {
+          params: { sessionID: SessionID },
+          query: TraceQuery,
+          success: described(TraceListResult, "Session trace entries"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.trace",
+            summary: "Get session trace",
+            description:
+              "Retrieve high-fidelity model trace entries for a session, optionally including subagent sessions.",
           }),
         ),
         HttpApiEndpoint.get("todo", SessionPaths.todo, {

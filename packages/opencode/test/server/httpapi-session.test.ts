@@ -374,9 +374,14 @@ describe("session HttpApi", () => {
         const updated = yield* requestJson<Session.Info>(pathFor(SessionPaths.update, { sessionID: created.id }), {
           method: "PATCH",
           headers,
-          body: JSON.stringify({ title: "updated", time: { archived: 1 } }),
+          body: JSON.stringify({ title: "updated", trace: { enabled: true }, time: { archived: 1 } }),
         })
-        expect(updated).toMatchObject({ id: created.id, title: "updated", time: { archived: 1 } })
+        expect(updated).toMatchObject({
+          id: created.id,
+          title: "updated",
+          trace: { enabled: true },
+          time: { archived: 1 },
+        })
 
         const forked = yield* requestJson<Session.Info>(pathFor(SessionPaths.fork, { sessionID: created.id }), {
           method: "POST",
@@ -449,6 +454,28 @@ describe("session HttpApi", () => {
         })
         expect(response.status).toBe(200)
         expect((yield* json<Session.Info>(response)).time.archived).toBe(-1)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "returns trace metadata for the session trace endpoint",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory }
+        const session = yield* createSession({ title: "trace meta" })
+
+        const response = yield* requestJson<{
+          items: unknown[]
+          cursor?: string
+          meta: { available: boolean; retentionDays: number }
+        }>(pathFor(SessionPaths.trace, { sessionID: session.id }), { headers })
+
+        expect(response.items).toEqual([])
+        expect(response.cursor == null).toBe(true)
+        expect(typeof response.meta.available).toBe("boolean")
+        expect(response.meta.retentionDays).toBeGreaterThan(0)
       }),
     { git: true, config: { formatter: false, lsp: false } },
   )

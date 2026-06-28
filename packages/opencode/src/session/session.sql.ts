@@ -52,6 +52,7 @@ export const SessionTable = sqliteTable(
     roleplay_character: text("roleplay_character"),
     roleplay_scene_key: text("roleplay_scene_key"),
     roleplay_purpose: text("roleplay_purpose"),
+    trace: text({ mode: "json" }).$type<{ enabled: boolean }>(),
     ...Timestamps,
     time_compacting: integer(),
     time_archived: integer(),

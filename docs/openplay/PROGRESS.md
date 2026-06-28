@@ -79,6 +79,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Roleplay WebUI 右侧状态面板人物卡片排版调整：在场人物字段改为单行 inline 展示，仅对字段名做弱强调，避免字段名与内容分行。
 - [x] Roleplay WebUI 右侧状态面板在场人物 name 支持弹出只读 `profile.yaml` 预览，使用对话框和高亮代码块展示。
 - [x] Roleplay WebUI 新增模型轨迹查看入口：右上角“切换文件树”左侧增加按钮，可按主会话 / Character SubAgent / 工具调用查看真实请求与响应内容。
+- [x] `openplay-ui` 会话级高保真 Trace：新增当前会话 Trace 开关、子代理继承、独立 JSONL 存储与 7 天保留、`GET /session/:id/trace` 查询接口，以及可读/原始双视图 Trace 阅读器
 - [x] Director 同场景人物连续性修复：`embody` 复用同角色同场景 Character 子会话，保留完整子会话历史；场景连续性锚点改由内部 scene-state 维护，不再依赖 `runtime.yaml.current_scene.scene_id`，并对用户手改/损坏 `runtime.yaml` 保持 fail-open 降级。
 - [x] Director 人物连续性止血修复：修复 `SessionID is not defined` 运行时错误；连续性查找/复用失败时 `embody` 自动降级为 fresh Character 子会话，不能阻断当次采样；`scene_update(runtime.yaml)` 现自动刷新内部场景连续性状态，`openplay init` 不再默认写 `current_scene.scene_id`。
 - [x] Director 场景连续性锚点内置化：`scene_update` 全量覆盖 `runtime.yaml` 时，内部 scene-state 会按 `current_scene.date/location` 自动保留或切换场景 key，避免 `scene_id` 被覆盖后人物连续性丢失。
@@ -88,6 +89,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-29: 为 `openplay-ui` 补齐会话级高保真 Trace 链路：Session 现持久化 `trace.enabled` 并在 Character/子代理会话创建时自动继承；模型 Trace 独立写入 `~/.local/share/openplay/log/model-trace/`，按会话+日期分段 JSONL 存储，写入最近索引并仅对该目录执行 7 天保留清理。新增 `PATCH /session/:id` Trace 控制与 `GET /session/:id/trace` 阅读接口，返回原始事件与可用性/保留期元信息；WebUI 设置页新增 Trace 阅读偏好，Session header 与 Roleplay 右侧面板新增显式状态/入口，统一接入新的 Trace 阅读器，可在 Readable/Raw 间切换并复制原始记录。
 - 2026-06-29: 修正 Roleplay WebUI “模型轨迹”弹窗高度设置未实际生效的问题：底层通用 `Dialog` 之前只允许给内容层传 class，`x-large` 容器仍被固定在约 600px 高；现补充容器级尺寸覆盖入口，并将模型轨迹弹窗外层容器提升到更高的桌面尺寸，避免窗口继续显得过扁。
 - 2026-06-29: 继续收紧 Roleplay WebUI “模型轨迹”查看器默认范围与列表密度：左侧卡片列缩窄并移除内容预览，仅保留归属/时间/目录元信息；默认只显示最近 7 天轨迹，并将该查看入口可见范围限制为最近 30 天，作为替代“自动清理旧日志”的 UI 层收口，避免误删真实会话历史。
 - 2026-06-29: 修复 Roleplay WebUI “模型轨迹”弹窗卡死：不再在打开时强制拉取主会话与全部 Character 子会话的完整历史，改为先加载已缓存/首屏消息并仅渲染最近一批卡片；更早历史改为用户手动按需加载。同时将资源加载键从不稳定数组改为稳定字符串，避免响应式反复触发重复同步与重渲染。

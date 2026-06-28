@@ -8,7 +8,7 @@ import { Spinner } from "@openplay-ai/ui/spinner"
 import { showToast } from "@openplay-ai/ui/toast"
 import { Tooltip, TooltipKeybind } from "@openplay-ai/ui/tooltip"
 import { getFilename } from "@openplay-ai/core/util/path"
-import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import { useCommand } from "@/context/command"
@@ -19,6 +19,7 @@ import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
+import { useSDK } from "@/context/sdk"
 import { focusTerminalById } from "@/pages/session/helpers"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { messageAgentColor } from "@/utils/agent"
@@ -27,7 +28,7 @@ import { isRoleplayMode } from "@/utils/roleplay"
 import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover } from "../status-popover"
 import { useDialog } from "@openplay-ai/ui/context/dialog"
-import { SessionRoleplayAuditDialog } from "./session-roleplay-audit-dialog"
+import { SessionTraceDialog } from "./session-trace-dialog"
 
 const OPEN_APPS = [
   "vscode",
@@ -141,6 +142,7 @@ export function SessionHeader() {
   const settings = useSettings()
   const sync = useSync()
   const terminal = useTerminal()
+  const sdk = useSDK()
   const dialog = useDialog()
   const { params, view } = useSessionLayout()
 
@@ -236,6 +238,44 @@ export function SessionHeader() {
     messageAgentColor(params.id ? sync.data.message[params.id] : undefined, sync.data.agent),
   )
   const roleplaySession = createMemo(() => isRoleplayMode(sync.data.path.world) && !!params.id)
+  const currentSession = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
+  const traceEnabled = createMemo(() => currentSession()?.trace?.enabled === true)
+  const traceToggleVisible = createMemo(() => settings.trace.showSessionToggle() && !!params.id)
+  const [traceMeta] = createResource(
+    () => params.id,
+    async (sessionID) => {
+      if (!sessionID) return undefined
+      const response = await sdk.client.session.trace({
+        sessionID,
+        includeSubagents: false,
+        limit: 1,
+      })
+      return response.data?.meta
+    },
+  )
+  const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
+  const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
+  const traceTooltip = createMemo(() => {
+    if (!traceAvailable()) return language.t("trace.header.unavailable")
+    return traceEnabled() ? language.t("trace.header.disable") : language.t("trace.header.enable")
+  })
+
+  const openTraceDialog = () => {
+    const sessionID = params.id
+    if (!sessionID) return
+    dialog.show(() => <SessionTraceDialog sessionID={sessionID} />)
+  }
+
+  const toggleTrace = () => {
+    const sessionID = params.id
+    if (!sessionID || !traceAvailable()) return
+    void sdk.client.session
+      .update({
+        sessionID,
+        trace: { enabled: !traceEnabled() },
+      })
+      .catch((err: unknown) => showRequestError(language, err))
+  }
 
   const selectApp = (app: OpenApp) => {
     if (!options().some((item) => item.id === app)) return
@@ -455,6 +495,48 @@ export function SessionHeader() {
                 </Show>
 
                 <div class="hidden md:flex items-center gap-1 shrink-0">
+                  <Show when={traceToggleVisible()}>
+                    <Tooltip
+                      placement="bottom"
+                      value={traceTooltip()}
+                    >
+                      <Button
+                        variant="ghost"
+                        class="titlebar-icon min-w-[72px] h-6 px-2 box-border gap-1"
+                        disabled={!traceAvailable()}
+                        onClick={toggleTrace}
+                      >
+                        <span
+                          class="inline-block w-2 h-2 rounded-full"
+                          classList={{
+                            "bg-[var(--color-success)]": traceEnabled(),
+                            "bg-border-strong": !traceEnabled(),
+                          }}
+                        />
+                        <span class="text-11-medium">{language.t("trace.header.label")}</span>
+                      </Button>
+                    </Tooltip>
+                  </Show>
+
+                  <Show when={params.id}>
+                    <Tooltip
+                      placement="bottom"
+                      value={language.t("trace.header.open", {
+                        days: String(traceRetentionDays()),
+                      })}
+                    >
+                      <Button
+                        variant="ghost"
+                        class="titlebar-icon min-w-[72px] h-6 px-2 box-border gap-1"
+                        onClick={openTraceDialog}
+                        aria-label={language.t("trace.header.openButton")}
+                      >
+                        <Icon size="small" name="bubble-5" />
+                        <span class="text-11-medium">{language.t("trace.header.openButton")}</span>
+                      </Button>
+                    </Tooltip>
+                  </Show>
+
                   <TooltipKeybind
                     title={language.t("command.review.toggle")}
                     keybind={command.keybind("review.toggle")}
@@ -476,11 +558,7 @@ export function SessionHeader() {
                       <Button
                         variant="ghost"
                         class="titlebar-icon w-8 h-6 p-0 box-border"
-                        onClick={() => {
-                          const sessionID = params.id
-                          if (!sessionID) return
-                          dialog.show(() => <SessionRoleplayAuditDialog sessionID={sessionID} />)
-                        }}
+                        onClick={openTraceDialog}
                         aria-label={language.t("roleplay.audit.open")}
                       >
                         <Icon size="small" name="bubble-5" />

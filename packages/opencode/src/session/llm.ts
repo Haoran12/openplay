@@ -3,6 +3,7 @@ import * as Log from "@openplay-ai/core/util/log"
 import { Context, Effect, Layer, Record } from "effect"
 import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
+import type { JSONSchema7 } from "@ai-sdk/provider"
 import { mergeDeep } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -17,6 +18,8 @@ import { PermissionID } from "@/permission/schema"
 import { Bus } from "@/bus"
 import { Wildcard } from "@/util/wildcard"
 import { SessionID } from "@/session/schema"
+import { SessionTrace } from "@/session/trace"
+import { ToolJsonSchema } from "@/tool/json-schema"
 import { Auth } from "@/auth"
 import { InstallationVersion } from "@openplay-ai/core/installation/version"
 import { EffectBridge } from "@/effect/bridge"
@@ -62,7 +65,12 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/LL
 const live: Layer.Layer<
   Service,
   never,
-  Auth.Service | Config.Service | Provider.Service | Plugin.Service | Permission.Service | RuntimeFlags.Service
+  | Auth.Service
+  | Config.Service
+  | Provider.Service
+  | Plugin.Service
+  | Permission.Service
+  | RuntimeFlags.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -72,6 +80,7 @@ const live: Layer.Layer<
     const plugin = yield* Plugin.Service
     const perm = yield* Permission.Service
     const flags = yield* RuntimeFlags.Service
+    const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
       const l = log
@@ -215,6 +224,45 @@ const live: Layer.Layer<
       }
       const sortedTools = Object.fromEntries(Object.entries(tools).toSorted(([a], [b]) => a.localeCompare(b)))
 
+      const traceTools = Object.fromEntries(
+        Object.entries(sortedTools).map(([name, item]) => [
+          name,
+          {
+            description: item.description,
+            inputSchema:
+              "inputSchema" in item && item.inputSchema
+                ? (item.inputSchema as JSONSchema7)
+                : "parameters" in item && item.parameters
+                  ? ToolJsonSchema.fromSchema(item.parameters as any)
+                  : undefined,
+          },
+        ]),
+      )
+
+      if (trace) {
+        yield* trace.write({
+          sessionID: input.sessionID,
+          rootSessionID: input.parentSessionID ?? input.sessionID,
+          source: input.parentSessionID ? "subagent" : "model",
+          kind: "llm.request",
+          agent: input.agent.name,
+          parentSessionID: input.parentSessionID,
+          payload: trace.requestPayload({
+            userMessageID: input.user.id,
+            model: {
+              id: input.model.id,
+              providerID: input.model.providerID,
+              variant: input.user.model.variant,
+            },
+            system,
+            messages,
+            toolChoice: input.toolChoice,
+            tools: traceTools,
+            options: params.options ?? {},
+          }),
+        })
+      }
+
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via opencode's tool system
       // and results sent back over the WebSocket.
@@ -322,7 +370,7 @@ const live: Layer.Layer<
         ? (yield* InstanceState.context).project.id
         : undefined
 
-      return streamText({
+      const result = streamText({
         onError(error) {
           l.error("stream error", {
             error,
@@ -402,6 +450,51 @@ const live: Layer.Layer<
           },
         },
       })
+
+      return {
+        ...result,
+        fullStream: (async function* () {
+          const text: string[] = []
+          const reasoning: string[] = []
+          let finish: unknown
+          for await (const event of result.fullStream) {
+            if (event.type === "text-delta") text.push(event.text)
+            if (event.type === "reasoning-delta") reasoning.push(event.text)
+            if (event.type === "finish") finish = event
+            if (trace) {
+              Effect.runSync(
+                trace.write({
+                  sessionID: input.sessionID,
+                  rootSessionID: input.parentSessionID ?? input.sessionID,
+                  source: input.parentSessionID ? "subagent" : "model",
+                  kind: "llm.stream.event",
+                  agent: input.agent.name,
+                  parentSessionID: input.parentSessionID,
+                  payload: event,
+                }),
+              )
+            }
+            yield event
+          }
+          if (trace) {
+            Effect.runSync(
+              trace.write({
+                sessionID: input.sessionID,
+                rootSessionID: input.parentSessionID ?? input.sessionID,
+                source: input.parentSessionID ? "subagent" : "model",
+                kind: "llm.response.completed",
+                agent: input.agent.name,
+                parentSessionID: input.parentSessionID,
+                payload: {
+                  text: text.join(""),
+                  reasoning: reasoning.join(""),
+                  finish,
+                },
+              }),
+            )
+          }
+        })(),
+      }
     })
 
     const stream: Interface["stream"] = (input) =>

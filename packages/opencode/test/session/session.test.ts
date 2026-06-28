@@ -171,6 +171,19 @@ describe("step-finish token propagation via Bus event", () => {
 })
 
 describe("Session", () => {
+  it.instance("inherits trace settings when creating child sessions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const parent = yield* session.create({ title: "parent", trace: { enabled: true } })
+      const child = yield* session.create({ title: "child", parentID: parent.id })
+
+      expect(parent.trace).toEqual({ enabled: true })
+      expect(child.trace).toEqual({ enabled: true })
+
+      yield* session.remove(parent.id)
+    }),
+  )
+
   it.live("remove works without an instance", () =>
     Effect.gen(function* () {
       const session = yield* SessionNs.Service
