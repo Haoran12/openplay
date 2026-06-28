@@ -141,3 +141,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-05-26: `embody` 新增结构化 `sceneEvents` 输入；Director 可把当前场景中的 speech / outward action / objective result 以 JSON 完整传给 Character，避免被摘要压扁。
 - 2026-05-26: `embody` 结构化事件隔离收紧：程序级拒绝 `inner_thought`、emotion、intent、plan 等他人主观字段进入 Character SubAgent，并对 `sceneEvents` 中残留的 God Only 字符串执行同样过滤。
 - 2026-06-04: Director 模式角色子代理 prompt 重构：收紧 `character.txt` 为角色基线约束，`embody` 改为变量化场景模板，向 Character 明确注入“你是谁、你身在何处、你此刻如何感到并会怎样反应”的临场信息；`sceneEvents` 同步改为更贴近角色感知的可读呈现，并移除“这不是什么题”一类否定式提示语。
+- 2026-06-29: 知识文件目录契约明确化：移除 `knowledge/people/` 子目录，改为在 `knowledge/` 一级目录下直接创建特定人物/地区/势力的 `.md` 文件；新增 `world_base.yaml` 作为整体世界观与自然规则文件；在 `knowledge_reflect`、`knowledge_update`、Director prompt 中明确区分整体性文件（`world_base.yaml`、`social_and_world.md`、`nature_and_body.md`）与特定对象文件（`<name>.md`）；明确角色数值/能力/经历/身份/观念应写入 `profile.yaml` 而非知识文件。

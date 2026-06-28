@@ -427,9 +427,12 @@ sense_traits:
     )
 
     expect(manifest).toContain("profile.yaml")
+    expect(manifest).toContain("knowledge/world_base.yaml")
     expect(manifest).toContain("knowledge/social_and_world.md")
     expect(manifest).toContain("knowledge/nature_and_body.md")
-    expect(manifest).toContain("knowledge/people/README.md")
+    expect(await fs.readFile(path.join(characterDir, "knowledge", "world_base.yaml"), "utf-8")).toContain(
+      "世界观基础",
+    )
     expect(await fs.readFile(path.join(characterDir, "knowledge", "social_and_world.md"), "utf-8")).toContain(
       "对社会与世道的长期认知",
     )

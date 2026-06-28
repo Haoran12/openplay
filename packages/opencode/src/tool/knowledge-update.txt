@@ -1,6 +1,6 @@
 Update the current character's own long-term knowledge resources in the roleplay world.
 
-Use this tool to revise stable character-owned knowledge about society, nature, other people, habits, judgments, and recurring understandings that should live outside the transient scene.
+Use this tool to revise stable character-owned knowledge about society, nature, other people, regions, factions, habits, judgments, and recurring understandings that should live outside the transient scene.
 
 ## Parameters
 
@@ -8,10 +8,25 @@ Use this tool to revise stable character-owned knowledge about society, nature, 
 - `content`: The complete file content to write.
 - `create` (optional, default true): Whether to create the file if it does not exist.
 
+## Knowledge File Directory Contract
+
+Files under `{character}/knowledge/` hold character-owned durable understanding:
+
+- `world_base.yaml`: Overall worldview and natural laws — broad, general rules about how the world works.
+- `social_and_world.md`: Overall social landscape, political culture, and societal patterns — broad observations about nations, cultures, or the world as a whole.
+- `nature_and_body.md`: Natural environment and body/sensory experience — climate, terrain, physical habits, sensory patterns.
+- `<person_or_entity>.md`: Knowledge about a **specific** person, region, faction, or entity. Create separate files for specific targets.
+- Other custom files may exist for specialized topics.
+
+When updating knowledge:
+
+- Write to `world_base.yaml`, `social_and_world.md`, or `nature_and_body.md` only for **broad, general** observations about the world, society, or nature.
+- For knowledge about a **specific** person, region, faction, or entity, create or update a dedicated file (e.g., `li_ming.md`, `northern_frontier.md`, `iron_sect.md`).
+- To update your own stats, abilities, history, identity, or beliefs, use `profile.yaml` — not knowledge files.
+
 ## Important
 
 - This tool is only for the current character's own `knowledge/**` resources.
 - Do not use absolute paths, parent-directory traversal, or non-knowledge paths.
 - Prefer one stable topic per file so future revisions stay readable.
-- Good fits include long-term social understanding, natural or bodily experience, and knowledge about specific other people.
 - Do not write public event records or omniscient world truth here.
