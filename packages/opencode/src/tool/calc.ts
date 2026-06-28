@@ -2,14 +2,20 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import DESCRIPTION from "./calc.txt"
 
-const DEFAULT_TIERS: ReadonlyArray<readonly [number, string]> = [
-  [0, "Mortal"],
-  [100, "Novice"],
-  [500, "Apprentice"],
-  [1000, "Adept"],
-  [2500, "Master"],
-  [5000, "Grandmaster"],
-  [10000, "Legendary"],
+interface Tier {
+  name: string
+  min: number
+  max: number | typeof Infinity
+  description: string
+}
+
+const DEFAULT_TIERS: ReadonlyArray<Tier> = [
+  { name: "Mundane", min: 0, max: 200, description: "没有锻炼/修行的普通人" },
+  { name: "Apprentice", min: 200, max: 1000, description: "有基础锻炼/修行" },
+  { name: "Adept", min: 1000, max: 1800, description: "中坚力量, 需要长时间锻炼/修行, 也是难以突破的瓶颈" },
+  { name: "Master", min: 1800, max: 2600, description: "宗师级别, 寻常生灵的极限" },
+  { name: "Ascendant", min: 2600, max: 6000, description: "突破凡俗界限, 仙灵的层级" },
+  { name: "Transcendent", min: 6000, max: Infinity, description: "极少数存在" },
 ]
 
 function calcDate(from: string, to: string): string {
@@ -27,35 +33,31 @@ function calcDate(from: string, to: string): string {
   return `${parts.join(", ")} ${diffDays > 0 ? "later" : "earlier"}.`
 }
 
-function calcTier(value: number, tiers?: ReadonlyArray<readonly [number, string]>): string {
+function calcTier(value: number, tiers?: ReadonlyArray<Tier>): string {
   const table = tiers ?? DEFAULT_TIERS
-  for (let i = table.length - 1; i >= 0; i--) {
-    if (value >= table[i][0]) {
-      const name = table[i][1]
+  for (let i = 0; i < table.length; i++) {
+    const tier = table[i]
+    if (value >= tier.min && (tier.max === Infinity || value < tier.max)) {
+      let result = `${value} → ${tier.name} (${tier.description})`
       const next = i < table.length - 1 ? table[i + 1] : undefined
-      let result = `${value} → ${name}`
       if (next) {
-        const progress = ((value - table[i][0]) / (next[0] - table[i][0])) * 100
-        result += ` (距 ${next[1]} ${progress.toFixed(1)}%)`
+        const progress = ((value - tier.min) / (next.min - tier.min)) * 100
+        result += ` (距 ${next.name} ${progress.toFixed(1)}%)`
       }
       return result
     }
   }
-  return `${value} → ${table[0]?.[1] ?? "Unknown"} (最低)`
+  return `${value} → ${table[0]?.name ?? "Unknown"} (${table[0]?.description ?? ""}) (最低)`
 }
 
 function calcDelta(a: number, b: number): string {
   const diff = Math.abs(a - b)
-  const ratio = a > b ? a / Math.max(b, 0.001) : b / Math.max(a, 0.001)
-  let magnitude: string
-  if (ratio < 1.1) magnitude = "几乎相同"
-  else if (ratio < 1.5) magnitude = "差距较小"
-  else if (ratio < 2) magnitude = "有明显差距"
-  else if (ratio < 3) magnitude = "差距显著"
-  else if (ratio < 5) magnitude = "差距很大"
-  else if (ratio < 10) magnitude = "差距悬殊"
-  else magnitude = "实力差距巨大"
-  return `差值 ${diff}，倍率 ${ratio.toFixed(2)}x，${magnitude}。`
+  let description: string
+  if (diff < 150) description = "难分高下, 更看临场发挥"
+  else if (diff < 400) description = "有明显差距, 但是 环境适应性/心态差异/技能克制 可以弥补差距"
+  else if (diff < 1000) description = "差距较大, 难以弥补"
+  else description = "碾压, 无法抗衡"
+  return `差值 ${diff}，${description}。`
 }
 
 function calcAge(birthDate: string, currentDate: string): string {
@@ -94,9 +96,14 @@ export const Parameters = Schema.Struct({
   to: Schema.optional(Schema.String.annotate({ description: "End date in YYYY-MM-DD or YYYY-MM-DD BC format" })),
   value: Schema.optional(Schema.Number.annotate({ description: "Numeric value to classify into a tier" })),
   tiers: Schema.optional(
-    Schema.mutable(Schema.Tuple([Schema.Number, Schema.String])),
+    Schema.mutable(Schema.Array(Schema.Struct({
+      name: Schema.String,
+      min: Schema.Number,
+      max: Schema.Number,
+      description: Schema.String,
+    }))),
   ).annotate({
-    description: "Custom tier table as [threshold, name]. Defaults to standard cultivation tiers.",
+    description: "Custom tier table. Defaults to standard cultivation tiers.",
   }),
   a: Schema.optional(Schema.Number.annotate({ description: "First value" })),
   b: Schema.optional(Schema.Number.annotate({ description: "Second value" })),
