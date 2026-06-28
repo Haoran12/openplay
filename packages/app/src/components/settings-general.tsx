@@ -640,6 +640,7 @@ export const SettingsGeneral: Component = () => {
   const TraceSection = () => (
     <div class="flex flex-col gap-1">
       <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.general.section.trace")}</h3>
+      <p class="pb-3 text-12-regular text-text-weak">{language.t("settings.trace.help")}</p>
 
       <SettingsList>
         <SettingsRow

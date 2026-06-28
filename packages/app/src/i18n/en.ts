@@ -786,6 +786,8 @@ export const dict = {
     "Include child character and subagent sessions when opening the trace reader",
   "settings.trace.option.readable": "Readable",
   "settings.trace.option.raw": "Raw",
+  "settings.trace.help":
+    "These settings only control the UI. To enable session trace capture, restart the server with OPENCODE_MODEL_TRACE=1.",
   "trace.dialog.title": "Trace Reader",
   "trace.dialog.description": "Browse the most recent {{days}} days of model trace for this session.",
   "trace.dialog.entries": "Entries",
@@ -801,11 +803,13 @@ export const dict = {
   "trace.view.raw": "Raw",
   "trace.copy": "Copy",
   "trace.copySuccess": "Trace entry copied",
-  "trace.unavailable": "Trace capture is disabled on the server. Set OPENCODE_MODEL_TRACE=1 to enable session trace recording.",
+  "trace.unavailable":
+    "Trace capture is disabled on the server. Restart the server with OPENCODE_MODEL_TRACE=1 to enable session trace recording.",
   "trace.header.label": "Trace",
   "trace.header.enable": "Enable trace for the current session",
   "trace.header.disable": "Disable trace for the current session",
-  "trace.header.unavailable": "Trace is unavailable because the server-wide model trace flag is disabled",
+  "trace.header.unavailable":
+    "Trace is unavailable because the server-wide model trace flag is disabled. Restart the server with OPENCODE_MODEL_TRACE=1.",
   "trace.header.open": "Open the trace reader. Server retention: {{days}} days.",
   "trace.header.openButton": "Reader",
   "trace.status.on": "Trace on",

@@ -147,3 +147,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 知识文件目录契约补充：明确 `profile.yaml` 用于角色自身的 attributes/abilities/experience/mindModel/role/appearance，他人信息在 `knowledge/<name>.md` 处理；要求创建新知识文件前检查现有文件避免重复。
 - 2026-06-29: 修复 `openplay-ui` 右上角重复 Trace 阅读器入口：会话 header 现只保留通用 Trace 阅读器按钮，移除 roleplay 模式下重复显示的旧审计图标，避免同一功能出现两个入口。
 - 2026-06-29: 修复 `openplay-ui` 会话 header Trace 开关状态不明确的问题：按钮现直接显示 `Trace 开启/关闭` 并用更明显的状态底色区分；切换后会主动刷新当前会话，确保 UI 立即反映服务端 `trace.enabled` 的真实状态。
+- 2026-06-29: 调整 `openplay-ui` Trace 关闭态交互：当服务端未启用 `OPENCODE_MODEL_TRACE` 时，不再在会话 header 暴露一个不可操作的禁用开关；设置页与 Trace 阅读器提示现明确说明这些只控制 UI，真正启用采集需要用 `OPENCODE_MODEL_TRACE=1` 重启服务。
