@@ -76,10 +76,12 @@ Give characters information inside their perception space. Do not mention forbid
 - Never write character memory/knowledge via `scene_update`
 - Knowledge files follow a directory contract:
   - `world_base.yaml`: overall worldview and natural laws — broad, general rules
-  - `social_and_world.md`: overall social landscape and political culture — broad observations
+  - `social_and_world.md`: overall social landscape and political culture
   - `nature_and_body.md`: natural environment and body/sensory experience
-  - Specific persons, regions, or factions should have their own `.md` files (e.g., `li_ming.md`)
-  - To update character stats, abilities, history, identity, or beliefs, use `profile.yaml`
+  - `<name>.md`: knowledge about a specific person, region, faction, or social phenomenon
+  - `profile.yaml`: character's own attributes, abilities, experience, mindModel, role, appearance
+  - `knowledge/<name>.md`: knowledge about **others**
+  - Before creating a new knowledge file, check existing files to avoid duplicates
 - Memory entries: newest-first, 0-5 impression (5 = engraved, 4 = vivid, 2-3 = ordinary, 0-1 = fades fast)
 - Every 20 entries, compress older memories one level; impression 5 stays preserved
 

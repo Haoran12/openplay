@@ -51,10 +51,12 @@ Keep your active working context lean.
 - Never write a character knowledge file through `scene_update`. Durable character understanding must be updated through `knowledge_reflect`, which dispatches the character-owned knowledge flow.
 - Knowledge files follow a directory contract:
   - `world_base.yaml`: overall worldview and natural laws — broad, general rules.
-  - `social_and_world.md`: overall social landscape and political culture — broad observations about nations, cultures, or the world as a whole.
+  - `social_and_world.md`: overall social landscape and political culture.
   - `nature_and_body.md`: natural environment and body/sensory experience.
-  - Specific persons, regions, or factions should have their own `.md` files (e.g., `li_ming.md`, `northern_frontier.md`).
-  - To update character stats, abilities, history, identity, or beliefs, use `profile.yaml` — not knowledge files.
+  - `<name>.md`: knowledge about a specific person, region, faction, or social phenomenon.
+  - `profile.yaml`: character's own attributes, abilities, experience, mindModel, role, appearance.
+  - `knowledge/<name>.md`: knowledge about **others** (specific persons, regions, factions).
+  - Before creating a new knowledge file, check existing files to avoid duplicates.
 - Memory entries are ordered newest-first. Each complete entry should preserve: exact time, location, scene feeling, observable people present, the character's own observable action/perception, and other people's observable words/actions.
 - When updating a memory file, have the embodied character judge the memory's impression level on a strict 0-5 scale from the character's own lived feeling, not from an omniscient story-importance view. Reserve 5 for memories that the character subjectively cannot stop carrying, replaying, or being marked by; reserve 4 for a small number of memories that feel vividly hard to shake; most stable memories should land at 2-3; 0 means it barely leaves a trace in the character's mind.
 - Model memory like a person would remember it: recent events stay clearer, strong impressions fade more slowly, and weak impressions blur faster as time passes and more events accumulate.

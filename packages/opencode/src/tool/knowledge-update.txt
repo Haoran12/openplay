@@ -15,13 +15,21 @@ Files under `{character}/knowledge/` hold character-owned durable understanding:
 - `world_base.yaml`: Overall worldview and natural laws — broad, general rules.
 - `social_and_world.md`: Overall social landscape and political culture.
 - `nature_and_body.md`: Natural environment and body/sensory experience.
-- `<name>.md`: Knowledge about a **specific** person, region, or faction.
+- `<name>.md`: Knowledge about a **specific** person, region, faction, or social phenomenon.
+
+**Self vs Others:**
+
+- `profile.yaml`: Your own attributes, abilities, experience, mindModel, role, appearance.
+- `knowledge/<name>.md`: Knowledge about **others** (specific persons, regions, factions).
+
+**Before creating a new file:**
+
+Check existing files to avoid duplicates (e.g., if `li_ming.md` exists, update it instead of creating `李明.md`).
 
 **Important:**
 
 - Write to `world_base.yaml`/`social_and_world.md`/`nature_and_body.md` only for **broad, general** observations.
-- For **specific** persons, regions, or factions, create dedicated files (e.g., `li_ming.md`, `northern_frontier.md`).
-- Stats, abilities, history, identity, beliefs → `profile.yaml`, not knowledge files.
-- One stable topic per file for readability.
+- For **specific** persons, regions, factions, or social phenomena, create dedicated files.
+- One topic per file for readability.
 - No absolute paths, parent traversal, or non-knowledge paths.
 - No public event records or omniscient world truth.
