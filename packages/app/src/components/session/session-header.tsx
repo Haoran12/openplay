@@ -23,8 +23,11 @@ import { focusTerminalById } from "@/pages/session/helpers"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { messageAgentColor } from "@/utils/agent"
 import { decode64 } from "@/utils/base64"
+import { isRoleplayMode } from "@/utils/roleplay"
 import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover } from "../status-popover"
+import { useDialog } from "@openplay-ai/ui/context/dialog"
+import { SessionRoleplayAuditDialog } from "./session-roleplay-audit-dialog"
 
 const OPEN_APPS = [
   "vscode",
@@ -138,6 +141,7 @@ export function SessionHeader() {
   const settings = useSettings()
   const sync = useSync()
   const terminal = useTerminal()
+  const dialog = useDialog()
   const { params, view } = useSessionLayout()
 
   const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
@@ -231,6 +235,7 @@ export function SessionHeader() {
   const tint = createMemo(() =>
     messageAgentColor(params.id ? sync.data.message[params.id] : undefined, sync.data.agent),
   )
+  const roleplaySession = createMemo(() => isRoleplayMode(sync.data.path.world) && !!params.id)
 
   const selectApp = (app: OpenApp) => {
     if (!options().some((item) => item.id === app)) return
@@ -465,6 +470,23 @@ export function SessionHeader() {
                       <Icon size="small" name={view().reviewPanel.opened() ? "review-active" : "review"} />
                     </Button>
                   </TooltipKeybind>
+
+                  <Show when={roleplaySession()}>
+                    <Tooltip placement="bottom" value={language.t("roleplay.audit.open")}>
+                      <Button
+                        variant="ghost"
+                        class="titlebar-icon w-8 h-6 p-0 box-border"
+                        onClick={() => {
+                          const sessionID = params.id
+                          if (!sessionID) return
+                          dialog.show(() => <SessionRoleplayAuditDialog sessionID={sessionID} />)
+                        }}
+                        aria-label={language.t("roleplay.audit.open")}
+                      >
+                        <Icon size="small" name="bubble-5" />
+                      </Button>
+                    </Tooltip>
+                  </Show>
 
                   <Show when={tree()}>
                     <TooltipKeybind

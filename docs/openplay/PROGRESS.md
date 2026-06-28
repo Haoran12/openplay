@@ -78,6 +78,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` 一键同时打开 OpenPlay 与 Roleplay WebUI
 - [x] Roleplay WebUI 右侧状态面板人物卡片排版调整：在场人物字段改为单行 inline 展示，仅对字段名做弱强调，避免字段名与内容分行。
 - [x] Roleplay WebUI 右侧状态面板在场人物 name 支持弹出只读 `profile.yaml` 预览，使用对话框和高亮代码块展示。
+- [x] Roleplay WebUI 新增模型轨迹查看入口：右上角“切换文件树”左侧增加按钮，可按主会话 / Character SubAgent / 工具调用查看真实请求与响应内容。
 - [x] Director 同场景人物连续性修复：`embody` 复用同角色同场景 Character 子会话，保留完整子会话历史；场景连续性锚点改由内部 scene-state 维护，不再依赖 `runtime.yaml.current_scene.scene_id`，并对用户手改/损坏 `runtime.yaml` 保持 fail-open 降级。
 - [x] Director 人物连续性止血修复：修复 `SessionID is not defined` 运行时错误；连续性查找/复用失败时 `embody` 自动降级为 fresh Character 子会话，不能阻断当次采样；`scene_update(runtime.yaml)` 现自动刷新内部场景连续性状态，`openplay init` 不再默认写 `current_scene.scene_id`。
 - [x] Director 场景连续性锚点内置化：`scene_update` 全量覆盖 `runtime.yaml` 时，内部 scene-state 会按 `current_scene.date/location` 自动保留或切换场景 key，避免 `scene_id` 被覆盖后人物连续性丢失。
@@ -87,6 +88,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-29: Roleplay WebUI 右上角新增“模型轨迹”入口，位于“切换文件树”左侧。弹窗会补拉主会话与 Character 子会话完整历史，并按“主会话 / SubAgent / 工具调用”整理为卡片；详情页用分段代码块展示真实发送给模型的文本、角色子代理往返内容，以及工具调用的输入/输出，提升长回合审计可读性。
 - 2026-06-29: 收紧 `embody` 对人物子代理的场景锚点注入：除客观环境摘要外，现额外把 `runtime.yaml` 中当前场景的时间/地点作为独立固定段落与 `environmentOverride` 明确传给 Character 子代理；优先读取 `current_scene.date/location`，缺失时回退 `environment.time/location`，并补充回归测试覆盖 `"1003-07-14 上午"` / `"今庭-荆州-襄陵县"` 这类格式。
 - 2026-06-29: 人物子代理连续会话链路排查：确认 `embody` 自 2026-06-26 起按“同父 Director 会话 + 同角色 + 同 sceneKey”复用 Character 子会话；新的场景 prompt 每轮都会追加进同一子会话历史，旧轮次中角色先前的 `inner_thought` / `action_intent` / `outward_action` 也持续保留。当前实现没有按轮裁剪或总结旧场景历史，且 scene-state 默认 `keep` 仅靠显式 `scene_transition=switch` 轮换 key，因此在 runtime 已明显推进但未切 key 时，旧场景残留更容易干扰当前人物输出。
 - 2026-06-27: Director `calc` 工具挡位系统重构：Tiers 改为区间语义 `[min, max)`，更新为 Mundane/Apprentice/Adept/Master/Ascendant/Transcendent 六档并附带中文描述；Delta 改为绝对差值分级 `[0,150)/[150,400)/[400,1000)/[1000,∞)`，描述同步中文化。
