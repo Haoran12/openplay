@@ -253,11 +253,10 @@ export function SessionHeader() {
     },
   )
   const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
-  const traceToggleVisible = createMemo(
-    () => settings.trace.showSessionToggle() && !!params.id && traceAvailable(),
-  )
+  const traceToggleVisible = createMemo(() => settings.trace.showSessionToggle() && !!params.id)
   const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
   const traceTooltip = createMemo(() => {
+    if (traceEnabled() && !traceAvailable()) return language.t("trace.header.unavailable")
     if (!traceAvailable()) return language.t("trace.header.enableGlobal")
     return traceEnabled() ? language.t("trace.header.disable") : language.t("trace.header.enable")
   })
@@ -271,8 +270,9 @@ export function SessionHeader() {
   const toggleTrace = async () => {
     const sessionID = params.id
     if (!sessionID) return
+    const nextEnabled = !traceEnabled()
     try {
-      if (!traceAvailable()) {
+      if (nextEnabled && !traceAvailable()) {
         await sdk.client.config.update({
           config: {
             ...sync.data.config,
@@ -288,7 +288,7 @@ export function SessionHeader() {
       }
       await sdk.client.session.update({
         sessionID,
-        trace: { enabled: !traceEnabled() },
+        trace: { enabled: nextEnabled },
       })
       const response = await sdk.client.session.trace({
         sessionID,
@@ -535,10 +535,10 @@ export function SessionHeader() {
                         classList={{
                           "border-[var(--color-success)]/30 bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] text-text-strong":
                             traceEnabled() && traceAvailable(),
-                          "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled() && traceAvailable(),
-                          "border-border-weak-base bg-surface-weaker text-text-weaker": !traceAvailable(),
+                          "border-[var(--syntax-warning)]/35 bg-[color:color-mix(in_srgb,var(--syntax-warning)_14%,transparent)] text-text-strong":
+                            traceEnabled() && !traceAvailable(),
+                          "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled(),
                         }}
-                        disabled={!traceAvailable()}
                         onClick={() => void toggleTrace()}
                         aria-pressed={traceEnabled()}
                         aria-label={traceTooltip()}
@@ -547,6 +547,7 @@ export function SessionHeader() {
                           class="inline-block w-2 h-2 rounded-full shadow-[0_0_0_2px_var(--background-base)]"
                           classList={{
                             "bg-[var(--color-success)]": traceEnabled(),
+                            "bg-[var(--syntax-warning)]": traceEnabled() && !traceAvailable(),
                             "bg-border-strong": !traceEnabled(),
                           }}
                         />
