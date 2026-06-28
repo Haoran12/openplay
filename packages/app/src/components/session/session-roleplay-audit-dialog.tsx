@@ -312,8 +312,8 @@ export const SessionRoleplayAuditDialog: Component<{
       title={language.t("roleplay.audit.title")}
       description={language.t("roleplay.audit.description")}
       size="x-large"
-      fit
-      class="w-[min(calc(100vw-32px),1240px)] h-[min(calc(100vh-16px),960px)] overflow-hidden"
+      containerClass="w-[min(calc(100vw-32px),1320px)] h-[min(calc(100vh-16px),1040px)]"
+      class="h-full min-h-0 overflow-hidden"
     >
       <div
         class="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]"
