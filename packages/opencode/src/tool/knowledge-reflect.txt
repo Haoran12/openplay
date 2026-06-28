@@ -27,7 +27,7 @@ Files under `{character}/knowledge/` hold character-owned durable understanding:
 
 **Before creating a new file:**
 
-Check existing files to avoid duplicates (e.g., if `li_ming.md` exists, update it instead of creating `李明.md`).
+Check existing files to avoid duplicates (e.g., if `李明.md` exists, update it instead of creating `liming.md`).
 
 When updating knowledge:
 
