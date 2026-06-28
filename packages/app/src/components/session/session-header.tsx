@@ -240,9 +240,6 @@ export function SessionHeader() {
   const roleplaySession = createMemo(() => isRoleplayMode(sync.data.path.world) && !!params.id)
   const currentSession = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
   const traceEnabled = createMemo(() => currentSession()?.trace?.enabled === true)
-  const traceToggleVisible = createMemo(
-    () => settings.trace.showSessionToggle() && !!params.id && traceAvailable(),
-  )
   const [traceMeta, { refetch: refetchTraceMeta }] = createResource(
     () => params.id,
     async (sessionID) => {
@@ -256,6 +253,9 @@ export function SessionHeader() {
     },
   )
   const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
+  const traceToggleVisible = createMemo(
+    () => settings.trace.showSessionToggle() && !!params.id && traceAvailable(),
+  )
   const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
   const traceTooltip = createMemo(() => {
     if (!traceAvailable()) return language.t("trace.header.enableGlobal")
