@@ -266,15 +266,18 @@ export function SessionHeader() {
     dialog.show(() => <SessionTraceDialog sessionID={sessionID} />)
   }
 
-  const toggleTrace = () => {
+  const toggleTrace = async () => {
     const sessionID = params.id
     if (!sessionID || !traceAvailable()) return
-    void sdk.client.session
-      .update({
+    try {
+      await sdk.client.session.update({
         sessionID,
         trace: { enabled: !traceEnabled() },
       })
-      .catch((err: unknown) => showRequestError(language, err))
+      await sync.session.sync(sessionID, { force: true })
+    } catch (err: unknown) {
+      showRequestError(language, err)
+    }
   }
 
   const selectApp = (app: OpenApp) => {
@@ -496,24 +499,31 @@ export function SessionHeader() {
 
                 <div class="hidden md:flex items-center gap-1 shrink-0">
                   <Show when={traceToggleVisible()}>
-                    <Tooltip
-                      placement="bottom"
-                      value={traceTooltip()}
-                    >
+                    <Tooltip placement="bottom" value={traceTooltip()}>
                       <Button
                         variant="ghost"
-                        class="titlebar-icon min-w-[72px] h-6 px-2 box-border gap-1"
+                        class="titlebar-icon min-w-[96px] h-6 px-2.5 box-border gap-1.5 border"
+                        classList={{
+                          "border-[var(--color-success)]/30 bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] text-text-strong":
+                            traceEnabled() && traceAvailable(),
+                          "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled() && traceAvailable(),
+                          "border-border-weak-base bg-surface-weaker text-text-weaker": !traceAvailable(),
+                        }}
                         disabled={!traceAvailable()}
-                        onClick={toggleTrace}
+                        onClick={() => void toggleTrace()}
+                        aria-pressed={traceEnabled()}
+                        aria-label={traceTooltip()}
                       >
                         <span
-                          class="inline-block w-2 h-2 rounded-full"
+                          class="inline-block w-2 h-2 rounded-full shadow-[0_0_0_2px_var(--background-base)]"
                           classList={{
                             "bg-[var(--color-success)]": traceEnabled(),
                             "bg-border-strong": !traceEnabled(),
                           }}
                         />
-                        <span class="text-11-medium">{language.t("trace.header.label")}</span>
+                        <span class="text-11-medium">
+                          {traceEnabled() ? language.t("trace.status.on") : language.t("trace.status.off")}
+                        </span>
                       </Button>
                     </Tooltip>
                   </Show>
