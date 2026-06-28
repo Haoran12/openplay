@@ -777,6 +777,9 @@ export const dict = {
     "Display the animated progress bar at the top of the session when the agent is working",
   "settings.trace.row.showSessionToggle.title": "Show session trace toggle",
   "settings.trace.row.showSessionToggle.description": "Show the current-session trace switch in the session header",
+  "settings.trace.row.serviceEnabled.title": "Enable OpenPlay trace service",
+  "settings.trace.row.serviceEnabled.description":
+    "Allow session trace capture across this OpenPlay server so session-level trace toggles can record events",
   "settings.trace.row.defaultView.title": "Default trace view",
   "settings.trace.row.defaultView.description": "Choose whether the trace reader opens in readable or raw mode",
   "settings.trace.row.defaultReadableSections.title": "Expanded readable sections",
@@ -787,7 +790,7 @@ export const dict = {
   "settings.trace.option.readable": "Readable",
   "settings.trace.option.raw": "Raw",
   "settings.trace.help":
-    "These settings only control the UI. To enable session trace capture, restart the server with OPENCODE_MODEL_TRACE=1.",
+    "Use the OpenPlay trace service switch below to allow trace capture on this server. The remaining settings only control the UI.",
   "trace.dialog.title": "Trace Reader",
   "trace.dialog.description": "Browse the most recent {{days}} days of model trace for this session.",
   "trace.dialog.entries": "Entries",
@@ -804,12 +807,15 @@ export const dict = {
   "trace.copy": "Copy",
   "trace.copySuccess": "Trace entry copied",
   "trace.unavailable":
-    "Trace capture is disabled on the server. Restart the server with OPENCODE_MODEL_TRACE=1 to enable session trace recording.",
+    "Trace capture is disabled on this OpenPlay server. Turn on the OpenPlay trace service in Settings to enable session trace recording.",
   "trace.header.label": "Trace",
   "trace.header.enable": "Enable trace for the current session",
   "trace.header.disable": "Disable trace for the current session",
-  "trace.header.unavailable":
-    "Trace is unavailable because the server-wide model trace flag is disabled. Restart the server with OPENCODE_MODEL_TRACE=1.",
+  "trace.header.unavailable": "Trace is unavailable because the OpenPlay trace service is disabled.",
+  "trace.header.enableGlobal": "Enable the OpenPlay trace service and start tracing this session",
+  "trace.header.globalStillOff": "OpenPlay trace service is still off",
+  "trace.header.globalStillOffDescription":
+    "The server did not report trace availability after the update. Check the server configuration and try again.",
   "trace.header.open": "Open the trace reader. Server retention: {{days}} days.",
   "trace.header.openButton": "Reader",
   "trace.status.on": "Trace on",

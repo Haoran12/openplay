@@ -951,6 +951,9 @@ export type ServerConfig = {
   mdns?: boolean
   mdnsDomain?: string
   cors?: Array<string>
+  trace?: {
+    enabled?: boolean
+  }
 }
 
 export type ReferenceConfigEntry =

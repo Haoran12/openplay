@@ -243,7 +243,7 @@ export function SessionHeader() {
   const traceToggleVisible = createMemo(
     () => settings.trace.showSessionToggle() && !!params.id && traceAvailable(),
   )
-  const [traceMeta] = createResource(
+  const [traceMeta, { refetch: refetchTraceMeta }] = createResource(
     () => params.id,
     async (sessionID) => {
       if (!sessionID) return undefined
@@ -258,7 +258,7 @@ export function SessionHeader() {
   const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
   const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
   const traceTooltip = createMemo(() => {
-    if (!traceAvailable()) return language.t("trace.header.unavailable")
+    if (!traceAvailable()) return language.t("trace.header.enableGlobal")
     return traceEnabled() ? language.t("trace.header.disable") : language.t("trace.header.enable")
   })
 
@@ -270,13 +270,40 @@ export function SessionHeader() {
 
   const toggleTrace = async () => {
     const sessionID = params.id
-    if (!sessionID || !traceAvailable()) return
+    if (!sessionID) return
     try {
+      if (!traceAvailable()) {
+        await sdk.client.config.update({
+          config: {
+            ...sync.data.config,
+            server: {
+              ...(sync.data.config.server ?? {}),
+              trace: {
+                ...sync.data.config.server?.trace,
+                enabled: true,
+              },
+            },
+          },
+        })
+      }
       await sdk.client.session.update({
         sessionID,
         trace: { enabled: !traceEnabled() },
       })
+      const response = await sdk.client.session.trace({
+        sessionID,
+        includeSubagents: false,
+        limit: 1,
+      })
+      void refetchTraceMeta()
       await sync.session.sync(sessionID, { force: true })
+      if (response.data?.meta.available === false) {
+        showToast({
+          variant: "error",
+          title: language.t("trace.header.globalStillOff"),
+          description: language.t("trace.header.globalStillOffDescription"),
+        })
+      }
     } catch (err: unknown) {
       showRequestError(language, err)
     }

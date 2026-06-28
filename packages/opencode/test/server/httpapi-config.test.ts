@@ -110,4 +110,58 @@ describe("config HttpApi", () => {
       })
     }),
   )
+
+  it.live(
+    "serves OpenPlay trace service config through the default server app",
+    Effect.gen(function* () {
+      const tmp = yield* tmpdirEffect({
+        config: {
+          formatter: false,
+          lsp: false,
+          server: {
+            trace: {
+              enabled: false,
+            },
+          },
+        },
+      })
+
+      const response = yield* Effect.promise(() =>
+        Promise.resolve(
+          app().request("/config", {
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              "x-opencode-directory": tmp.path,
+            },
+            body: JSON.stringify({
+              formatter: false,
+              lsp: false,
+              server: {
+                trace: {
+                  enabled: true,
+                },
+              },
+            }),
+          }),
+        ),
+      )
+
+      expect(response.status).toBe(200)
+      expect(yield* Effect.promise(() => response.json())).toMatchObject({
+        server: {
+          trace: {
+            enabled: true,
+          },
+        },
+      })
+      expect(yield* Effect.promise(() => Bun.file(path.join(tmp.path, "config.json")).json())).toMatchObject({
+        server: {
+          trace: {
+            enabled: true,
+          },
+        },
+      })
+    }),
+  )
 })

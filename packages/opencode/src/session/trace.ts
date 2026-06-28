@@ -9,6 +9,7 @@ import type { SessionID } from "./schema"
 import * as Database from "@/storage/db"
 import { SessionTable } from "./session.sql"
 import { eq } from "drizzle-orm"
+import { Config } from "@/config/config"
 
 export const TraceSource = Schema.Literals(["main", "subagent", "tool", "model"]).annotate({
   identifier: "SessionTrace.Source",
@@ -80,6 +81,7 @@ type WriteInput = Omit<TraceEntry, "id" | "timestamp">
 
 export interface Interface {
   readonly enabled: (sessionID: SessionID | string) => Effect.Effect<boolean>
+  readonly available: () => Effect.Effect<boolean>
   readonly write: (input: WriteInput) => Effect.Effect<void>
   readonly list: (input: TraceListInput) => Effect.Effect<TraceListResult>
   readonly requestPayload: (input: RequestPayload) => RequestPayload
@@ -143,6 +145,12 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const flags = yield* RuntimeFlags.Service
+    const config = yield* Config.Service
+
+    const available: Interface["available"] = Effect.fn("SessionTrace.available")(function* () {
+      const cfg = yield* config.get()
+      return cfg.server?.trace?.enabled ?? flags.modelTrace
+    })
 
     const cleanup = Effect.fn("SessionTrace.cleanup")(function* () {
       const ttl = normalizedRetentionDays(flags.modelTraceRetentionDays) * 24 * 60 * 60 * 1000
@@ -160,7 +168,7 @@ export const layer = Layer.effect(
     })
 
     const enabled: Interface["enabled"] = Effect.fn("SessionTrace.enabled")(function* (sessionID) {
-      if (!flags.modelTrace) return false
+      if (!(yield* available())) return false
       const row = yield* Effect.sync(() =>
         Database.use((db) =>
           db
@@ -212,11 +220,12 @@ export const layer = Layer.effect(
         ),
       )
       if (!requested?.id) {
+        const isAvailable = yield* available()
         return {
           items: [],
           cursor: undefined,
           meta: {
-            available: flags.modelTrace,
+            available: isAvailable,
             retentionDays: normalizedRetentionDays(flags.modelTraceRetentionDays),
           },
         }
@@ -301,11 +310,12 @@ export const layer = Layer.effect(
       const limit = Number.isFinite(input.limit) && input.limit && input.limit > 0 ? Math.trunc(input.limit) : 200
       const slice = items.slice(0, limit)
       const next = items.length > limit && slice.length > 0 ? cursorOf(slice[slice.length - 1]!) : undefined
+      const isAvailable = yield* available()
       return {
         items: slice,
         cursor: next,
         meta: {
-          available: flags.modelTrace,
+          available: isAvailable,
           retentionDays: normalizedRetentionDays(flags.modelTraceRetentionDays),
         },
       }
@@ -316,6 +326,7 @@ export const layer = Layer.effect(
     }
 
     return Service.of({
+      available,
       enabled,
       write,
       list,
@@ -324,6 +335,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(RuntimeFlags.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(Config.defaultLayer), Layer.provide(RuntimeFlags.defaultLayer))
 
 export * as SessionTrace from "./trace"

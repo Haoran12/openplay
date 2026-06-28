@@ -177,6 +177,19 @@ export const SettingsGeneral: Component = () => {
 
   const globalSync = useGlobalSync()
   const globalSdk = useGlobalSDK()
+  const traceServiceEnabled = createMemo(() => globalSync.data.config.server?.trace?.enabled === true)
+
+  const setTraceServiceEnabled = async (enabled: boolean) => {
+    await globalSync.updateConfig({
+      server: {
+        ...(globalSync.data.config.server ?? {}),
+        trace: {
+          ...globalSync.data.config.server?.trace,
+          enabled,
+        },
+      },
+    })
+  }
 
   const [shells] = createResource(
     () =>
@@ -643,6 +656,15 @@ export const SettingsGeneral: Component = () => {
       <p class="pb-3 text-12-regular text-text-weak">{language.t("settings.trace.help")}</p>
 
       <SettingsList>
+        <SettingsRow
+          title={language.t("settings.trace.row.serviceEnabled.title")}
+          description={language.t("settings.trace.row.serviceEnabled.description")}
+        >
+          <div data-action="settings-trace-service-enabled">
+            <Switch checked={traceServiceEnabled()} onChange={(checked) => void setTraceServiceEnabled(checked)} />
+          </div>
+        </SettingsRow>
+
         <SettingsRow
           title={language.t("settings.trace.row.showSessionToggle.title")}
           description={language.t("settings.trace.row.showSessionToggle.description")}
