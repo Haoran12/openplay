@@ -83,9 +83,14 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director 场景连续性锚点内置化：`scene_update` 全量覆盖 `runtime.yaml` 时，内部 scene-state 会按 `current_scene.date/location` 自动保留或切换场景 key，避免 `scene_id` 被覆盖后人物连续性丢失。
 - [x] Director 场景切换判定收紧：短时/短距导致的 `date/location` 变化不再自动切场；只有显式 `# openplay: scene_transition=switch` 才会轮换内部 scene key。
 - [x] Director 会话边界接入场景边界：新建 Director 会话会自动轮换内部 scene key，不再复用旧会话的场景连续性。
+- [x] Embody 显式注入场景时间地点：Character 子代理每轮固定收到从 `runtime.yaml` 抽取的当前时间/地点锚点，降低连续子会话中的日期地点幻觉。
 
 ## Changelog
 
+- 2026-06-29: 收紧 `embody` 对人物子代理的场景锚点注入：除客观环境摘要外，现额外把 `runtime.yaml` 中当前场景的时间/地点作为独立固定段落与 `environmentOverride` 明确传给 Character 子代理；优先读取 `current_scene.date/location`，缺失时回退 `environment.time/location`，并补充回归测试覆盖 `"1003-07-14 上午"` / `"今庭-荆州-襄陵县"` 这类格式。
+- 2026-06-29: 人物子代理连续会话链路排查：确认 `embody` 自 2026-06-26 起按“同父 Director 会话 + 同角色 + 同 sceneKey”复用 Character 子会话；新的场景 prompt 每轮都会追加进同一子会话历史，旧轮次中角色先前的 `inner_thought` / `action_intent` / `outward_action` 也持续保留。当前实现没有按轮裁剪或总结旧场景历史，且 scene-state 默认 `keep` 仅靠显式 `scene_transition=switch` 轮换 key，因此在 runtime 已明显推进但未切 key 时，旧场景残留更容易干扰当前人物输出。
+- 2026-06-27: Director `calc` 工具挡位系统重构：Tiers 改为区间语义 `[min, max)`，更新为 Mundane/Apprentice/Adept/Master/Ascendant/Transcendent 六档并附带中文描述；Delta 改为绝对差值分级 `[0,150)/[150,400)/[400,1000)/[1000,∞)`，描述同步中文化。
+- 2026-06-27: `playerNudge` 主观传递放开：移除 `playerNudge` 的主观拦截限制，允许通过该字段传递主观想法、判断或结论，绕过 `sceneFacts`/`situationFrame` 等字段的主观用词拦截
 - 2026-06-26: 退役 `openplay migrate-characters` CLI 迁移命令，并删除对应测试。该命令会在迁移旧平铺角色文件时按解析出的角色名重建目录，导致用户原本带“所属+名字”语义的目录名被收缩为“名字”。
 - 2026-06-26: 将 Director 会话边界并入场景边界规则：`.openplay/scene-state.json` 现记录写入该场景 key 的父会话；新建 Director 会话后首次写 `runtime.yaml` 会自动切到新 scene key，即使场景内容相同也不继承旧会话连续性。
 - 2026-06-26: 收紧 Director 场景切换规则：`.openplay/scene-state.json` 现默认保留当前内部 scene key，`current_scene.date/location` 的短时或短距离变化不会自动断开人物连续性；只有在 `scene_update(runtime.yaml)` 内容首行显式写入 `# openplay: scene_transition=switch` 时，程序才切换到新场景。
@@ -106,10 +111,10 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-26: 修复 WebUI 启动时的残留品牌导入：`packages/app/src/index.css` 从已不存在的 `@opencode-ai/ui/styles/tailwind` 切换到 `@openplay-ai/ui/styles/tailwind`，恢复 Vite/Tailwind 样式入口解析。
 - 2026-06-26: 修复 `packages/opencode/test/session/prompt.test.ts` 的过期 `sessions.messages` 调用签名，恢复仓库 `bun turbo typecheck` 通过。
 - 2026-06-26: WebUI 阅读体验增强：会话时间线新增“仅看叙事 / 全部”切换，`narrate` 正文可在连续阅读视图中按顺序串读；右侧角色面板新增最近一次 Character 子代理输入/输出卡片、`records/*` 场景变更时间线，以及 `runtime.yaml` / 角色目录快捷入口。
-- 2026-06-26: WebUI 阅读体验调整：会话时间线的“仅看叙事 / 全部”切换移到固定标题卡区域，避免用户必须滚动消息列表顶部才能找到阅读模式开关。
+- 2026-06-26: WebUI 阅读体验调整：阅读模式切换移到固定标题卡区域，避免用户必须滚动消息列表顶部才能找到阅读模式开关。
 - 2026-06-26: WebUI 阅读体验再调整：阅读模式切换并入会话标题行右侧动作区，避免额外占用一整行并压缩消息内容区域。
 - 2026-06-26: 网络启动便捷性补强：`openplay web` 新增 `--lan`，可直接绑定 `0.0.0.0` 并打印局域网访问地址；仍支持 `openplay web --hostname 0.0.0.0`。
-- 2026-06-25: 收紧 Director 首工具约束：Roleplay Director 现在每轮开始时首个工具调用必须是 `scene_update`；若先调用其他工具，会被程序直接拦截并要求先更新 `runtime.yaml` 或 `records/*`。保留既有 `embody` 后必须继续走到 `narrate` 或 `question` 的回合收束约束，并补充 session prompt 回归测试。
+- 2026-06-25: 收紧 Director 首工具约束：Roleplay Director 现在每轮开始时首个工具调用必须是 `scene_update`；若先调用其他工具，会被程序直接拦截并要求先更新 `runtime.yaml`。保留既有 `embody` 后必须继续走到 `narrate` 或 `question` 的回合收束约束，并补充 session prompt 回归测试。
 - 2026-06-24: 修复 Director 右侧面板 `runtime.yaml` 摘要解析：`World.fromDirectory` 现兼容旧式 `current_date` + 标量 `current_scene`，并可从 `environment.time/location` 回填场景时间地点；补充 `world` 与 HTTP API 回归测试，确保右侧面板能稳定显示当前时间、地点和在场人物。
 - 2026-06-24: 修复 Director `narrate` 终端渲染回退错误：CLI/run 链路不再在 completed 且 `output` 缺失时回退展示 `input.content`，避免把工具调用参数误显示成“正文叙事”；补充回归测试覆盖该场景。
 - 2026-06-24: TUI `narrate` 对 completed 但空 `output` 的异常态改为显式提示 `Narrate completed without output`，不再误显示为仍在 `Narrating...`，便于区分真实无输出与渲染链路问题。
@@ -130,4 +135,3 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-05-26: `embody` 新增结构化 `sceneEvents` 输入；Director 可把当前场景中的 speech / outward action / objective result 以 JSON 完整传给 Character，避免被摘要压扁。
 - 2026-05-26: `embody` 结构化事件隔离收紧：程序级拒绝 `inner_thought`、emotion、intent、plan 等他人主观字段进入 Character SubAgent，并对 `sceneEvents` 中残留的 God Only 字符串执行同样过滤。
 - 2026-06-04: Director 模式角色子代理 prompt 重构：收紧 `character.txt` 为角色基线约束，`embody` 改为变量化场景模板，向 Character 明确注入“你是谁、你身在何处、你此刻如何感到并会怎样反应”的临场信息；`sceneEvents` 同步改为更贴近角色感知的可读呈现，并移除“这不是什么题”一类否定式提示语。
-- 2026-06-29: 人物子代理连续会话链路排查：确认 `embody` 自 2026-06-26 起按“同父 Director 会话 + 同角色 + 同 sceneKey”复用 Character 子会话；新的场景 prompt 每轮都会追加进同一子会话历史，旧轮次中角色先前的 `inner_thought` / `action_intent` / `outward_action` 也持续保留。当前实现没有按轮裁剪或总结旧场景历史，且 scene-state 默认 `keep` 仅靠显式 `scene_transition=switch` 轮换 key，因此在 runtime 已明显推进但未切 key 时，旧场景残留更容易干扰当前人物输出。

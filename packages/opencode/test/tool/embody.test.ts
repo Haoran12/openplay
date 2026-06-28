@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import {
   buildCharacterSettingSection,
+  buildRoleplayEnvironmentOverride,
   buildCharacterSelfKnowledge,
+  buildScenePlacement,
   buildSubagentSystemPrompt,
   detectSubjectiveLeakage,
   ensureCharacterBinding,
@@ -327,6 +329,7 @@ sense_traits:
       persona: "寡言，谨慎，先观人再出手。",
       selfKnowledgeSection: "- Name: 孟缘\n- Faction: 云梦泽",
       visibleResourcesSection: "profile.yaml\nmemory.yaml\nknowledge/social_and_world.md",
+      scenePlacementSection: "- 当前时间：1003-07-14 上午\n- 当前地点：今庭-荆州-襄陵县",
       objectiveEnvironmentSection: "- 夜雨刚停，竹舍檐角还在滴水\n- 屋内烛火微晃，窗纸映着浅黄光",
       bodyStateSection: "- 左臂旧伤未愈，抬得太急会牵扯发痛",
       baselineSensorySection: "- 对灵力扰动敏感",
@@ -341,12 +344,71 @@ sense_traits:
     expect(prompt).toContain("当前角色：孟缘")
     expect(prompt).toContain("请立刻进入这个角色的当下处境。")
     expect(prompt).toContain("## 先把自己放进这一刻")
+    expect(prompt).toContain("### 你此刻明确身在")
+    expect(prompt).toContain("当前时间：1003-07-14 上午")
+    expect(prompt).toContain("当前地点：今庭-荆州-襄陵县")
     expect(prompt).toContain("### 你所处的环境")
     expect(prompt).toContain("### 眼前的局势")
     expect(prompt).toContain("### 你刚刚亲历的言行")
     expect(prompt).toContain("宋祈开口：“我能进来吗？”")
     expect(prompt).toContain("### 玩家给你的引导")
     expect(prompt).toContain("只返回一个 JSON 对象")
+  })
+
+  test("extracts scene placement from runtime.yaml-compatible data", () => {
+    expect(
+      buildScenePlacement({
+        runtime: {
+          current_scene: {
+            date: "1003-07-14 上午",
+            location: "今庭-荆州-襄陵县",
+          },
+          environment: {
+            time: "不应覆盖 current_scene.date",
+            location: "不应覆盖 current_scene.location",
+          },
+        },
+      }),
+    ).toEqual({
+      date: "1003-07-14 上午",
+      location: "今庭-荆州-襄陵县",
+    })
+
+    expect(
+      buildScenePlacement({
+        runtime: {
+          environment: {
+            time: "1003-07-14 上午",
+            location: "今庭-荆州-襄陵县",
+          },
+        },
+      }),
+    ).toEqual({
+      date: "1003-07-14 上午",
+      location: "今庭-荆州-襄陵县",
+    })
+  })
+
+  test("builds roleplay environment override with explicit time and location", () => {
+    expect(
+      buildRoleplayEnvironmentOverride({
+        character: "孟缘",
+        scenePlacement: {
+          date: "1003-07-14 上午",
+          location: "今庭-荆州-襄陵县",
+        },
+      }),
+    ).toContain("当前时间：1003-07-14 上午。")
+
+    expect(
+      buildRoleplayEnvironmentOverride({
+        character: "孟缘",
+        scenePlacement: {
+          date: "1003-07-14 上午",
+          location: "今庭-荆州-襄陵县",
+        },
+      }),
+    ).toContain("当前地点：今庭-荆州-襄陵县。")
   })
 
   test("auto-creates starter knowledge resources and exposes them in manifest", async () => {

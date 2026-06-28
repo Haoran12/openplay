@@ -130,6 +130,11 @@ type CharacterWorldResources = {
     stateContent?: string
 }
 
+type ScenePlacement = {
+    date?: string
+    location?: string
+}
+
 const GOD_ONLY_ACCESS = new Set(["godonly"])
 const CHARACTER_SAMPLE_ALIASES = new Map<string, keyof CharacterSample>([
     ["innerthought", "inner_thought"],
@@ -749,6 +754,40 @@ function formatBulletSection(lines: string[]): string {
     return lines.join("\n")
 }
 
+export function buildScenePlacement(input: {
+    runtime: RuntimeData | undefined
+    forbiddenSet?: ForbiddenSet
+}): ScenePlacement | undefined {
+    const descriptor = extractRuntimeSceneDescriptor(input.runtime)
+    const sanitize = (value: string | undefined) => {
+        if (!value) return undefined
+        return input.forbiddenSet ? filterL2View(value, input.forbiddenSet) : value
+    }
+    const date = sanitize(descriptor?.date)
+    const location = sanitize(descriptor?.location)
+    if (!date && !location) return
+    return { date, location }
+}
+
+function formatScenePlacementSection(scenePlacement: ScenePlacement | undefined): string {
+    const lines: string[] = []
+    if (scenePlacement?.date) lines.push(`- 当前时间：${scenePlacement.date}`)
+    if (scenePlacement?.location) lines.push(`- 当前地点：${scenePlacement.location}`)
+    return lines.length > 0 ? lines.join("\n") : "- 当前时间地点未明确写入 runtime.yaml。"
+}
+
+export function buildRoleplayEnvironmentOverride(input: {
+    character: string
+    scenePlacement?: ScenePlacement
+}): string {
+    const lines = [
+        `当前角色：${input.character}。你正身在这一幕之中；请面对此刻能感知到的现场，以及自己主动回忆到的个人资源，理解自己的处境。`,
+    ]
+    if (input.scenePlacement?.date) lines.push(`当前时间：${input.scenePlacement.date}。`)
+    if (input.scenePlacement?.location) lines.push(`当前地点：${input.scenePlacement.location}。`)
+    return lines.join(" ")
+}
+
 function formatMemorySection(lines: string[]): string {
     if (lines.length === 0) return "- (none)"
     return lines.map((line, index) => `- [${index + 1}] ${line}`).join("\n")
@@ -1355,6 +1394,9 @@ const CHARACTER_SCENE_PROMPT_TEMPLATE = `
 先用{{character}}自己的身体、经验、脾气、记忆去理解眼前这一幕。
 你接下来生出的理解、情绪、戒心、渴望、迟疑或趣味，都必须从这些你此刻能感知到或主动回忆到的现实里自然长出来。
 
+### 你此刻明确身在
+{{scene_placement_section}}
+
 ### 你所处的环境
 {{environment_section}}
 
@@ -1408,6 +1450,7 @@ export function buildSubagentSystemPrompt(input: {
     persona?: string
     selfKnowledgeSection: string
     visibleResourcesSection: string
+    scenePlacementSection: string
     objectiveEnvironmentSection: string
     bodyStateSection: string
     baselineSensorySection: string
@@ -1450,6 +1493,7 @@ export function buildSubagentSystemPrompt(input: {
         persona_section: personaSection,
         self_knowledge_section: input.selfKnowledgeSection.trim(),
         resources_section: resourcesSection,
+        scene_placement_section: input.scenePlacementSection.trim(),
         environment_section: environmentSection,
         body_section: bodySection,
         senses_section: sensesSection,
@@ -1534,6 +1578,7 @@ export const EmbodyTool = Tool.define(
                     stateContent,
                     forbiddenSet,
                 })
+                const scenePlacement = buildScenePlacement({ runtime, forbiddenSet })
                 const objectiveEnvironmentLines = buildObjectiveEnvironmentLines({ runtime, forbiddenSet })
                 const bodyStateLines = buildCharacterBodyStateLines({ runtimeCharacter, forbiddenSet })
                 const baselineSensoryLines = buildBaselineSensoryLines({
@@ -1559,6 +1604,7 @@ export const EmbodyTool = Tool.define(
                       )
                     : ["profile.yaml", "memory.yaml"]
                 const visibleResourcesSection = visibleResources.length > 0 ? visibleResources.join("\n") : "(empty)"
+                const scenePlacementSection = formatScenePlacementSection(scenePlacement)
                 const objectiveEnvironmentSection = formatBulletSection(objectiveEnvironmentLines)
                 const bodyStateSection = formatBulletSection(bodyStateLines)
                 const baselineSensorySection = formatBulletSection(baselineSensoryLines)
@@ -1661,6 +1707,7 @@ export const EmbodyTool = Tool.define(
                     selfKnowledgeSection,
                     visibleResourcesSection,
                     objectiveEnvironmentSection,
+                    scenePlacementSection,
                     bodyStateSection,
                     baselineSensorySection,
                     effectiveSensorySection,
@@ -1700,7 +1747,10 @@ export const EmbodyTool = Tool.define(
                         },
                         system: systemPrompt,
                         roleplay: {
-                            environmentOverride: `当前角色：${params.character}。你正身在这一幕之中；请面对此刻能感知到的现场，以及自己主动回忆到的个人资源，理解自己的处境。`,
+                            environmentOverride: buildRoleplayEnvironmentOverride({
+                                character: params.character,
+                                scenePlacement,
+                            }),
                             instructionOverride: "",
                             skillsOverride: "",
                         },
