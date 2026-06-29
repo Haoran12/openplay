@@ -66,7 +66,9 @@ export const SessionTraceDialog: Component<{
     { value: "model" as const, label: language.t("trace.filter.model") },
   ])
 
-  const items = createMemo<SessionTraceEntry[]>(() => trace.latest?.items ?? [])
+  const items = createMemo<SessionTraceEntry[]>(() =>
+    (trace.latest?.items ?? []).filter((item) => item.kind !== "llm.stream.event"),
+  )
   const traceMeta = createMemo(
     () =>
       trace.latest?.meta ?? {

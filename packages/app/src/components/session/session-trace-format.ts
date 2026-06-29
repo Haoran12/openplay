@@ -97,6 +97,10 @@ function readableRequestBlocks(payload: Record<string, unknown>) {
 
 function readableResponseBlocks(payload: Record<string, unknown>) {
   const blocks: TraceBlock[] = []
+  if (typeof payload.readable === "string" && payload.readable.trim()) {
+    pushBlock(blocks, "ASSISTANT", payload.readable)
+    return blocks
+  }
   pushBlock(blocks, "ASSISTANT", payload.text)
   pushBlock(blocks, "REASONING", payload.reasoning)
   return blocks
@@ -104,15 +108,6 @@ function readableResponseBlocks(payload: Record<string, unknown>) {
 
 function readableStreamEventBlocks(payload: Record<string, unknown>) {
   const blocks: TraceBlock[] = []
-  if (payload.type === "text-delta") {
-    pushBlock(blocks, "ASSISTANT", payload.text)
-    return blocks
-  }
-  if (payload.type === "reasoning-delta") {
-    pushBlock(blocks, "REASONING", payload.text)
-    return blocks
-  }
-  pushBlock(blocks, "EVENT", traceSafeJson(payload))
   return blocks
 }
 

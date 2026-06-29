@@ -46,6 +46,7 @@ describe("session trace formatting", () => {
         payload: {
           text: "final answer",
           reasoning: "hidden chain summary",
+          readable: "final answer\n\nReasoning:\nhidden chain summary",
           finish: { finishReason: "stop" },
         },
       }),
@@ -55,7 +56,24 @@ describe("session trace formatting", () => {
 
     expect(markdown).toContain("`ASSISTANT>`")
     expect(markdown).toContain("final answer")
-    expect(markdown).toContain("`REASONING>`")
+    expect(markdown).not.toContain("`REASONING>`")
+    expect(markdown).toContain("Reasoning:")
     expect(markdown).not.toContain("\"finishReason\"")
+  })
+
+  test("hides legacy stream-event chunks from readable view", () => {
+    const markdown = traceDetailMarkdown(
+      entry({
+        kind: "llm.stream.event",
+        payload: {
+          type: "text-delta",
+          text: "partial",
+        },
+      }),
+      "readable",
+      true,
+    )
+
+    expect(markdown).toBe("```json\n{\n  \"type\": \"text-delta\",\n  \"text\": \"partial\"\n}\n```")
   })
 })

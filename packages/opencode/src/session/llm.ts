@@ -83,6 +83,7 @@ const live: Layer.Layer<
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
       const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
+      const bridge = yield* EffectBridge.make()
       const l = log
         .clone()
         .tag("providerID", input.model.providerID)
@@ -461,23 +462,12 @@ const live: Layer.Layer<
             if (event.type === "text-delta") text.push(event.text)
             if (event.type === "reasoning-delta") reasoning.push(event.text)
             if (event.type === "finish") finish = event
-            if (trace) {
-              Effect.runSync(
-                trace.write({
-                  sessionID: input.sessionID,
-                  rootSessionID: input.parentSessionID ?? input.sessionID,
-                  source: input.parentSessionID ? "subagent" : "model",
-                  kind: "llm.stream.event",
-                  agent: input.agent.name,
-                  parentSessionID: input.parentSessionID,
-                  payload: event,
-                }),
-              )
-            }
             yield event
           }
           if (trace) {
-            Effect.runSync(
+            const responseText = text.join("")
+            const reasoningText = reasoning.join("")
+            await bridge.promise(
               trace.write({
                 sessionID: input.sessionID,
                 rootSessionID: input.parentSessionID ?? input.sessionID,
@@ -486,8 +476,13 @@ const live: Layer.Layer<
                 agent: input.agent.name,
                 parentSessionID: input.parentSessionID,
                 payload: {
-                  text: text.join(""),
-                  reasoning: reasoning.join(""),
+                  text: responseText,
+                  reasoning: reasoningText,
+                  readable:
+                    [responseText.trim(), reasoningText.trim() ? `Reasoning:\n${reasoningText.trim()}` : ""]
+                      .filter(Boolean)
+                      .join("\n\n")
+                      .trim() || undefined,
                   finish,
                 },
               }),
