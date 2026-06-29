@@ -867,7 +867,7 @@ export const dict = {
   "trace.filter.subagent": "子代理",
   "trace.filter.tool": "工具",
   "trace.filter.model": "模型",
-  "trace.timeFilter.all": "全部",
+  "trace.timeFilter.all": "全部时间",
   "trace.timeFilter.1h": "1小时内",
   "trace.timeFilter.today": "今日内",
   "trace.includeSubagents.on": "包含子代理",

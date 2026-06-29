@@ -799,7 +799,7 @@ export const dict = {
   "trace.filter.subagent": "Subagent",
   "trace.filter.tool": "Tool",
   "trace.filter.model": "Model",
-  "trace.timeFilter.all": "All Time",
+  "trace.timeFilter.all": "All Times",
   "trace.timeFilter.1h": "Last 1 Hour",
   "trace.timeFilter.today": "Today",
   "trace.includeSubagents.on": "Subagents on",
