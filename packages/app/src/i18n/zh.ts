@@ -92,6 +92,8 @@ export const dict = {
 
   "command.model.variant.cycle": "切换思考强度",
   "command.model.variant.cycle.description": "切换到下一个强度等级",
+  "command.subagent.models": "子智能体模型",
+  "command.subagent.models.description": "选择各角色扮演子智能体使用的模型（导演、角色、GM、叙述）",
 
   "command.prompt.mode.shell": "Shell",
   "command.prompt.mode.normal": "Prompt",
@@ -143,6 +145,16 @@ export const dict = {
   "dialog.model.manage.provider.toggle": "切换所有 {{provider}} 模型",
   "dialog.model.unpaid.freeModels.title": "OpenCode 提供的免费模型",
   "dialog.model.unpaid.addMore.title": "从热门提供商添加更多模型",
+  "dialog.subagentModels.title": "子智能体模型",
+  "dialog.subagentModels.description": "选择各个角色扮演子智能体使用的模型。留空则继承父会话模型。",
+  "dialog.subagentModels.placeholder": "继承父模型",
+  "subagent.slot.director": "导演",
+  "subagent.slot.character": "角色",
+  "subagent.slot.gm": "GM",
+  "subagent.slot.narrate": "叙述",
+  "subagent.addProvider": "添加提供商",
+  "subagent.clear": "清除覆盖",
+  "subagent.inherit": "继承",
 
   "dialog.provider.viewAll": "查看更多提供商",
 

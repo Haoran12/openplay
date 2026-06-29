@@ -1045,3 +1045,159 @@ test("embody sampling falls back to a fresh child session when continuity lookup
   expect(result.metadata.subagentSessionID).toBe(SessionID.make("ses_fresh_character"))
   expect(result.output).toContain('"inner_thought": "test"')
 })
+
+test("embody uses roleplay.characterModel fallback when no per-character agent model is set", async () => {
+  const fakeSessions: Session.Interface = {
+    get: (id: SessionID) =>
+      Effect.succeed({
+        id,
+        slug: "parent",
+        projectID: "proj_1" as any,
+        directory: "/tmp/world",
+        title: "Director Session",
+        version: "1",
+        time: { created: 1, updated: 1 },
+        permission: [],
+      } as Session.Info),
+    create: () =>
+      Effect.succeed({
+        id: SessionID.make("ses_character_model_fallback"),
+        slug: "child",
+        projectID: "proj_1" as any,
+        directory: "/tmp/world",
+        parentID: SessionID.make("ses_parent"),
+        title: "Character: 孟缘",
+        agent: "character",
+        version: "1",
+        time: { created: 1, updated: 1 },
+        roleplayCharacter: "孟缘",
+        roleplaySceneKey: "ephemeral:ses_parent:孟缘",
+        roleplayPurpose: "embody",
+      } as Session.Info),
+    children: () => Effect.succeed([]),
+  } as unknown as Session.Interface
+
+  const fakeAgents: Agent.Interface = {
+    get: (name: string) =>
+      Effect.succeed(
+        name === "character"
+          ? ({
+              name: "character",
+              mode: "subagent",
+              permission: [],
+              options: {},
+            } as unknown as Agent.Info)
+          : undefined,
+      ),
+  } as unknown as Agent.Interface
+
+  const fakeConfig: Config.Interface = {
+    get: () =>
+      Effect.succeed({
+        model: "openai/gpt-5",
+        roleplay: { characterModel: "anthropic/claude-haiku-latest" },
+      } as any),
+  } as unknown as Config.Interface
+
+  let seenModel: { modelID: string; providerID: string } | undefined
+  const promptOps: TaskPromptOps = {
+    cancel: () => Effect.void,
+    resolvePromptParts: () => Effect.succeed([]),
+    loop: () => Effect.die("unused"),
+    prompt: (input) =>
+      Effect.sync(() => {
+        seenModel = {
+          modelID: input.model?.modelID ?? "",
+          providerID: input.model?.providerID ?? "",
+        }
+        return {
+          info: {
+            id: MessageID.make("msg_reply"),
+            sessionID: input.sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            roleplayCharacter: "孟缘",
+            roleplayPurpose: "embody",
+            providerID: input.model?.providerID ?? "anthropic",
+            modelID: input.model?.modelID ?? "claude-haiku-latest",
+            mode: "default",
+            agent: "character",
+            path: { cwd: "/tmp/world", root: "/tmp/world" },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            finish: "stop",
+          },
+          parts: [
+            {
+              id: "part_reply",
+              sessionID: input.sessionID,
+              messageID: MessageID.make("msg_reply"),
+              type: "text",
+              text: '{"inner_thought":"ok","speech":"","action_intent":"","outward_action":""}',
+            },
+          ],
+        }
+      }) as any,
+  }
+
+  const tool = await Effect.runPromise(
+    Effect.gen(function* () {
+      const info = yield* EmbodyTool
+      return yield* info.init()
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          AppFileSystem.defaultLayer,
+          GodOnlyFilter.defaultLayer,
+          Truncate.defaultLayer,
+          Layer.succeed(Session.Service, fakeSessions),
+          Layer.succeed(Agent.Service, fakeAgents),
+          Layer.succeed(Config.Service, fakeConfig),
+          Layer.succeed(InstanceRef, {
+            directory: "/tmp/world",
+            worktree: "/tmp/world",
+            project: { id: "proj_1", worktree: "/tmp/world", vcs: false },
+          } as any),
+        ),
+      ),
+    ),
+  )
+
+  await Effect.runPromise(
+    tool.execute(
+      {
+        character: "孟缘",
+        sceneFacts: "门外有脚步声。",
+        situationFrame: "夜里，有人停在门前。",
+      },
+      {
+        sessionID: SessionID.make("ses_parent"),
+        messageID: MessageID.make("msg_parent"),
+        agent: "director",
+        abort: new AbortController().signal,
+        extra: { promptOps },
+        messages: [],
+        metadata: () => Effect.void,
+        ask: () => Effect.void,
+      },
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          AppFileSystem.defaultLayer,
+          GodOnlyFilter.defaultLayer,
+          Truncate.defaultLayer,
+          Layer.succeed(Session.Service, fakeSessions),
+          Layer.succeed(Agent.Service, fakeAgents),
+          Layer.succeed(Config.Service, fakeConfig),
+          Layer.succeed(InstanceRef, {
+            directory: "/tmp/world",
+            worktree: "/tmp/world",
+            project: { id: "proj_1", worktree: "/tmp/world", vcs: false },
+          } as any),
+        ),
+      ),
+    ),
+  )
+
+  expect(seenModel).toEqual({ modelID: "claude-haiku-latest", providerID: "anthropic" })
+})

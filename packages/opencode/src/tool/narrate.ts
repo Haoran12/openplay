@@ -276,25 +276,36 @@ function generateNarrative(
       return yield* Effect.fail(new Error("narrate could not resolve a valid provider/model pair"))
     }
 
+    const narrateAgent = directorAgent?.name ?? parentSession.agent ?? ctx.agent
+    const narrateSession = yield* deps.sessions
+      .create({
+        parentID: ctx.sessionID,
+        title: `Narrate: ${params.scene?.location ?? "scene"}`,
+        agent: narrateAgent,
+      })
+      .pipe(Effect.orDie)
+
+    const narrateTimeoutSeconds = cfg.roleplay?.narrateTimeoutSeconds ?? 90
     const result = yield* ops
       .prompt({
         messageID: MessageID.ascending(),
-        sessionID: ctx.sessionID,
+        sessionID: narrateSession.id,
         model: {
           modelID: ModelID.make(model.modelID),
           providerID: ProviderID.make(model.providerID),
         },
-        agent: directorAgent?.name ?? parentSession.agent ?? ctx.agent,
+        agent: narrateAgent,
         tools: { "*": false },
         persistTools: false,
         system: buildNarrateSystemPrompt(params),
         parts: [{ type: "text", text: "请直接输出叙事正文。" }],
       })
       .pipe(
-        Effect.timeout("30 seconds"),
+        Effect.timeout(`${narrateTimeoutSeconds} seconds`),
         Effect.catchCause((cause) => {
           if (fallbackContent) return Effect.succeed(undefined)
-          const message = Cause.squash(cause).message || "unknown error"
+          const squashed = Cause.squash(cause)
+          const message = (squashed instanceof Error ? squashed.message : undefined) || Cause.pretty(cause) || "unknown error"
           return Effect.fail(new Error(`narrate LLM generation failed: ${message}; no fallback content was provided`))
         }),
       )

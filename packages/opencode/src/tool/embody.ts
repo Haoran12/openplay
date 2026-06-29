@@ -1677,6 +1677,8 @@ export const EmbodyTool = Tool.define(
                 if (characterAgent?.model) {
                     const agentModel = characterAgent.model
                     model = { modelID: agentModel.modelID, providerID: agentModel.providerID }
+                } else if (cfg.roleplay?.characterModel) {
+                    model = parseModelString(cfg.roleplay.characterModel)!
                 } else if (parentSession.model) {
                     const sessionModel = parentSession.model
                     model = { modelID: sessionModel.id, providerID: sessionModel.providerID }

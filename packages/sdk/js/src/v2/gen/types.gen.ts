@@ -1159,6 +1159,9 @@ export type ConfigRoleplay = {
     pacing?: string
   }
   recordThreshold?: number
+  narrateModel?: string
+  narrateTimeoutSeconds?: number
+  characterModel?: string
 }
 
 export type McpLocalConfig = {

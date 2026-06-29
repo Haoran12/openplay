@@ -27,6 +27,7 @@ import { IconButton } from "@openplay-ai/ui/icon-button"
 import { Select } from "@openplay-ai/ui/select"
 import { useDialog } from "@openplay-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
+import { DialogSubagentModels } from "@/components/dialog-subagent-models"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
@@ -1574,6 +1575,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           </ModelSelectorPopover>
                         </TooltipKeybind>
                       </Show>
+                      <Tooltip placement="top" gutter={4} value={language.t("command.subagent.models")}>
+                        <IconButton
+                          icon="sliders"
+                          variant="ghost"
+                          class="size-6"
+                          aria-label={language.t("command.subagent.models")}
+                          onClick={() => {
+                            dialog.show(() => <DialogSubagentModels />)
+                          }}
+                        />
+                      </Tooltip>
                     </div>
                     <Show when={variants().length > 2}>
                       <div

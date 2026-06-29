@@ -83,6 +83,19 @@ function buildTool(options?: {
         time: { created: 1, updated: 1 },
         permission: [],
       } as Session.Info),
+    create: (input?: { parentID?: SessionID; title?: string; agent?: string }) =>
+      Effect.succeed({
+        id: SessionID.make("ses_narrate_sub"),
+        slug: "narrate-session",
+        projectID: "proj_1" as any,
+        parentID: input?.parentID,
+        directory: "/tmp/world",
+        title: input?.title ?? "Narrate",
+        agent: input?.agent ?? "director",
+        version: "1",
+        time: { created: 1, updated: 1 },
+        permission: [],
+      } as Session.Info),
   } as unknown as Session.Interface
 
   const fakeAgents: Agent.Interface = {
@@ -116,15 +129,17 @@ function promptOps(input: {
   text?: string
   onPrompt?: (value: SessionPrompt.PromptInput) => void
   fail?: boolean
+  delayMs?: number
 }): TaskPromptOps {
   return {
     cancel: () => Effect.void,
     resolvePromptParts: () => Effect.succeed([]),
     loop: () => Effect.die("unused"),
     prompt: (value) =>
-      Effect.sync(() => {
-        input.onPrompt?.(value)
+      Effect.gen(function* () {
+        if (input.delayMs) yield* Effect.sleep(`${input.delayMs} millis`)
         if (input.fail) throw new Error("provider timeout")
+        input.onPrompt?.(value)
         return reply(value, input.text ?? "夜风穿过竹影，檐下静了一瞬。")
       }),
   }
@@ -342,5 +357,59 @@ environment: 盛夏午后，日光斜照入堂，院外蝉鸣阵阵。室内较�
     })
 
     expect(decoded.narrateModel).toBe("openai/gpt-5-mini")
+  })
+
+  test("roleplay config schema accepts narrateTimeoutSeconds and characterModel", () => {
+    const decoded = Schema.decodeUnknownSync(ConfigRoleplay.Info)({
+      narrateTimeoutSeconds: 120,
+      characterModel: "anthropic/claude-haiku",
+    })
+
+    expect(decoded.narrateTimeoutSeconds).toBe(120)
+    expect(decoded.characterModel).toBe("anthropic/claude-haiku")
+  })
+
+  test("respects narrateTimeoutSeconds under the configured value", async () => {
+    const tool = await Effect.runPromise(
+      buildTool({
+        config: {
+          roleplay: {
+            narrateTimeoutSeconds: 1,
+          } as ConfigRoleplay.Info,
+        },
+      }),
+    )
+
+    await expect(
+      Effect.runPromise(
+        tool.execute(
+          {
+            scene: {
+              time: "夜里",
+              location: "竹舍门前",
+            },
+            outcomes: "两人之间的气氛骤然紧绷。",
+          },
+          ctx(promptOps({ delayMs: 2000, text: "不应 arrive" })),
+        ),
+      ),
+    ).rejects.toThrow("narrate LLM generation failed: TimeoutError")
+  })
+
+  test("default narrate timeout is 90 seconds (long prompts succeed under 90s)", async () => {
+    const tool = await Effect.runPromise(buildTool())
+
+    const result = await Effect.runPromise(
+      tool.execute(
+        {
+          scene: { time: "夜里", location: "竹舍门前" },
+          outcomes: "停顿。",
+        },
+        ctx(promptOps({ delayMs: 50, text: "檐下风声细了半瞬。" })),
+      ),
+    )
+
+    expect(result.output).toBe("檐下风声细了半瞬。")
+    expect(result.metadata.source).toBe("generated")
   })
 })

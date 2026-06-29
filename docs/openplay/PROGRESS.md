@@ -104,6 +104,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
 - [x] Director `narrate` 子调用权限隔离修复：`narrate` 内部为“本次生成禁用工具”设置的临时 `tools: {"*": false}` 不再持久化污染父 session 的 `permission`，避免后续 Director 回合工具列表被清空后再次中断。
 - [x] Director 历史污染会话自愈修复：旧版 `narrate` 已写坏为 `permission = * deny *` 的 roleplay Director 会话，在下一次真实玩家 prompt 进入 loop 时会自动清除该遗留权限污染，恢复真实工具供给。
+- [x] `narrate` 可配置超时 (`roleplay.narrateTimeoutSeconds`, 默认 90s)
+- [x] `roleplay.characterModel` 统一角色模型回退字段
+- [x] SDK types.gen.ts `ConfigRoleplay` 同步更新
+- [x] 前端 `DialogSubagentModels` 子代理模型选择对话框
+- [x] 前端消息输入区 `+` 按钮入口
 
 ## Changelog
 
@@ -195,3 +200,5 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: Director 新增 `todowrite` 和 `task` 权限，支持 Todo 机制强制按顺序执行操作流程。
 - 2026-06-29: 新增 GM 子代理：依据环境上下文（`runtime.yaml.current_scene.environment`）、近期事件、人物言行与目标构建世界局部；权限包括 read/glob/grep/calc/dice_roll/question；提示词外置支持 `prompts/gm.txt`。
 - 2026-06-29: 清理废弃文件：删除未被引用的 `session/prompt/director.txt`，实际使用的是 `agent/prompt/director.txt`。
+- 2026-06-29: 修复 Director `narrate` 未知错误与嵌套 prompt 冲突：`narrate` 的 LLM 生成改为使用独立子会话（类似 `embody` 的 Character 子会话模式），避免在 Director 已运行的 prompt loop 内部嵌套调用同一 session 的 prompt 导致状态冲突；错误消息提取改用 `Cause.pretty(cause)` 兜底，确保 defect 类型错误也能输出可读信息而非泛化的 "unknown error"。
+- 2026-06-30: 修复 `narrate` TimeoutError（硬编码 30 秒 → 可配置 `roleplay.narrateTimeoutSeconds`，默认 90 秒）；角色模型配置新增 `roleplay.characterModel` 统一回退字段；前端新增子代理模型选择对话框 (`DialogSubagentModels`)，支持 Director/Character/GM/Narrate 各槽位独立选模型及添加新 Provider；按钮入口位于消息输入区 ModelSelectorPopover 旁。
