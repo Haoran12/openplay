@@ -13,6 +13,7 @@ import PROMPT_SCOUT from "./prompt/scout.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_DIRECTOR from "./prompt/director.txt"
+import PROMPT_GM from "./prompt/gm.txt"
 import PROMPT_CHARACTER from "../session/prompt/character.txt"
 import { PromptLoader } from "../session/prompt/loader"
 import { Permission } from "@/permission"
@@ -152,6 +153,7 @@ export const layer = Layer.effect(
           ? {
               character: yield* PromptLoader.loadPrompt(fs, ctx.world.rootPath, "character", PROMPT_CHARACTER),
               director: yield* PromptLoader.loadPrompt(fs, ctx.world.rootPath, "director", PROMPT_DIRECTOR),
+              gm: yield* PromptLoader.loadPrompt(fs, ctx.world.rootPath, "gm", PROMPT_GM),
             }
           : undefined
 
@@ -230,6 +232,29 @@ export const layer = Layer.effect(
                   native: true,
                   hidden: true,
                   prompt: worldPrompts!.character,
+                } satisfies Info,
+                gm: {
+                  name: "gm",
+                  description:
+                    "Roleplay GM assistant. Builds world details based on environment context, recent events, character speech/actions and goals.",
+                  permission: Permission.merge(
+                    defaults,
+                    Permission.fromConfig({
+                      "*": "deny",
+                      read: "allow",
+                      glob: "allow",
+                      grep: "allow",
+                      calc: "allow",
+                      dice_roll: "allow",
+                      question: "allow",
+                    }),
+                    user,
+                  ),
+                  options: {},
+                  mode: "subagent" as const,
+                  native: true,
+                  hidden: true,
+                  prompt: worldPrompts!.gm,
                 } satisfies Info,
               }
             : {}),
@@ -355,6 +380,8 @@ export const layer = Layer.effect(
                       memory_update: "deny",
                       knowledge_update: "deny",
                       question: "allow",
+                      todowrite: "allow",
+                      task: "allow",
                     }),
                     user,
                   ),

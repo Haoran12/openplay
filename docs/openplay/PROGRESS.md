@@ -171,3 +171,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 修复 `openplay-ui` Trace 阅读器里“response 看起来像 request”的展示歧义：问题不在 trace 采集，而在 Readable 视图把不同 kind 的 payload 混用同一套标题。现抽离 trace 格式化模块，分别按 `llm.request`、`llm.response.completed`、`llm.stream.event` 渲染，并补充前端单测，避免再次把请求内容误标成响应。
 - 2026-06-29: 调整 `openplay-ui` Trace 阅读器 `可读` 标签页语义：不再以 `Model/System/Messages` 字段清单展示，而改为按消息顺序输出 `SYSTEM>` / `USER>` / `ASSISTANT>` / `REASONING>` 等对话块；`model`、`options`、`finish` 等元数据只保留在 `原始` 标签页，降低阅读负担。
 - 2026-06-29: 继续收口 `openplay-ui` Trace 阅读器流式回复展示：后端不再为每个 stream chunk 单独写 `llm.stream.event`，改为仅在回复完成时落一条聚合后的 `llm.response.completed`；其中新增 `readable` 段落字段供前端优先直出完整正文。阅读器左侧同时过滤历史 chunk 条目，`可读` 标签默认只看一次回复的一条完整段落，旧 chunk 仅在 `原始` 视图中保留兼容。
+- 2026-06-29: Director 提示词重构：新增"每轮操作流程（Todo 约束）"章节，强制要求每轮用 `todowrite` 初始化 7 步清单；调整顺序为先"构建世界局部"再"更新场景状态"；新增 GM 子代理调用指引；补充 `playerNudge` 用于传递玩家对人物判断/意图的引导。
+- 2026-06-29: Director 新增 `todowrite` 和 `task` 权限，支持 Todo 机制强制按顺序执行操作流程。
+- 2026-06-29: 新增 GM 子代理：依据环境上下文（`runtime.yaml.current_scene.environment`）、近期事件、人物言行与目标构建世界局部；权限包括 read/glob/grep/calc/dice_roll/question；提示词外置支持 `prompts/gm.txt`。
+- 2026-06-29: 清理废弃文件：删除未被引用的 `session/prompt/director.txt`，实际使用的是 `agent/prompt/director.txt`。
