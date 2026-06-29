@@ -30,6 +30,52 @@ function formatStructuredValue(value: unknown) {
   }
 }
 
+function unescapeString(text: string): string {
+  return text
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t")
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, "\\")
+}
+
+function formatPayloadContent(content: unknown): string {
+  if (content === undefined || content === null) return ""
+  if (typeof content === "string") {
+    try {
+      const parsed = JSON.parse(content)
+      if (typeof parsed === "string") return unescapeString(parsed)
+      return formatReadableJson(parsed)
+    } catch {
+      return unescapeString(content)
+    }
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => formatMessagePart(part))
+      .filter((part) => part.trim())
+      .join("\n\n")
+  }
+  return formatReadableJson(content)
+}
+
+function formatReadableJson(value: unknown): string {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value)
+      return formatReadableJson(parsed)
+    } catch {
+      return unescapeString(value)
+    }
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 function formatMessagePart(part: unknown) {
   const item = asRecord(part)
   if (!item) return String(part)
@@ -76,6 +122,40 @@ function pushBlock(blocks: TraceBlock[], role: string, text: unknown) {
   blocks.push({ role, text: rendered })
 }
 
+function readableInteractionBlocks(payload: Record<string, unknown>) {
+  const blocks: TraceBlock[] = []
+  
+  const request = payload.request as Record<string, unknown> | undefined
+  if (request) {
+    const system = request.system
+    if (Array.isArray(system)) {
+      for (const item of system) pushBlock(blocks, "SYSTEM", item)
+    }
+    
+    const messages = Array.isArray(request.messages) ? request.messages : []
+    for (const message of messages) {
+      const item = asRecord(message)
+      if (!item) {
+        pushBlock(blocks, "UNKNOWN", message)
+        continue
+      }
+      pushBlock(blocks, roleName(item.role), formatMessageContent(item.content))
+    }
+  }
+  
+  const response = payload.response as Record<string, unknown> | undefined
+  if (response) {
+    if (typeof response.readable === "string" && response.readable.trim()) {
+      pushBlock(blocks, "ASSISTANT", response.readable)
+    } else if (typeof response.text === "string" || typeof response.reasoning === "string") {
+      pushBlock(blocks, "ASSISTANT", response.text)
+      pushBlock(blocks, "REASONING", response.reasoning)
+    }
+  }
+  
+  return blocks
+}
+
 function readableRequestBlocks(payload: Record<string, unknown>) {
   const blocks: TraceBlock[] = []
   const system = payload.system
@@ -111,9 +191,42 @@ function readableStreamEventBlocks(payload: Record<string, unknown>) {
   return blocks
 }
 
+function readablePayloadBlocks(payload: Record<string, unknown>): TraceBlock[] {
+  const blocks: TraceBlock[] = []
+
+  if (typeof payload.role === "string") {
+    const content = payload.content ?? payload.text ?? payload.message
+    pushBlock(blocks, roleName(payload.role), formatPayloadContent(content))
+    return blocks
+  }
+
+  if (Array.isArray(payload.messages)) {
+    for (const msg of payload.messages) {
+      const item = asRecord(msg)
+      if (!item) continue
+      pushBlock(blocks, roleName(item.role), formatPayloadContent(item.content ?? item.text))
+    }
+    if (blocks.length > 0) return blocks
+  }
+
+  if (payload.request || payload.response) {
+    return readableInteractionBlocks(payload)
+  }
+
+  if (typeof payload.text === "string" || typeof payload.content === "string") {
+    pushBlock(blocks, "PAYLOAD", formatPayloadContent(payload.text ?? payload.content))
+    return blocks
+  }
+
+  pushBlock(blocks, "PAYLOAD", formatReadableJson(payload))
+  return blocks
+}
+
 export function traceReadableBlocks(entry: SessionTraceEntry) {
   const payload = (entry.payload ?? {}) as Record<string, unknown>
   switch (entry.kind) {
+    case "llm.interaction":
+      return readableInteractionBlocks(payload)
     case "llm.request":
       return readableRequestBlocks(payload)
     case "llm.response.completed":
@@ -121,7 +234,7 @@ export function traceReadableBlocks(entry: SessionTraceEntry) {
     case "llm.stream.event":
       return readableStreamEventBlocks(payload)
     default:
-      return [{ role: "PAYLOAD", text: traceSafeJson(payload) }]
+      return readablePayloadBlocks(payload)
   }
 }
 
