@@ -11,7 +11,6 @@ import { useDialog } from "@openplay-ai/ui/context/dialog"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { agentDisplayName } from "@/utils/roleplay"
 import { agentColor } from "@/utils/agent"
-import { SessionTraceDialog } from "@/components/session/session-trace-dialog"
 
 type RuntimeCharacter = NonNullable<WorldInfo["presentCharacters"]>[number]
 const ROLEPLAY_PANEL_WIDTH = "clamp(340px, 30vw, 460px)"
@@ -618,18 +617,6 @@ export const SessionRoleplayPanel: Component = () => {
                             </Show>
                         </div>
                         <div class="flex items-center gap-3">
-                            <Show when={sessionID()}>
-                                <button
-                                    class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"
-                                    onClick={() => {
-                                        const id = sessionID()
-                                        if (!id) return
-                                        dialog.show(() => <SessionTraceDialog sessionID={id} />)
-                                    }}
-                                >
-                                    {language.t("trace.header.openButton")}
-                                </button>
-                            </Show>
                             <Show when={worldConfigPath()}>
                                 <button
                                     class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"

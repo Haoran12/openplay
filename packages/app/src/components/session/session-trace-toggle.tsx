@@ -133,10 +133,7 @@ export const SessionTraceToggle: Component<SessionTraceToggleProps> = (props) =>
           class={props.class}
           style={props.style}
           classList={{
-            "border-[var(--color-success)]/30 bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] text-text-strong":
-              traceEnabled() && traceAvailable(),
-            "border-[var(--syntax-warning)]/35 bg-[color:color-mix(in_srgb,var(--syntax-warning)_14%,transparent)] text-text-strong":
-              traceEnabled() && !traceAvailable(),
+            "border-border-weak-base bg-surface-panel text-text-strong": traceEnabled(),
             "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled(),
           }}
           onClick={() => void toggleTrace()}
@@ -144,14 +141,17 @@ export const SessionTraceToggle: Component<SessionTraceToggleProps> = (props) =>
           aria-label={traceTooltip()}
         >
           <span
-            class="inline-block h-2 w-2 rounded-full"
+            class="inline-block h-3.5 w-3.5 rounded-full border-2"
             classList={{
-              "bg-[var(--color-success)]": traceEnabled() && traceAvailable(),
-              "bg-[var(--syntax-warning)]": traceEnabled() && !traceAvailable(),
-              "bg-border-strong": !traceEnabled(),
+              "border-[#0B5D1E] bg-[#22C55E] shadow-[0_0_0_1px_rgba(255,255,255,0.92),0_0_0_4px_rgba(34,197,94,0.28)]":
+                traceEnabled() && traceAvailable(),
+              "border-[#9A6700] bg-[#F59E0B] shadow-[0_0_0_1px_rgba(255,255,255,0.92)]":
+                traceEnabled() && !traceAvailable(),
+              "border-[#5C6370] bg-[#9CA3AF] shadow-[0_0_0_1px_rgba(255,255,255,0.92)]":
+                !traceEnabled(),
             }}
           />
-          <span class="text-11-medium">{traceEnabled() ? language.t("trace.status.on") : language.t("trace.status.off")}</span>
+          <span class="text-11-medium">{language.t("trace.header.label")}</span>
         </Button>
       </Tooltip>
     </Show>
