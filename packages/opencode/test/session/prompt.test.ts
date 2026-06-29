@@ -16,9 +16,11 @@ import { Permission } from "../../src/permission"
 import { Plugin } from "../../src/plugin"
 import { Provider as ProviderSvc } from "@/provider/provider"
 import { Env } from "../../src/env"
+import { InstanceRef } from "../../src/effect/instance-ref"
 import { Git } from "../../src/git"
 import { Image } from "../../src/image/image"
 import { ModelID, ProviderID } from "../../src/provider/schema"
+import type { InstanceContext } from "../../src/project/instance-context"
 import { Question } from "../../src/question"
 import { Todo } from "../../src/session/todo"
 import { Session } from "@/session/session"
@@ -56,6 +58,7 @@ import { reply, TestLLMServer } from "../lib/llm-server"
 import { SyncEvent } from "@/sync"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { WorldID } from "../../src/world/schema"
 
 void Log.init({ print: false })
 
@@ -71,6 +74,22 @@ const summary = Layer.succeed(
 const ref = {
   providerID: ProviderID.make("test"),
   modelID: ModelID.make("test-model"),
+}
+
+function withRoleplayDirectorContext(directory: string) {
+  return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      const base = yield* InstanceRef
+      const ctx: InstanceContext = {
+        ...base,
+        world: {
+          id: WorldID.generate(),
+          rootPath: directory,
+          configPath: path.join(directory, "runtime.yaml"),
+        },
+      }
+      return yield* self.pipe(Effect.provideService(InstanceRef, ctx))
+    })
 }
 
 function withSh<A, E, R>(fx: () => Effect.Effect<A, E, R>) {
@@ -2184,6 +2203,42 @@ it.instance(
 
       const afterPersistent = yield* sessions.get(session.id)
       expect(afterPersistent.permission).toEqual([{ permission: "*", pattern: "*", action: "deny" }])
+    }),
+  { git: true },
+)
+
+it.instance(
+  "heals legacy deny-all tool permission on roleplay director sessions",
+  () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+
+      yield* writeText(
+        path.join(dir, "runtime.yaml"),
+        ["scene:", "  location: 竹舍", "present_characters:", "  - 孟缘"].join("\n"),
+      )
+
+      yield* Effect.gen(function* () {
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+
+        yield* llm.push(reply().text("继续。").stop())
+
+        const chat = yield* sessions.create({
+          title: "Legacy Roleplay Director",
+          agent: "director",
+          permission: [{ permission: "*", pattern: "*", action: "deny" }],
+        })
+
+        yield* prompt.prompt({
+          sessionID: chat.id,
+          agent: "director",
+          parts: [{ type: "text", text: "继续这一幕。" }],
+        })
+
+        const healed = yield* sessions.get(chat.id)
+        expect(healed.permission ?? []).toEqual([])
+      }).pipe(withRoleplayDirectorContext(dir))
     }),
   { git: true },
 )

@@ -1001,6 +1001,7 @@ export const GithubRunCommand = effectCmd({
                 modelID,
               },
               tools: { "*": false },
+              persistTools: false,
               parts: [
                 {
                   id: PartID.ascending(),

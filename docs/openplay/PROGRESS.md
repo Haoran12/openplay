@@ -103,9 +103,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director `narrate` 失败诊断与 init 模型配置修复：`openplay init` 生成合法的 `provider/model` 字符串；`narrate` 在无 `content` 回退时保留底层 provider/model 失败原因，避免只看到泛化报错。
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
 - [x] Director `narrate` 子调用权限隔离修复：`narrate` 内部为“本次生成禁用工具”设置的临时 `tools: {"*": false}` 不再持久化污染父 session 的 `permission`，避免后续 Director 回合工具列表被清空后再次中断。
+- [x] Director 历史污染会话自愈修复：旧版 `narrate` 已写坏为 `permission = * deny *` 的 roleplay Director 会话，在下一次真实玩家 prompt 进入 loop 时会自动清除该遗留权限污染，恢复真实工具供给。
 
 ## Changelog
 
+- 2026-06-29: 修复旧 Director 会话在代码已更新后仍继续中断的问题：进一步核对本机实际运行态，确认生效 provider/model 来自 `~/.config/openplay/openplay.json`，实际为 `AstronCodingPlan/astron-code-latest`，world 与 `/home/refzhu/airp/opencode.json` 均无模型覆盖。最新 trace 显示 `session.compose` 已拿到完整 Director 工具集，但旧会话数据库仍残留 `permission=[{"permission":"*","action":"deny","pattern":"*"}]`，导致真正发给 LLM 的 `request.tools` 为空，Astron 只能输出伪 `<tool_call>` 文本。现为 roleplay Director 增加旧会话运行时自愈：检测到这种历史遗留的 `* deny *` 且当前玩家 prompt 未显式设置工具覆盖时，自动清空该污染权限并持久化修复；同时将另一个内部 `tools: {"*": false}` 调用点也改为非持久化，避免同类问题在其他流程复现。补充回归测试覆盖“新污染不再写回”和“旧 Director 会话会自动修复”两条路径。
 - 2026-06-29: 修复 Director 模式 Agent 工作流再次中断的核心权限污染问题：trace 与 session DB 显示 `narrate` 的一次内部生成调用会携带 `tools: {"*": false}`，而 `session.prompt` 之前会把这类临时工具覆盖直接写回 `session.permission`，导致父 Director 会话后续真实可用工具集被永久降成 `* deny *`，模型只能输出伪 `<tool_call>` 文本并在下一轮被误判结束。现为 `SessionPrompt.PromptInput` 增加非持久化工具覆盖开关，`narrate` 内部 prompt 显式使用该开关，并补充 session/narrate 回归测试锁住该路径。
 - 2026-06-29: 修复 Director 模式 Agent 工作流再次中断：trace 显示 roleplay Director 的 system prompt 强制要求先调用 `todowrite`，但 runtime 侧 `ROLEPLAY_TOOL_IDS` 白名单误写成不存在的 `todo`，且漏掉了 `task`，导致真实工具列表里没有 `todowrite` / `task`。Astron 因而把 `<tool_call>todowrite...` 生成为普通文本，服务端未执行任何工具却在下一轮将该 assistant 文本视为可结束输出，出现 `step=1 loop` 后立即 `exiting loop` 的假完成。现已将 roleplay 白名单改为包含 `todowrite` 与 `task`，移除错误的 `todo`，并补充回归测试覆盖 Director roleplay 工具暴露集合。
 - 2026-06-29: 修复 Director `narrate` 失败排障信息不足与 `openplay init` 模型配置格式错误：`openplay init` 生成的 `openplay.json` 现为 `agent.director.model` 写入合法字符串 `anthropic/claude-sonnet-4-20250514`，不再写入 schema 不接受的 `{ id: ... }` 对象；`narrate` 在无 `content` 回退时会把底层 provider/model 调用失败原因拼入错误消息，便于直接区分超时、无 key、坏模型名或 provider 不可用。补充 `init` 与 `narrate` 回归测试，并同步修正文档示例配置。

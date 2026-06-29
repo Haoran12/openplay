@@ -167,6 +167,15 @@ export function shouldExitPromptLoop(input: {
   )
 }
 
+function isLegacyPromptToolsDenyAll(permission: Permission.Ruleset | undefined) {
+  return (
+    permission?.length === 1 &&
+    permission[0].permission === "*" &&
+    permission[0].action === "deny" &&
+    permission[0].pattern === "*"
+  )
+}
+
 function referencePromptMetadata(input: unknown): ReferencePromptMetadata | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return
   const record = input as Record<string, unknown>
@@ -1776,6 +1785,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             const error = new NamedError.Unknown({ message: `Agent not found: "${lastUser.agent}".${hint}` })
             yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
+          }
+
+          if (ctx.world && agent.isDirector && !lastUser.tools && isLegacyPromptToolsDenyAll(session.permission)) {
+            session.permission = []
+            yield* sessions.setPermission({ sessionID: session.id, permission: [] })
+            yield* slog.warn("healed legacy deny-all tool permission on roleplay director session")
           }
 
           const lastAssistantMsg = msgs.findLast(
