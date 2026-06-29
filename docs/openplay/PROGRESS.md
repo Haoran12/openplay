@@ -101,9 +101,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器代码块转义字符统一处理：tool-call input 与 tool-result output 现统一调用 `unescapeString` / `unescapedStrings`，确保 `\n`/`\t`/`\"` 等转义序列在所有场景下正确渲染为可读形式。
 - [x] Director workflow 提前退出修复：provider-executed 工具调用后，若仅完成人物采样而尚未 `narrate` / `question` 收束，本轮会继续 prompt loop 而不会被误判为完成。
 - [x] Director `narrate` 失败诊断与 init 模型配置修复：`openplay init` 生成合法的 `provider/model` 字符串；`narrate` 在无 `content` 回退时保留底层 provider/model 失败原因，避免只看到泛化报错。
+- [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
 
 ## Changelog
 
+- 2026-06-29: 修复 Director 模式 Agent 工作流再次中断：trace 显示 roleplay Director 的 system prompt 强制要求先调用 `todowrite`，但 runtime 侧 `ROLEPLAY_TOOL_IDS` 白名单误写成不存在的 `todo`，且漏掉了 `task`，导致真实工具列表里没有 `todowrite` / `task`。Astron 因而把 `<tool_call>todowrite...` 生成为普通文本，服务端未执行任何工具却在下一轮将该 assistant 文本视为可结束输出，出现 `step=1 loop` 后立即 `exiting loop` 的假完成。现已将 roleplay 白名单改为包含 `todowrite` 与 `task`，移除错误的 `todo`，并补充回归测试覆盖 Director roleplay 工具暴露集合。
 - 2026-06-29: 修复 Director `narrate` 失败排障信息不足与 `openplay init` 模型配置格式错误：`openplay init` 生成的 `openplay.json` 现为 `agent.director.model` 写入合法字符串 `anthropic/claude-sonnet-4-20250514`，不再写入 schema 不接受的 `{ id: ... }` 对象；`narrate` 在无 `content` 回退时会把底层 provider/model 调用失败原因拼入错误消息，便于直接区分超时、无 key、坏模型名或 provider 不可用。补充 `init` 与 `narrate` 回归测试，并同步修正文档示例配置。
 - 2026-06-29: 修复 Director 在 workflow/provider-executed 工具调用后的提前退出：`session.prompt` 主循环新增显式退出判定，只有在非 provider 工具调用已处理完且 Roleplay Director 回合已完成叙事收束时才退出；避免 Astron / workflow 模型执行 `embody` 等工具后因为 `finish=stop` 被误判结束。补充回归测试覆盖“provider-executed + 仅 embody 不应退出”和“provider-executed + narrate 后允许退出”两条路径。
 - 2026-06-29: 修复 `openplay-ui` / Roleplay 历史会话中的坏 `tool.state.input` 兼容问题：`MessageV2` 与 `Session` 读取/写入边界现统一把字符串、数组或其他非对象工具输入归一化为对象（优先解析 JSON，失败则保留为 `{ raw: ... }`），避免旧 `narrate` 记录在页面加载、消息接口和后续模型历史重放时触发 `Expected object`；补充分页读取回归测试覆盖该类历史脏数据。

@@ -73,6 +73,8 @@ const ROLEPLAY_TOOL_IDS = new Set([
   "read",
   "glob",
   "grep",
+  "todowrite",
+  "task",
   "calc",
   "dice_roll",
   "embody",
@@ -83,7 +85,6 @@ const ROLEPLAY_TOOL_IDS = new Set([
   "memory_update",
   "knowledge_update",
   "character_view_read",
-  "todo",
 ])
 
 export function webSearchEnabled(providerID: ProviderID, flags = { exa: false, parallel: false }) {

@@ -6,7 +6,7 @@ import { Effect, Layer, Result, Schema } from "effect"
 import { CrossSpawnSpawner } from "@openplay-ai/core/cross-spawn-spawner"
 import { ToolRegistry } from "@/tool/registry"
 import { Tool } from "@/tool/tool"
-import { disposeAllInstances, TestInstance } from "../fixture/fixture"
+import { disposeAllInstances, provideInstance, TestInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { TestConfig } from "../fixture/config"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
@@ -133,28 +133,38 @@ describe("tool.registry", () => {
     }),
   )
 
-  it.instance("roleplay director tools include memory_reflect but not general coding tools", () =>
+  it.live("roleplay director tools include roleplay workflow tools but not general coding tools", () =>
     Effect.gen(function* () {
-      const test = yield* TestInstance
+      const directory = yield* tmpdirScoped()
       yield* Effect.promise(() =>
-        fs.writeFile(path.join(test.directory, "runtime.yaml"), "scene: {}\n"),
+        fs.writeFile(path.join(directory, "runtime.yaml"), "scene: {}\n"),
       )
       yield* Effect.promise(() =>
-        fs.writeFile(path.join(test.directory, "openplay.json"), JSON.stringify({ id: "wld_test_registry" })),
+        fs.writeFile(
+          path.join(directory, "openplay.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            roleplay: { worldPath: "." },
+          }),
+        ),
       )
 
-      const registry = yield* ToolRegistry.Service
-      const agents = yield* Agent.Service
-      const director = yield* agents.get("director")
-      if (!director) throw new Error("director agent not found")
-      const tools = yield* registry.tools({
-        providerID: ProviderID.opencode,
-        modelID: ModelID.make("test"),
-        agent: director,
-      })
-      const ids = tools.map((tool) => tool.id)
+      const ids = yield* Effect.gen(function* () {
+        const registry = yield* ToolRegistry.Service
+        const agents = yield* Agent.Service
+        const director = yield* agents.get("director")
+        if (!director) throw new Error("director agent not found")
+        const tools = yield* registry.tools({
+          providerID: ProviderID.opencode,
+          modelID: ModelID.make("test"),
+          agent: director,
+        })
+        return tools.map((tool) => tool.id)
+      }).pipe(provideInstance(directory))
 
       expect(ids).toContain("scene_update")
+      expect(ids).toContain("todowrite")
+      expect(ids).toContain("task")
       expect(ids).toContain("memory_reflect")
       expect(ids).toContain("memory_update")
       expect(ids).not.toContain("shell")
