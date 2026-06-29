@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionTraceEntry } from "@openplay-ai/sdk/v2/client"
-import { traceDetailMarkdown, traceReadableSections } from "./session-trace-format"
+import { traceDetailMarkdown, traceReadableBlocks } from "./session-trace-format"
 
 function entry(overrides: Partial<SessionTraceEntry>): SessionTraceEntry {
   return {
@@ -16,24 +16,30 @@ function entry(overrides: Partial<SessionTraceEntry>): SessionTraceEntry {
 }
 
 describe("session trace formatting", () => {
-  test("renders request entries as request context instead of response", () => {
-    const sections = traceReadableSections(
+  test("renders request entries as role-ordered conversation blocks", () => {
+    const blocks = traceReadableBlocks(
       entry({
         kind: "llm.request",
         payload: {
           model: { id: "gpt-5", providerID: "openai" },
           system: ["You are helpful"],
-          messages: [{ role: "user", content: "hello" }],
+          messages: [
+            { role: "user", content: "hello" },
+            { role: "assistant", content: [{ type: "text", text: "hi" }] },
+          ],
           tools: { read: { description: "Read files" } },
         },
       }),
     )
 
-    expect(sections.map((item) => item.label)).toEqual(["Model", "System", "Messages", "Tools"])
-    expect(sections.some((item) => item.label === "Response Text")).toBe(false)
+    expect(blocks).toEqual([
+      { role: "SYSTEM", text: "You are helpful" },
+      { role: "USER", text: "hello" },
+      { role: "ASSISTANT", text: "hi" },
+    ])
   })
 
-  test("renders completed response entries with response text", () => {
+  test("renders completed response entries as assistant-first readable text", () => {
     const markdown = traceDetailMarkdown(
       entry({
         kind: "llm.response.completed",
@@ -47,8 +53,9 @@ describe("session trace formatting", () => {
       true,
     )
 
-    expect(markdown).toContain("## Response Text")
+    expect(markdown).toContain("`ASSISTANT>`")
     expect(markdown).toContain("final answer")
-    expect(markdown).not.toContain("## Messages")
+    expect(markdown).toContain("`REASONING>`")
+    expect(markdown).not.toContain("\"finishReason\"")
   })
 })
