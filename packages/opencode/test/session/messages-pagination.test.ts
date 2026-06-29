@@ -5,6 +5,8 @@ import { MessageV2 } from "../../src/session/message-v2"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { NotFoundError } from "@/storage/storage"
+import * as Database from "@/storage/db"
+import { PartTable } from "../../src/session/session.sql"
 import * as Log from "@openplay-ai/core/util/log"
 import { testEffect } from "../lib/effect"
 
@@ -215,6 +217,64 @@ describe("MessageV2.page", () => {
         expect(result.items).toHaveLength(1)
         expect(result.items[0].info.id).toBe(ids[ids.length - 1])
         expect(result.more).toBe(true)
+      }),
+    ),
+  )
+
+  it.instance("normalizes legacy tool inputs stored as strings", () =>
+    withSession(({ session, sessionID }) =>
+      Effect.gen(function* () {
+        const userID = yield* addUser(sessionID, "continue")
+        const assistantID = yield* addAssistant(sessionID, userID, { finish: "tool-calls" })
+        const toolPartID = PartID.ascending()
+
+        yield* session.updatePart({
+          id: toolPartID,
+          sessionID,
+          messageID: assistantID,
+          type: "tool",
+          callID: "call_legacy_narrate",
+          tool: "narrate",
+          state: {
+            status: "completed",
+            input: { content: "placeholder" },
+            output: "夜风过竹，门内门外都静了一瞬。",
+            title: "Narrate",
+            metadata: {},
+            time: { start: 1, end: 2 },
+          },
+        } as MessageV2.ToolPart)
+
+        Database.use((db) =>
+          db
+            .update(PartTable)
+            .set({
+              data: {
+                type: "tool",
+                callID: "call_legacy_narrate",
+                tool: "narrate",
+                state: {
+                  status: "completed",
+                  input:
+                    '{"scene": time: 1003-07-14 申时（约15:45）\\nlocation: 襄陵县城西北-吴宅主宅内院厅堂, "perspective": "第三人称客观"}',
+                  output: "夜风过竹，门内门外都静了一瞬。",
+                  title: "Narrate",
+                  metadata: {},
+                  time: { start: 1, end: 2 },
+                },
+              } as any,
+            })
+            .where(Database.eq(PartTable.id, toolPartID))
+            .run(),
+        )
+
+        const result = yield* MessageV2.page({ sessionID, limit: 10 })
+        const assistant = result.items.find((item) => item.info.id === assistantID)
+        const tool = assistant?.parts.find((part): part is MessageV2.ToolPart => part.type === "tool")
+
+        expect(tool?.state.input).toEqual({
+          raw: '{"scene": time: 1003-07-14 申时（约15:45）\\nlocation: 襄陵县城西北-吴宅主宅内院厅堂, "perspective": "第三人称客观"}',
+        })
       }),
     ),
   )

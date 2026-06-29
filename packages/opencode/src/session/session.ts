@@ -701,12 +701,13 @@ export const layer: Layer.Layer<
 
     const updatePart = <T extends MessageV2.Part>(part: T): Effect.Effect<T> =>
       Effect.gen(function* () {
+        const normalized = MessageV2.normalizePart(structuredClone(part))
         yield* sync.run(MessageV2.Event.PartUpdated, {
-          sessionID: part.sessionID,
-          part: structuredClone(part),
+          sessionID: normalized.sessionID,
+          part: normalized,
           time: Date.now(),
         })
-        return part
+        return normalized as T
       }).pipe(Effect.withSpan("Session.updatePart"))
 
     const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
@@ -724,12 +725,12 @@ export const layer: Layer.Layer<
           .get(),
       )
       if (!row) return
-      return {
+      return MessageV2.normalizePart({
         ...row.data,
         id: row.id,
         sessionID: row.session_id,
         messageID: row.message_id,
-      } as MessageV2.Part
+      } as MessageV2.Part)
     })
 
     const create = Effect.fn("Session.create")(function* (input?: {

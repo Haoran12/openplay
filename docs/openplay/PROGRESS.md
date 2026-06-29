@@ -73,6 +73,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director `narrate` 终端正文修复：CLI/TUI completed 态仅渲染真实 output，禁止回退到 tool input 伪装正文
 - [x] P2-2 Director / narrate 职责拆分：Director 只提供结构化场景数据，`narrate` 内部负责模型选择、视角约束、正文生成与失败回退
 - [x] P2-2 narrate 宽松入参兼容：`scene` / `characterSamples` 接受 YAML 风格文本块并在工具内归一化，避免 Director 半结构化嵌套参数在 schema 解码前失败
+- [x] `openplay-ui` 历史工具输入兼容修复：消息读取与回放链路会自动把旧会话中字符串化的 `tool.state.input` 归一化为对象，避免页面加载或后续模型重放时报 `Expected object`
 - [x] Director 右侧面板 `runtime.yaml` 兼容解析修复：旧式 `current_date` / 标量 `current_scene` 与 `environment.time/location` 都能正确显示时间地点和在场人物
 - [x] Director 回合强制 `scene_update`：Roleplay Director 每轮开始时首个工具调用必须是 `scene_update`
 - [x] WebUI 阅读体验增强：叙事连续阅读视图、角色最近一次代入卡片、场景变更时间线与 runtime/角色目录快捷入口
@@ -101,6 +102,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-29: 修复 `openplay-ui` / Roleplay 历史会话中的坏 `tool.state.input` 兼容问题：`MessageV2` 与 `Session` 读取/写入边界现统一把字符串、数组或其他非对象工具输入归一化为对象（优先解析 JSON，失败则保留为 `{ raw: ... }`），避免旧 `narrate` 记录在页面加载、消息接口和后续模型历史重放时触发 `Expected object`；补充分页读取回归测试覆盖该类历史脏数据。
 - 2026-06-29: 修复 `narrate` 结构化入参过严导致的 tool-call 解码失败：`scene` 与 `characterSamples` 现同时接受标准 JSON 结构、单对象以及 YAML 风格文本块，并在 `narrate` 内部统一解析归一化；补充回归测试覆盖 Director 产出 `time: ...` / `- name: ...` 这类半结构化嵌套参数的场景。
 - 2026-06-29: 完成 P2-2 Director / narrate 职责拆分：`roleplay` 新增 `narrateModel` 配置；`narrate` 改为支持结构化 `scene` / `characterSamples` / `outcomes` 输入并在内部调用 LLM 生成正文，支持 POV 约束、失败回退到 `content`、专用 prompt 模板；Director 提示词同步改为只负责组织结构化叙事输入，并补充 `narrate` 工具回归测试。
 - 2026-06-29: `openplay-ui` Trace 阅读器代码块转义字符统一处理：新增 `unescapedStrings` 辅助函数递归处理 JSON 对象中的所有字符串值；`formatStructuredValue` 与 `tool-result` 渲染现统一调用转义处理，确保 `\n`/`\t`/`\"`/`\'`/`\\` 在 tool-call input 与 tool-result output 中正确还原为可读形式。

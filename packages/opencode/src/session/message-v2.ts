@@ -568,6 +568,41 @@ export type WithParts = {
   parts: Part[]
 }
 
+function objectRecord(value: unknown): value is Record<string, any> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function normalizeToolInput(value: unknown): Record<string, any> {
+  if (objectRecord(value)) return value
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (!trimmed) return {}
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (objectRecord(parsed)) return parsed
+      if (Array.isArray(parsed)) return { items: parsed }
+      return { value: parsed }
+    } catch {
+      return { raw: value }
+    }
+  }
+  if (Array.isArray(value)) return { items: value }
+  if (value === undefined || value === null) return {}
+  return { value }
+}
+
+export function normalizePart<T extends Part>(value: T): T {
+  if (value.type !== "tool") return value
+  if (objectRecord(value.state.input)) return value
+  return {
+    ...value,
+    state: {
+      ...value.state,
+      input: normalizeToolInput(value.state.input),
+    },
+  } as T
+}
+
 const Cursor = Schema.Struct({
   id: MessageID,
   time: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -593,12 +628,12 @@ const info = (row: typeof MessageTable.$inferSelect) =>
   }) as Info
 
 const part = (row: typeof PartTable.$inferSelect) =>
-  ({
+  normalizePart({
     ...row.data,
     id: row.id,
     sessionID: row.session_id,
     messageID: row.message_id,
-  }) as Part
+  } as Part)
 
 const older = (row: Cursor) =>
   or(lt(MessageTable.time_created, row.time), and(eq(MessageTable.time_created, row.time), lt(MessageTable.id, row.id)))
@@ -992,14 +1027,13 @@ export function parts(message_id: MessageID) {
   const rows = Database.use((db) =>
     db.select().from(PartTable).where(eq(PartTable.message_id, message_id)).orderBy(PartTable.id).all(),
   )
-  return rows.map(
-    (row) =>
-      ({
-        ...row.data,
-        id: row.id,
-        sessionID: row.session_id,
-        messageID: row.message_id,
-      }) as Part,
+  return rows.map((row) =>
+    normalizePart({
+      ...row.data,
+      id: row.id,
+      sessionID: row.session_id,
+      messageID: row.message_id,
+    } as Part),
   )
 }
 
