@@ -155,6 +155,7 @@ export const layer = Layer.effect(
       let currentSessionID: SessionID | undefined = sessionID as SessionID
 
       while (currentSessionID) {
+        const lookupSessionID = currentSessionID as SessionID
         const row = yield* Effect.sync(() =>
           Database.use((db) =>
             db
@@ -163,7 +164,7 @@ export const layer = Layer.effect(
                 parentID: SessionTable.parent_id,
               })
               .from(SessionTable)
-              .where(eq(SessionTable.id, currentSessionID))
+              .where(eq(SessionTable.id, lookupSessionID))
               .get(),
           ),
         )

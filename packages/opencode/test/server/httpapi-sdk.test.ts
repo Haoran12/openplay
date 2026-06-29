@@ -828,10 +828,15 @@ describe("HttpApi SDK", () => {
               sdk.session.create({
                 title: "prompt async trace",
                 permission: [{ permission: "*", pattern: "*", action: "allow" }],
-                trace: { enabled: true },
               }),
             )
             const sessionID = String(record(session.data).id)
+            yield* capture(() =>
+              sdk.session.update({
+                sessionID,
+                trace: { enabled: true },
+              }),
+            )
             const asyncPrompt = yield* capture(() =>
               sdk.session.promptAsync({
                 sessionID,
@@ -882,6 +887,78 @@ describe("HttpApi SDK", () => {
                 expect(result.statuses.asyncPrompt).toBe(204)
                 expect(result.statuses.trace).toBe(200)
                 expect(result.messageTexts).toContain("async trace hello")
+              }),
+            ),
+          ),
+      )
+    }).pipe(Effect.provide(TestLLMServer.layer)),
+  )
+
+  serverPathParity("keeps promptAsync working for streamed llm trace events", (serverPath) =>
+    Effect.gen(function* () {
+      const llm = yield* TestLLMServer
+      return yield* withProject(
+        serverPath,
+        {
+          config: providerConfigWithTrace(llm.url),
+        },
+        ({ sdk }) =>
+          Effect.gen(function* () {
+            yield* llm.text("stream trace ok", { usage: { input: 17, output: 11 } })
+            const session = yield* capture(() =>
+              sdk.session.create({
+                title: "stream trace context",
+                permission: [{ permission: "*", pattern: "*", action: "allow" }],
+              }),
+            )
+            const sessionID = String(record(session.data).id)
+            yield* capture(() =>
+              sdk.session.update({
+                sessionID,
+                trace: { enabled: true },
+              }),
+            )
+
+            const asyncPrompt = yield* capture(() =>
+              sdk.session.promptAsync({
+                sessionID,
+                agent: "build",
+                model: { providerID: "test", modelID: "test-model" },
+                parts: [{ type: "text", text: "please stream a reply" }],
+              }),
+            )
+
+            const messages = yield* call(async () => {
+              for (let attempt = 0; attempt < 40; attempt++) {
+                const result = await sdk.session.messages({ sessionID })
+                const serialized = JSON.stringify(result.data)
+                if (serialized.includes("please stream a reply") && serialized.includes("stream trace ok")) {
+                  return result
+                }
+                await Bun.sleep(50)
+              }
+              return await sdk.session.messages({ sessionID })
+            })
+
+            return {
+              statuses: statuses({
+                session,
+                asyncPrompt,
+                messages: {
+                  status: messages.response.status,
+                  data: messages.data,
+                  error: messages.error,
+                },
+              }),
+              containsUserText: JSON.stringify(messages.data).includes("please stream a reply"),
+              containsAssistantText: JSON.stringify(messages.data).includes("stream trace ok"),
+            }
+          }).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                expect(result.statuses.asyncPrompt).toBe(204)
+                expect(result.containsUserText).toBe(true)
+                expect(result.containsAssistantText).toBe(true)
               }),
             ),
           ),

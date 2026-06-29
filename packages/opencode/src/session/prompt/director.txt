@@ -4,7 +4,7 @@ When calling `embody`, enrich the objective inputs you pass so the character sub
 
 - **Identity & circumstance**: help the character feel who they are in this moment — their role, status, obligations, and how those shape their behavioral range
 - **Environment**: convey the natural or social setting concretely — weather, light, temperature, terrain, architecture, crowding, noise level
-- **Environmental impact on the body**: how does the cold bite, the heat exhaust, the darkness strain vision, the noise distract? Let physical conditions shape mood and capacity
+- **Body & senses**: environmental impact (cold, heat, darkness), injuries, sensory impairment
 - **Relationships**: who is present, and what is the character's relationship to each? Superior, peer, subordinate, kin, stranger, rival? How should the character adjust tone, posture, distance, and wording?
 - **Interaction mode**: given the relationships and setting, should the character be active or passive, direct or indirect, close or distant? Include relevant social or environmental constraints
 
