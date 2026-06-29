@@ -60,17 +60,6 @@ function cleanLabel(value: string | undefined) {
   return next.length > 0 ? next : undefined
 }
 
-function headingFromMarkdown(text: string) {
-  const markdown = text.replace(/\r\n?/g, "\n")
-  const atx = markdown.match(/^\s{0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?$/m)
-  if (atx?.[1]) return cleanLabel(atx[1].replace(/[*_`~]+/g, ""))
-  const strong = markdown.match(/^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*$/m)
-  if (strong?.[1]) return cleanLabel(strong[1].replace(/[*_`~]+/g, ""))
-  const firstLine = markdown.split("\n").find((line) => line.trim().length > 0)
-  if (!firstLine) return undefined
-  return cleanLabel(firstLine.slice(0, 80))
-}
-
 export function narrativeEntriesFromMessages(messages: readonly Message[], partsByMessageID: Record<string, Part[] | undefined>) {
   const entries: NarrativeEntry[] = []
 
@@ -89,7 +78,7 @@ export function narrativeEntriesFromMessages(messages: readonly Message[], parts
         messageID: message.parentID ?? message.id,
         sessionID: message.sessionID,
         output,
-        heading: headingFromMarkdown(output),
+        heading: undefined,
         metaLabel: badges.length > 0 ? badges.join(" · ") : undefined,
         timestamp: message.time.completed ?? message.time.created,
         perspective: meta.perspective,

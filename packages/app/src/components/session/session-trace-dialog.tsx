@@ -34,7 +34,7 @@ export const SessionTraceDialog: Component<{
   const settings = useSettings()
   const [selectedID, setSelectedID] = createSignal<string>()
   const [view, setView] = createSignal<TraceView>(settings.trace.defaultView())
-  const [source, setSource] = createSignal<"all" | "main" | "subagent" | "tool" | "model">("all")
+  const [source, setSource] = createSignal<"all" | "main" | "subagent" | "tool" | "other">("all")
   const [timeFilter, setTimeFilter] = createSignal<"all" | "1h" | "today">("all")
   const [includeSubagents, setIncludeSubagents] = createSignal(settings.trace.includeSubagentsByDefault())
 
@@ -64,7 +64,7 @@ export const SessionTraceDialog: Component<{
     { value: "main" as const, label: language.t("trace.filter.main") },
     { value: "subagent" as const, label: language.t("trace.filter.subagent") },
     { value: "tool" as const, label: language.t("trace.filter.tool") },
-    { value: "model" as const, label: language.t("trace.filter.model") },
+    { value: "other" as const, label: language.t("trace.filter.other") },
   ])
 
   const timeFilterOptions = createMemo(() => [
@@ -89,6 +89,7 @@ export const SessionTraceDialog: Component<{
         if (filter === "today") return item.timestamp >= todayTimestamp
         return true
       })
+      .sort((a, b) => b.timestamp - a.timestamp)
   })
   const traceMeta = createMemo(
     () =>
@@ -217,6 +218,7 @@ export const SessionTraceDialog: Component<{
                       <div class="text-15-medium text-text-strong [overflow-wrap:anywhere]">{entry().kind}</div>
                       <div class="mt-1 text-12-regular text-text-weak [overflow-wrap:anywhere]">
                         {formatTimestamp(entry().timestamp)} · {entry().source} · {entry().title ?? entry().sessionID}
+                        {typeof (entry().payload as any)?.duration === "number" && ` · ${(entry().payload as any).duration}ms`}
                       </div>
                     </div>
                     <div class="flex items-center gap-2">

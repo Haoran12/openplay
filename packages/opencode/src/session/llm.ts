@@ -240,15 +240,8 @@ const live: Layer.Layer<
         ]),
       )
 
-      if (trace) {
-        yield* trace.write({
-          sessionID: input.sessionID,
-          rootSessionID: input.parentSessionID ?? input.sessionID,
-          source: input.parentSessionID ? "subagent" : "model",
-          kind: "llm.request",
-          agent: input.agent.name,
-          parentSessionID: input.parentSessionID,
-          payload: trace.requestPayload({
+      const requestPayload = trace
+        ? {
             userMessageID: input.user.id,
             model: {
               id: input.model.id,
@@ -260,9 +253,9 @@ const live: Layer.Layer<
             toolChoice: input.toolChoice,
             tools: traceTools,
             options: params.options ?? {},
-          }),
-        })
-      }
+          }
+        : undefined
+      const startTime = Date.now()
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via opencode's tool system
@@ -376,6 +369,33 @@ const live: Layer.Layer<
           l.error("stream error", {
             error,
           })
+          if (trace && requestPayload) {
+            const duration = Date.now() - startTime
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            const isTimeout = errorMessage.toLowerCase().includes("timeout") || errorMessage.toLowerCase().includes("timed out")
+            bridge.promise(
+              trace.write({
+                sessionID: input.sessionID,
+                rootSessionID: input.parentSessionID ?? input.sessionID,
+                source: "other",
+                kind: "llm.interaction",
+                agent: input.agent.name,
+                title: input.agent.name,
+                parentSessionID: input.parentSessionID,
+                payload: {
+                  request: requestPayload,
+                  response: {
+                    text: "",
+                    reasoning: "",
+                    readable: isTimeout ? "ERROR: Timeout" : `ERROR: ${errorMessage}`,
+                    finish: undefined,
+                    error: errorMessage,
+                  },
+                  duration,
+                },
+              }),
+            )
+          }
         },
         async experimental_repairToolCall(failed) {
           const lower = failed.toolCall.toolName.toLowerCase()
@@ -464,26 +484,32 @@ const live: Layer.Layer<
             if (event.type === "finish") finish = event
             yield event
           }
-          if (trace) {
+          if (trace && requestPayload) {
             const responseText = text.join("")
             const reasoningText = reasoning.join("")
+            const duration = Date.now() - startTime
             await bridge.promise(
               trace.write({
                 sessionID: input.sessionID,
                 rootSessionID: input.parentSessionID ?? input.sessionID,
-                source: input.parentSessionID ? "subagent" : "model",
-                kind: "llm.response.completed",
+                source: "other",
+                kind: "llm.interaction",
                 agent: input.agent.name,
+                title: input.agent.name,
                 parentSessionID: input.parentSessionID,
                 payload: {
-                  text: responseText,
-                  reasoning: reasoningText,
-                  readable:
-                    [responseText.trim(), reasoningText.trim() ? `Reasoning:\n${reasoningText.trim()}` : ""]
-                      .filter(Boolean)
-                      .join("\n\n")
-                      .trim() || undefined,
-                  finish,
+                  request: requestPayload,
+                  response: {
+                    text: responseText,
+                    reasoning: reasoningText,
+                    readable:
+                      [responseText.trim(), reasoningText.trim() ? `Reasoning:\n${reasoningText.trim()}` : ""]
+                        .filter(Boolean)
+                        .join("\n\n")
+                        .trim() || undefined,
+                    finish,
+                  },
+                  duration,
                 },
               }),
             )

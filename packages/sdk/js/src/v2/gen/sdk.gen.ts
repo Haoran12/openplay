@@ -3234,7 +3234,7 @@ export class Session2 extends HeyApiClient {
       workspace?: string
       cursor?: string
       limit?: number
-      source?: "main" | "subagent" | "tool" | "model"
+      source?: "main" | "subagent" | "tool" | "other"
       kind?: string
       includeSubagents?: boolean | "true" | "false"
     },

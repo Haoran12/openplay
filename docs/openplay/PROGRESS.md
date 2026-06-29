@@ -95,9 +95,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器排序与日期筛选：左侧卡片改为按时间从新到旧排序；类型筛选"全部"改为"全部类型"；新增日期筛选器（全部/1小时内/今日内）。
 - [x] `openplay-ui` Trace 阅读器 PAYLOAD 消息智能解析：未知 trace kind 的 payload 现自动识别常见结构（role/content 字段、messages 数组、request/response 结构），转义字符（\n/\"/\\t 等）还原为可读形式，最终以 `{ROLE}> {可读内容}` 格式展示。
 - [x] `openplay-ui` Trace 阅读器完整改进：新增 payload.type 字段作为 ROLE 提取、session.compose 专用解析、tools 完整显示、移除内容截断限制，所有消息在可读视图下显示完整内容。
+- [x] `openplay-ui` Trace 阅读器代码块转义字符统一处理：tool-call input 与 tool-result output 现统一调用 `unescapeString` / `unescapedStrings`，确保 `\n`/`\t`/`\"` 等转义序列在所有场景下正确渲染为可读形式。
 
 ## Changelog
 
+- 2026-06-29: `openplay-ui` Trace 阅读器代码块转义字符统一处理：新增 `unescapedStrings` 辅助函数递归处理 JSON 对象中的所有字符串值；`formatStructuredValue` 与 `tool-result` 渲染现统一调用转义处理，确保 `\n`/`\t`/`\"`/`\'`/`\\` 在 tool-call input 与 tool-result output 中正确还原为可读形式。
 - 2026-06-29: `openplay-ui` Trace 阅读器完整改进：新增 `readableSessionComposeBlocks` 专门解析 `session.compose`；新增 `formatToolsDisplay` 完整显示工具定义（含 description）；`readablePayloadBlocks` 现优先检查 `payload.type` 作为 ROLE；移除可读视图的 800 字符截断限制，完整显示所有内容；新增 6 组测试覆盖 type 字段、session.compose、tools 显示、无截断等场景。
 - 2026-06-29: `openplay-ui` Trace 阅读器 PAYLOAD 智能解析：新增 `readablePayloadBlocks` 函数，对未知 kind 的 payload 执行结构识别与转义字符还原；支持直接 role 字段、messages 数组、text/content 字段、request/response 结构等多种格式；转义字符（\n/\r/\t/\"/\'/\\）自动还原，提升可读性。
 - 2026-06-29: `openplay-ui` Trace 阅读器排序与日期筛选：左侧卡片改为按时间从新到旧排序；类型筛选"全部"改为"全部类型"；新增日期筛选器（全部/1小时内/今日内）。

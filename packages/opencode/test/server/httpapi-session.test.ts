@@ -508,7 +508,7 @@ describe("session HttpApi", () => {
           sessionID: grandchild.id,
           rootSessionID: child.id,
           source: "subagent",
-          kind: "llm.request",
+          kind: "llm.interaction",
           parentSessionID: child.id,
           payload: { ok: true },
         })
@@ -531,7 +531,7 @@ describe("session HttpApi", () => {
           sessionID: grandchild.id,
           rootSessionID: root.id,
           source: "subagent",
-          kind: "llm.request",
+          kind: "llm.interaction",
         })
       }),
     {

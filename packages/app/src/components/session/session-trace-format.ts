@@ -22,11 +22,18 @@ function roleName(value: unknown) {
 }
 
 function formatStructuredValue(value: unknown) {
-  if (typeof value !== "string") return traceSafeJson(value)
+  if (typeof value !== "string") {
+    try {
+      return JSON.stringify(unescapedStrings(value), null, 2)
+    } catch {
+      return traceSafeJson(value)
+    }
+  }
   try {
-    return JSON.stringify(JSON.parse(value), null, 2)
+    const parsed = JSON.parse(value)
+    return JSON.stringify(unescapedStrings(parsed), null, 2)
   } catch {
-    return value
+    return unescapeString(value)
   }
 }
 
@@ -38,6 +45,19 @@ function unescapeString(text: string): string {
     .replace(/\\"/g, '"')
     .replace(/\\'/g, "'")
     .replace(/\\\\/g, "\\")
+}
+
+function unescapedStrings(value: unknown): unknown {
+  if (typeof value === "string") return unescapeString(value)
+  if (Array.isArray(value)) return value.map(unescapedStrings)
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) {
+      result[k] = unescapedStrings(v)
+    }
+    return result
+  }
+  return value
 }
 
 function formatPayloadContent(content: unknown): string {
@@ -106,7 +126,7 @@ function formatMessagePart(part: unknown) {
 
   if (item.type === "tool-result") {
     const body = item.output ?? item.result ?? item.content
-    const detail = body === undefined ? "" : `\n\n\`\`\`\n${typeof body === "string" ? body : traceSafeJson(body)}\n\`\`\``
+    const detail = body === undefined ? "" : `\n\n\`\`\`\n${typeof body === "string" ? unescapeString(body) : formatStructuredValue(body)}\n\`\`\``
     return `Tool result: ${typeof item.toolName === "string" ? item.toolName : "unknown"}${detail}`
   }
 

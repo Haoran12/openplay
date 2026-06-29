@@ -73,9 +73,7 @@ export function NarrativeReader(props: {
                         <div class="text-12-regular text-text-weak">{entry.timestampLabel}</div>
                       </Show>
                     </div>
-                    <Show when={entry.heading}>
-                      <h2 class="text-20-medium text-text-strong">{entry.heading}</h2>
-                    </Show>
+
                     <Show when={entry.metaLabel}>
                       <div class="text-12-regular text-text-weak">{entry.metaLabel}</div>
                     </Show>

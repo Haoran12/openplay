@@ -798,7 +798,7 @@ export type SessionTraceEntry = {
   sessionID: string
   rootSessionID: string
   timestamp: number
-  source: "main" | "subagent" | "tool" | "model"
+  source: "main" | "subagent" | "tool" | "other"
   kind: string
   turn?: number
   title?: string
@@ -5842,7 +5842,7 @@ export type SessionTraceData = {
     workspace?: string
     cursor?: string
     limit?: number
-    source?: "main" | "subagent" | "tool" | "model"
+    source?: "main" | "subagent" | "tool" | "other"
     kind?: string
     includeSubagents?: boolean | "true" | "false"
   }

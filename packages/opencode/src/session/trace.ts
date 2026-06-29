@@ -11,7 +11,7 @@ import { SessionTable } from "./session.sql"
 import { eq } from "drizzle-orm"
 import { Config } from "@/config/config"
 
-export const TraceSource = Schema.Literals(["main", "subagent", "tool", "model"]).annotate({
+export const TraceSource = Schema.Literals(["main", "subagent", "tool", "other"]).annotate({
   identifier: "SessionTrace.Source",
 })
 
