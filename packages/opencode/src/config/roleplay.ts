@@ -2,6 +2,7 @@ export * as ConfigRoleplay from "./roleplay"
 
 import { Schema } from "effect"
 import { PositiveInt } from "@openplay-ai/core/schema"
+import { ConfigModelID } from "./model-id"
 
 const NarrativeStyle = Schema.Struct({
   language: Schema.optional(Schema.String).annotate({
@@ -30,6 +31,9 @@ export const Info = Schema.Struct({
   }),
   recordThreshold: Schema.optional(PositiveInt).annotate({
     description: "Event record trigger threshold",
+  }),
+  narrateModel: Schema.optional(ConfigModelID).annotate({
+    description: "Optional model for narrate tool (defaults to Director's model)",
   }),
 }).annotate({ identifier: "ConfigRoleplay" })
 export type Info = Schema.Schema.Type<typeof Info>

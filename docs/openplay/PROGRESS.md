@@ -71,6 +71,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `embody` 支持结构化当前事件输入，保留完整 speech/action 并程序级拒绝他人主观信息泄露
 - [x] Director `narrate` 主输出语义打通：metadata/UI/transcript/compaction 统一识别 player-facing narrative
 - [x] Director `narrate` 终端正文修复：CLI/TUI completed 态仅渲染真实 output，禁止回退到 tool input 伪装正文
+- [x] P2-2 Director / narrate 职责拆分：Director 只提供结构化场景数据，`narrate` 内部负责模型选择、视角约束、正文生成与失败回退
 - [x] Director 右侧面板 `runtime.yaml` 兼容解析修复：旧式 `current_date` / 标量 `current_scene` 与 `environment.time/location` 都能正确显示时间地点和在场人物
 - [x] Director 回合强制 `scene_update`：Roleplay Director 每轮开始时首个工具调用必须是 `scene_update`
 - [x] WebUI 阅读体验增强：叙事连续阅读视图、角色最近一次代入卡片、场景变更时间线与 runtime/角色目录快捷入口
@@ -99,6 +100,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-29: 完成 P2-2 Director / narrate 职责拆分：`roleplay` 新增 `narrateModel` 配置；`narrate` 改为支持结构化 `scene` / `characterSamples` / `outcomes` 输入并在内部调用 LLM 生成正文，支持 POV 约束、失败回退到 `content`、专用 prompt 模板；Director 提示词同步改为只负责组织结构化叙事输入，并补充 `narrate` 工具回归测试。
 - 2026-06-29: `openplay-ui` Trace 阅读器代码块转义字符统一处理：新增 `unescapedStrings` 辅助函数递归处理 JSON 对象中的所有字符串值；`formatStructuredValue` 与 `tool-result` 渲染现统一调用转义处理，确保 `\n`/`\t`/`\"`/`\'`/`\\` 在 tool-call input 与 tool-result output 中正确还原为可读形式。
 - 2026-06-29: `openplay-ui` Trace 阅读器完整改进：新增 `readableSessionComposeBlocks` 专门解析 `session.compose`；新增 `formatToolsDisplay` 完整显示工具定义（含 description）；`readablePayloadBlocks` 现优先检查 `payload.type` 作为 ROLE；移除可读视图的 800 字符截断限制，完整显示所有内容；新增 6 组测试覆盖 type 字段、session.compose、tools 显示、无截断等场景。
 - 2026-06-29: `openplay-ui` Trace 阅读器 PAYLOAD 智能解析：新增 `readablePayloadBlocks` 函数，对未知 kind 的 payload 执行结构识别与转义字符还原；支持直接 role 字段、messages 数组、text/content 字段、request/response 结构等多种格式；转义字符（\n/\r/\t/\"/\'/\\）自动还原，提升可读性。
