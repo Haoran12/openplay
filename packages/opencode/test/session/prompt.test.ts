@@ -2157,6 +2157,38 @@ it.instance(
 )
 
 it.instance(
+  "does not persist ephemeral tool overrides onto the session",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({ title: "Ephemeral tool overrides" })
+
+      yield* prompt.prompt({
+        sessionID: session.id,
+        noReply: true,
+        tools: { "*": false },
+        persistTools: false,
+        parts: [{ type: "text", text: "temporary sub-call" }],
+      })
+
+      const afterEphemeral = yield* sessions.get(session.id)
+      expect(afterEphemeral.permission ?? []).toEqual([])
+
+      yield* prompt.prompt({
+        sessionID: session.id,
+        noReply: true,
+        tools: { "*": false },
+        parts: [{ type: "text", text: "persisted restriction" }],
+      })
+
+      const afterPersistent = yield* sessions.get(session.id)
+      expect(afterPersistent.permission).toEqual([{ permission: "*", pattern: "*", action: "deny" }])
+    }),
+  { git: true },
+)
+
+it.instance(
   "records aborted errors when prompt is cancelled mid-stream",
   () =>
     Effect.gen(function* () {

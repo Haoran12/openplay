@@ -286,6 +286,7 @@ function generateNarrative(
         },
         agent: directorAgent?.name ?? parentSession.agent ?? ctx.agent,
         tools: { "*": false },
+        persistTools: false,
         system: buildNarrateSystemPrompt(params),
         parts: [{ type: "text", text: "请直接输出叙事正文。" }],
       })

@@ -188,6 +188,7 @@ describe("tool.narrate", () => {
     })
     expect(seen?.agent).toBe("director")
     expect(seen?.tools).toEqual({ "*": false })
+    expect(seen?.persistTools).toBe(false)
     expect(seen?.system).toContain("只描写可见、可闻、可感的外部行为与对话")
   })
 

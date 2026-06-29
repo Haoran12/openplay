@@ -1734,7 +1734,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       for (const [t, enabled] of Object.entries(input.tools ?? {})) {
         permissions.push({ permission: t, action: enabled ? "allow" : "deny", pattern: "*" })
       }
-      if (permissions.length > 0) {
+      if (permissions.length > 0 && input.persistTools !== false) {
         session.permission = permissions
         yield* sessions.setPermission({ sessionID: session.id, permission: permissions })
       }
@@ -2256,6 +2256,9 @@ export const PromptInput = Schema.Struct({
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
     description:
       "@deprecated tools and permissions have been merged, you can set permissions on the session itself now",
+  }),
+  persistTools: Schema.optional(Schema.Boolean).annotate({
+    description: "When false, tool availability overrides only apply to this prompt and are not written back to the session permission state.",
   }),
   format: Schema.optional(MessageV2.Format),
   system: Schema.optional(Schema.String),

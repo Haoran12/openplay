@@ -102,9 +102,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director workflow 提前退出修复：provider-executed 工具调用后，若仅完成人物采样而尚未 `narrate` / `question` 收束，本轮会继续 prompt loop 而不会被误判为完成。
 - [x] Director `narrate` 失败诊断与 init 模型配置修复：`openplay init` 生成合法的 `provider/model` 字符串；`narrate` 在无 `content` 回退时保留底层 provider/model 失败原因，避免只看到泛化报错。
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
+- [x] Director `narrate` 子调用权限隔离修复：`narrate` 内部为“本次生成禁用工具”设置的临时 `tools: {"*": false}` 不再持久化污染父 session 的 `permission`，避免后续 Director 回合工具列表被清空后再次中断。
 
 ## Changelog
 
+- 2026-06-29: 修复 Director 模式 Agent 工作流再次中断的核心权限污染问题：trace 与 session DB 显示 `narrate` 的一次内部生成调用会携带 `tools: {"*": false}`，而 `session.prompt` 之前会把这类临时工具覆盖直接写回 `session.permission`，导致父 Director 会话后续真实可用工具集被永久降成 `* deny *`，模型只能输出伪 `<tool_call>` 文本并在下一轮被误判结束。现为 `SessionPrompt.PromptInput` 增加非持久化工具覆盖开关，`narrate` 内部 prompt 显式使用该开关，并补充 session/narrate 回归测试锁住该路径。
 - 2026-06-29: 修复 Director 模式 Agent 工作流再次中断：trace 显示 roleplay Director 的 system prompt 强制要求先调用 `todowrite`，但 runtime 侧 `ROLEPLAY_TOOL_IDS` 白名单误写成不存在的 `todo`，且漏掉了 `task`，导致真实工具列表里没有 `todowrite` / `task`。Astron 因而把 `<tool_call>todowrite...` 生成为普通文本，服务端未执行任何工具却在下一轮将该 assistant 文本视为可结束输出，出现 `step=1 loop` 后立即 `exiting loop` 的假完成。现已将 roleplay 白名单改为包含 `todowrite` 与 `task`，移除错误的 `todo`，并补充回归测试覆盖 Director roleplay 工具暴露集合。
 - 2026-06-29: 修复 Director `narrate` 失败排障信息不足与 `openplay init` 模型配置格式错误：`openplay init` 生成的 `openplay.json` 现为 `agent.director.model` 写入合法字符串 `anthropic/claude-sonnet-4-20250514`，不再写入 schema 不接受的 `{ id: ... }` 对象；`narrate` 在无 `content` 回退时会把底层 provider/model 调用失败原因拼入错误消息，便于直接区分超时、无 key、坏模型名或 provider 不可用。补充 `init` 与 `narrate` 回归测试，并同步修正文档示例配置。
 - 2026-06-29: 修复 Director 在 workflow/provider-executed 工具调用后的提前退出：`session.prompt` 主循环新增显式退出判定，只有在非 provider 工具调用已处理完且 Roleplay Director 回合已完成叙事收束时才退出；避免 Astron / workflow 模型执行 `embody` 等工具后因为 `finish=stop` 被误判结束。补充回归测试覆盖“provider-executed + 仅 embody 不应退出”和“provider-executed + narrate 后允许退出”两条路径。
