@@ -147,6 +147,34 @@ export const layer = Layer.effect(
     const flags = yield* RuntimeFlags.Service
     const config = yield* Config.Service
 
+    const resolveRootSessionID = Effect.fn("SessionTrace.resolveRootSessionID")(function* (
+      sessionID: SessionID | string,
+      fallback?: string,
+    ) {
+      let rootSessionID = fallback ?? String(sessionID)
+      let currentSessionID: SessionID | undefined = sessionID as SessionID
+
+      while (currentSessionID) {
+        const row = yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .select({
+                id: SessionTable.id,
+                parentID: SessionTable.parent_id,
+              })
+              .from(SessionTable)
+              .where(eq(SessionTable.id, currentSessionID))
+              .get(),
+          ),
+        )
+        if (!row?.id) break
+        rootSessionID = row.id
+        currentSessionID = row.parentID ?? undefined
+      }
+
+      return rootSessionID
+    })
+
     const available: Interface["available"] = Effect.fn("SessionTrace.available")(function* () {
       const cfg = yield* config.get()
       return cfg.server?.trace?.enabled ?? flags.modelTrace
@@ -184,8 +212,10 @@ export const layer = Layer.effect(
     const write: Interface["write"] = Effect.fn("SessionTrace.write")(function* (input) {
       if (!(yield* enabled(input.sessionID))) return
       const timestamp = Date.now()
+      const rootSessionID = yield* resolveRootSessionID(input.sessionID, input.rootSessionID)
       const entry: TraceEntry = {
         ...input,
+        rootSessionID,
         id: `${timestamp}:${Math.random().toString(36).slice(2, 10)}`,
         timestamp,
       }
@@ -231,26 +261,7 @@ export const layer = Layer.effect(
         }
       }
 
-      let rootSessionID = requested.id
-      let parentID: SessionID | undefined = requested.parentID ?? undefined
-      while (parentID) {
-        const currentParentID = parentID
-        const row = yield* Effect.sync(() =>
-          Database.use((db) =>
-            db
-              .select({
-                id: SessionTable.id,
-                parentID: SessionTable.parent_id,
-              })
-              .from(SessionTable)
-              .where(eq(SessionTable.id, currentParentID))
-              .get(),
-          ),
-        )
-        if (!row?.id) break
-        rootSessionID = row.id
-        parentID = row.parentID ?? undefined
-      }
+      const rootSessionID = yield* resolveRootSessionID(requested.id, requested.id)
 
       const ids = new Set<string>([requested.id])
       if (input.includeSubagents !== false) {

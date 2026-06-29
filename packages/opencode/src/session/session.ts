@@ -651,6 +651,25 @@ export const layer: Layer.Layer<
       return rows.map(fromRow)
     })
 
+    const descendants = Effect.fn("Session.descendants")(function* (parentID: SessionID) {
+      const result: Info[] = []
+      const queue = [parentID]
+      const seen = new Set<string>([parentID])
+
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        const items = yield* children(current)
+        for (const child of items) {
+          if (seen.has(child.id)) continue
+          seen.add(child.id)
+          result.push(child)
+          queue.push(child.id)
+        }
+      }
+
+      return result
+    })
+
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
       const session = yield* get(sessionID)
       try {
@@ -811,6 +830,12 @@ export const layer: Layer.Layer<
       trace?: Info["trace"]
     }) {
       yield* patch(input.sessionID, { trace: input.trace ?? null, time: { updated: Date.now() } })
+      const childSessions = yield* descendants(input.sessionID)
+      yield* Effect.forEach(
+        childSessions,
+        (child) => patch(child.id, { trace: input.trace ?? null }),
+        { discard: true },
+      )
     })
 
     const setRevert = Effect.fn("Session.setRevert")(function* (input: {

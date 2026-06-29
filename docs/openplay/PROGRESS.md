@@ -151,3 +151,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 将 Trace 服务开关正式接入 OpenPlay UI：服务端新增实例配置 `server.trace.enabled` 作为全局 Trace 控制面，`/config` 可读写；左下角设置弹窗新增“启用 OpenPlay Trace 服务”开关；右上角当前会话 Trace 开关在需要时会联动打开全局 Trace 服务，再切换会话级 `trace.enabled`。新增的 Trace 相关文案统一使用 `OpenPlay` 命名。
 - 2026-06-29: 修复 `openplay-ui` 会话 header Trace 开关初始化顺序错误：`traceToggleVisible` 不再先于 `traceAvailable` 建立 memo，避免 Vite 开发页加载时触发 `ReferenceError: can't access lexical declaration 'traceAvailable' before initialization`。
 - 2026-06-29: 调整 `openplay-ui` 右上角会话 Trace 开关语义：即使全局 Trace 服务尚未开启也始终显示并可点击；点击开启当前会话 Trace 时会先自动打开全局 OpenPlay Trace 服务，再写入会话级 `trace.enabled`；点击关闭时只关闭当前会话采集，不连带关闭全局服务。
+- 2026-06-29: 修复 `openplay-ui` Trace 阅读器空白问题的服务端根因：`SessionTrace.write()` 现统一按真实根会话归档 JSONL，避免多层子会话把记录写进错误分桶后导致 `/session/:id/trace` 查不到；同时父会话切换 `trace.enabled` 时会同步到既有子会话，避免角色/子代理复用旧会话后继续处于未采集状态。新增 HTTP API 回归测试覆盖“父会话开启 Trace 后，孙级子会话写入的 LLM 记录可被 Trace 阅读器读到”。

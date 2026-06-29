@@ -15,6 +15,7 @@ import { Project } from "../../src/project/project"
 import { Server } from "../../src/server/server"
 import { SessionPaths } from "../../src/server/routes/instance/httpapi/groups/session"
 import { Session } from "@/session/session"
+import { SessionTrace } from "@/session/trace"
 import { MessageID, PartID, SessionID, type SessionID as SessionIDType } from "../../src/session/schema"
 import { MessageV2 } from "../../src/session/message-v2"
 import { Database } from "@/storage/db"
@@ -41,7 +42,9 @@ const instanceStoreLayer = InstanceStore.defaultLayer.pipe(
     Layer.succeed(InstanceBootstrapService.Service, InstanceBootstrapService.Service.of({ run: Effect.void })),
   ),
 )
-const it = testEffect(Layer.mergeAll(instanceStoreLayer, Project.defaultLayer, Session.defaultLayer, workspaceLayer))
+const it = testEffect(
+  Layer.mergeAll(instanceStoreLayer, Project.defaultLayer, Session.defaultLayer, SessionTrace.defaultLayer, workspaceLayer),
+)
 
 function app() {
   return Server.Default().app
@@ -478,6 +481,71 @@ describe("session HttpApi", () => {
         expect(response.meta.retentionDays).toBeGreaterThan(0)
       }),
     { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "records and serves descendant trace entries after enabling trace on the parent session",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        const root = yield* createSession({ title: "trace root" })
+        const child = yield* createSession({ title: "trace child", parentID: root.id })
+        const grandchild = yield* createSession({ title: "trace grandchild", parentID: child.id })
+
+        const update = yield* request(pathFor(SessionPaths.update, { sessionID: root.id }), {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ trace: { enabled: true } }),
+        })
+        expect(update.status).toBe(200)
+
+        const grandchildInfo = yield* Session.Service.use((svc) => svc.get(grandchild.id))
+        expect(grandchildInfo.trace).toEqual({ enabled: true })
+
+        const trace = yield* SessionTrace.Service
+        yield* trace.write({
+          sessionID: grandchild.id,
+          rootSessionID: child.id,
+          source: "subagent",
+          kind: "llm.request",
+          parentSessionID: child.id,
+          payload: { ok: true },
+        })
+
+        const response = yield* requestJson<{
+          items: Array<{
+            sessionID: string
+            rootSessionID: string
+            source: string
+            kind: string
+          }>
+          cursor?: string
+          meta: { available: boolean; retentionDays: number }
+        }>(`${pathFor(SessionPaths.trace, { sessionID: root.id })}?includeSubagents=true`, {
+          headers: { "x-opencode-directory": test.directory },
+        })
+
+        expect(response.items).toHaveLength(1)
+        expect(response.items[0]).toMatchObject({
+          sessionID: grandchild.id,
+          rootSessionID: root.id,
+          source: "subagent",
+          kind: "llm.request",
+        })
+      }),
+    {
+      git: true,
+      config: {
+        formatter: false,
+        lsp: false,
+        server: {
+          trace: {
+            enabled: true,
+          },
+        },
+      },
+    },
   )
 
   it.instance(
