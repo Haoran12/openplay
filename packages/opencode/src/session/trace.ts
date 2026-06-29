@@ -310,7 +310,7 @@ export const layer = Layer.effect(
       let items = parsed
         .filter((item) => (input.source ? item.source === input.source : true))
         .filter((item) => (input.kind ? item.kind === input.kind : true))
-        .sort((a, b) => (a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp))
+        .sort((a, b) => (a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : b.timestamp - a.timestamp))
 
       const cursor = input.cursor ? parseCursor(input.cursor) : undefined
       if (cursor) {

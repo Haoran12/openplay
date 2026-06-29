@@ -35,6 +35,7 @@ export const SessionTraceDialog: Component<{
   const [selectedID, setSelectedID] = createSignal<string>()
   const [view, setView] = createSignal<TraceView>(settings.trace.defaultView())
   const [source, setSource] = createSignal<"all" | "main" | "subagent" | "tool" | "model">("all")
+  const [timeFilter, setTimeFilter] = createSignal<"all" | "1h" | "today">("all")
   const [includeSubagents, setIncludeSubagents] = createSignal(settings.trace.includeSubagentsByDefault())
 
   const [trace] = createResource(
@@ -66,9 +67,29 @@ export const SessionTraceDialog: Component<{
     { value: "model" as const, label: language.t("trace.filter.model") },
   ])
 
-  const items = createMemo<SessionTraceEntry[]>(() =>
-    (trace.latest?.items ?? []).filter((item) => item.kind !== "llm.stream.event"),
-  )
+  const timeFilterOptions = createMemo(() => [
+    { value: "all" as const, label: language.t("trace.timeFilter.all") },
+    { value: "1h" as const, label: language.t("trace.timeFilter.1h") },
+    { value: "today" as const, label: language.t("trace.timeFilter.today") },
+  ])
+
+  const items = createMemo<SessionTraceEntry[]>(() => {
+    const now = Date.now()
+    const oneHourAgo = now - 60 * 60 * 1000
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayTimestamp = todayStart.getTime()
+
+    return (trace.latest?.items ?? [])
+      .filter((item) => item.kind !== "llm.stream.event")
+      .filter((item) => {
+        const filter = timeFilter()
+        if (filter === "all") return true
+        if (filter === "1h") return item.timestamp >= oneHourAgo
+        if (filter === "today") return item.timestamp >= todayTimestamp
+        return true
+      })
+  })
   const traceMeta = createMemo(
     () =>
       trace.latest?.meta ?? {
@@ -129,16 +150,28 @@ export const SessionTraceDialog: Component<{
                 {language.t("trace.unavailable")}
               </div>
             </Show>
-            <Select
-              options={sourceOptions()}
-              current={sourceOptions().find((item) => item.value === source())}
-              value={(item) => item.value}
-              label={(item) => item.label}
-              onSelect={(item) => item && setSource(item.value)}
-              variant="secondary"
-              size="small"
-              triggerVariant="settings"
-            />
+            <div class="flex items-center gap-2">
+              <Select
+                options={sourceOptions()}
+                current={sourceOptions().find((item) => item.value === source())}
+                value={(item) => item.value}
+                label={(item) => item.label}
+                onSelect={(item) => item && setSource(item.value)}
+                variant="secondary"
+                size="small"
+                triggerVariant="settings"
+              />
+              <Select
+                options={timeFilterOptions()}
+                current={timeFilterOptions().find((item) => item.value === timeFilter())}
+                value={(item) => item.value}
+                label={(item) => item.label}
+                onSelect={(item) => item && setTimeFilter(item.value)}
+                variant="secondary"
+                size="small"
+                triggerVariant="settings"
+              />
+            </div>
           </div>
           <div class="h-full min-h-0 overflow-y-auto p-3">
             <Show when={items().length > 0} fallback={<div class="px-2 py-4 text-13-regular text-text-weak">{language.t("trace.empty")}</div>}>
