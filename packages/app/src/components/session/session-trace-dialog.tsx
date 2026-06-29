@@ -9,6 +9,7 @@ import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { showToast } from "@openplay-ai/ui/toast"
 import type { SessionTraceEntry } from "@openplay-ai/sdk/v2/client"
+import { traceDetailMarkdown, traceSafeJson } from "./session-trace-format"
 
 type TraceView = "readable" | "raw"
 
@@ -22,46 +23,6 @@ function formatTimestamp(value: number | undefined) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value))
-}
-
-function safeJson(value: unknown) {
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
-function readableSections(entry: SessionTraceEntry) {
-  const payload = (entry.payload ?? {}) as Record<string, unknown>
-  const sections: Array<{ label: string; text: string }> = []
-  const push = (label: string, value: unknown) => {
-    if (value === undefined || value === null || value === "") return
-    sections.push({
-      label,
-      text: typeof value === "string" ? value : safeJson(value),
-    })
-  }
-  push("Request", payload.messages)
-  push("System", payload.system)
-  push("Messages", payload.modelMessages)
-  push("Tools", payload.tools)
-  push("Raw Response", payload.text ?? payload.finish ?? payload)
-  push("Reasoning", payload.reasoning)
-  return sections
-}
-
-function detailMarkdown(entry: SessionTraceEntry, view: TraceView, expandedSections: boolean) {
-  if (view === "raw") return ["```json", safeJson(entry), "```"].join("\n")
-  const sections = readableSections(entry)
-  if (sections.length === 0) return ["```json", safeJson(entry.payload), "```"].join("\n")
-  return sections
-    .map((section) =>
-      expandedSections
-        ? `## ${section.label}\n\n\`\`\`\n${section.text}\n\`\`\``
-        : `## ${section.label}\n\n${section.text.slice(0, 800)}${section.text.length > 800 ? "\n\n[truncated in readable view]" : ""}`,
-    )
-    .join("\n\n")
 }
 
 export const SessionTraceDialog: Component<{
@@ -120,7 +81,7 @@ export const SessionTraceDialog: Component<{
   const copyEntry = async (entry: SessionTraceEntry) => {
     if (!canCopy()) return
     try {
-      await navigator.clipboard.writeText(safeJson(entry))
+      await navigator.clipboard.writeText(traceSafeJson(entry))
       showToast({
         variant: "success",
         title: language.t("session.share.copy.copied"),
@@ -238,7 +199,7 @@ export const SessionTraceDialog: Component<{
                 </div>
                 <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                   <Markdown
-                    text={detailMarkdown(entry(), view(), settings.trace.defaultReadableSections())}
+                    text={traceDetailMarkdown(entry(), view(), settings.trace.defaultReadableSections())}
                     class="text-13-regular leading-6"
                     data-roleplay-audit-detail
                   />

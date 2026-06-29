@@ -89,6 +89,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Embody 显式注入场景时间地点：Character 子代理每轮固定收到从 `runtime.yaml` 抽取的当前时间/地点锚点，降低连续子会话中的日期地点幻觉。
 - [x] `openplay-ui` 新会话 Trace 开关可达性修复：无 `sessionID` 的新会话页也显示会话级 Trace 开关，首次点击时先创建空会话再开启采集。
 - [x] `openplay-ui` 发送消息 `InstanceRef not provided` 修复：避免 Trace 服务在 `promptAsync`/时间线链路中提前按无实例上下文初始化，恢复消息发送与时间线正常显示。
+- [x] `openplay-ui` Trace 阅读器请求/响应语义澄清：Readable 视图按 `llm.request` / `llm.response.completed` / `llm.stream.event` 分开渲染，避免把请求内容误看成模型响应。
 
 ## Changelog
 
@@ -160,3 +161,5 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 继续收口 `openplay-ui` Trace 入口语义：移除 roleplay 右侧面板上的“阅读器”按钮；消息输入框右下的 Trace 开关保留 `Trace` 标签，但不再显示“开启/关闭”文案，改为用“状态点 + Trace”表达当前会话状态，绿色表示开启，灰色表示关闭。
 - 2026-06-29: 最终收口 `openplay-ui` 输入区 Trace 状态点可见性：放弃按钮整体染色与主题变量绿点方案，改为中性按钮底板 + 固定高对比状态圆点；开启态使用亮绿色实心点并带浅色托底/外圈，关闭态使用灰色实心点，避免在当前主题下继续“看不出绿色”。
 - 2026-06-29: 修复 `openplay-ui` 发送消息后时间线报 `InstanceRef not provided`：`SessionPrompt` 与 `LLM` 不再在无实例请求上下文的服务初始化阶段提前解析 `SessionTrace.Service`，改为仅在具体会话执行时懒取 Trace 服务；补充 `promptAsync + trace enabled` HTTP API 回归测试，覆盖消息发送成功、消息落库与 Trace 记录可读。
+- 2026-06-29: 继续修复 `openplay-ui` 发送消息 `InstanceRef not provided`：定位到 `LLM` 流式事件 trace 写入使用 `Effect.runSync(trace.write(...))`，在异步流回调里脱离请求 fiber 后丢失 `InstanceRef`。现改为通过 `EffectBridge` 在已捕获的实例/工作区上下文内写 trace，并补充 `promptAsync` 流式回复回归测试。
+- 2026-06-29: 修复 `openplay-ui` Trace 阅读器里“response 看起来像 request”的展示歧义：问题不在 trace 采集，而在 Readable 视图把不同 kind 的 payload 混用同一套标题。现抽离 trace 格式化模块，分别按 `llm.request`、`llm.response.completed`、`llm.stream.event` 渲染，并补充前端单测，避免再次把请求内容误标成响应。
