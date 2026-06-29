@@ -1,6 +1,6 @@
 export * as Narrate from "./narrate"
 
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Schema } from "effect"
 import { parse as parseYaml } from "yaml"
 import {
   TOOL_PRESENTATION_PRIMARY_OUTPUT,
@@ -291,9 +291,10 @@ function generateNarrative(
       })
       .pipe(
         Effect.timeout("30 seconds"),
-        Effect.catchCause(() => {
+        Effect.catchCause((cause) => {
           if (fallbackContent) return Effect.succeed(undefined)
-          return Effect.fail(new Error("narrate LLM generation failed and no fallback content was provided"))
+          const message = Cause.squash(cause).message || "unknown error"
+          return Effect.fail(new Error(`narrate LLM generation failed: ${message}; no fallback content was provided`))
         }),
       )
 

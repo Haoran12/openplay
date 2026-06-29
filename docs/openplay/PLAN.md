@@ -231,11 +231,11 @@ shell, edit, write, read, glob, grep, task, task_status, fetch, search, question
   },
   "agent": {
     "director": {
-      "model": { "id": "claude-sonnet-4-20250514" },
+      "model": "anthropic/claude-sonnet-4-20250514",
       "isDirector": true
     },
     "孟缘": {
-      "model": { "id": "claude-sonnet-4-20250514" },
+      "model": "anthropic/claude-sonnet-4-20250514",
       "persona": "竹精灵，沉稳内敛...",
       "senses": { "vision": "Master", "hearing": "Adept" },
       "knowledgeAccess": ["Public", "Condition:修行者"]

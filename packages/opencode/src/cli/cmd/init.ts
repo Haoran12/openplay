@@ -19,6 +19,8 @@ interface RuntimeConfig {
   currentScene: string
 }
 
+const DEFAULT_DIRECTOR_MODEL = "anthropic/claude-sonnet-4-20250514"
+
 async function checkExistingWorld(targetDir: string): Promise<boolean> {
   return Filesystem.exists(join(targetDir, "openplay.json"))
 }
@@ -87,7 +89,7 @@ async function ensurePromptsReadme(targetDir: string): Promise<void> {
   )
 }
 
-function generateOpenplayJson(currentDate: string): string {
+export function generateOpenplayJson(currentDate: string): string {
   const id = `wld_${randomUUID().replace(/-/g, "")}`
   return JSON.stringify(
     {
@@ -105,7 +107,7 @@ function generateOpenplayJson(currentDate: string): string {
       },
       agent: {
         director: {
-          model: { id: "claude-sonnet-4-20250514" },
+          model: DEFAULT_DIRECTOR_MODEL,
           isDirector: true,
         },
       },

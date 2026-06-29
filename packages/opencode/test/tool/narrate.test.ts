@@ -211,6 +211,25 @@ describe("tool.narrate", () => {
     expect(result.metadata.source).toBe("fallback")
   })
 
+  test("preserves the provider error when llm generation fails without fallback content", async () => {
+    const tool = await Effect.runPromise(buildTool())
+
+    await expect(
+      Effect.runPromise(
+        tool.execute(
+          {
+            scene: {
+              time: "夜里",
+              location: "竹舍门前",
+            },
+            outcomes: "两人之间的气氛骤然紧绷。",
+          },
+          ctx(promptOps({ fail: true })),
+        ),
+      ),
+    ).rejects.toThrow("narrate LLM generation failed: provider timeout; no fallback content was provided")
+  })
+
   test("accepts yaml-like scene and characterSamples blocks from director tool calls", async () => {
     const tool = await Effect.runPromise(buildTool())
 
