@@ -80,6 +80,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Roleplay WebUI 右侧状态面板在场人物 name 支持弹出只读 `profile.yaml` 预览，使用对话框和高亮代码块展示。
 - [x] Roleplay WebUI 新增模型轨迹查看入口：右上角“切换文件树”左侧增加按钮，可按主会话 / Character SubAgent / 工具调用查看真实请求与响应内容。
 - [x] `openplay-ui` 会话级高保真 Trace：新增当前会话 Trace 开关、子代理继承、独立 JSONL 存储与 7 天保留、`GET /session/:id/trace` 查询接口，以及可读/原始双视图 Trace 阅读器
+- [x] `openplay-ui` Trace 开关位置收口与右侧面板宽度微调：移除 TopBar/状态面板中的重复 Trace 开关，将唯一会话级 Trace 开关移动到消息输入框右下、与 Model 选择器同一行且靠最右；同时略微上调审查 panel 与文件浏览 panel 默认宽度
 - [x] Director 同场景人物连续性修复：`embody` 复用同角色同场景 Character 子会话，保留完整子会话历史；场景连续性锚点改由内部 scene-state 维护，不再依赖 `runtime.yaml.current_scene.scene_id`，并对用户手改/损坏 `runtime.yaml` 保持 fail-open 降级。
 - [x] Director 人物连续性止血修复：修复 `SessionID is not defined` 运行时错误；连续性查找/复用失败时 `embody` 自动降级为 fresh Character 子会话，不能阻断当次采样；`scene_update(runtime.yaml)` 现自动刷新内部场景连续性状态，`openplay init` 不再默认写 `current_scene.scene_id`。
 - [x] Director 场景连续性锚点内置化：`scene_update` 全量覆盖 `runtime.yaml` 时，内部 scene-state 会按 `current_scene.date/location` 自动保留或切换场景 key，避免 `scene_id` 被覆盖后人物连续性丢失。
@@ -154,3 +155,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 调整 `openplay-ui` 右上角会话 Trace 开关语义：即使全局 Trace 服务尚未开启也始终显示并可点击；点击开启当前会话 Trace 时会先自动打开全局 OpenPlay Trace 服务，再写入会话级 `trace.enabled`；点击关闭时只关闭当前会话采集，不连带关闭全局服务。
 - 2026-06-29: 修复 `openplay-ui` Trace 阅读器空白问题的服务端根因：`SessionTrace.write()` 现统一按真实根会话归档 JSONL，避免多层子会话把记录写进错误分桶后导致 `/session/:id/trace` 查不到；同时父会话切换 `trace.enabled` 时会同步到既有子会话，避免角色/子代理复用旧会话后继续处于未采集状态。新增 HTTP API 回归测试覆盖“父会话开启 Trace 后，孙级子会话写入的 LLM 记录可被 Trace 阅读器读到”。
 - 2026-06-29: 修复 `openplay-ui` 新会话页的会话级 Trace 开关缺失：此前 `/session` 草稿页因尚未分配 `sessionID`，header 与 Roleplay 侧栏都会把 Trace 开关整体隐藏。现改为只要位于会话目录路由就显示开关；首次点击时前端会先创建空会话、同步本地会话列表与 handoff 状态，再立即写入 `trace.enabled`。同时将 header 的 Trace 控件从 `md` 响应式隐藏组中拆出，避免窄窗口下入口再次消失。
+- 2026-06-29: 调整 `openplay-ui` Trace 开关布局并微调右侧面板宽度：移除会话 TopBar 与 Roleplay 状态面板中的 Trace 开关，仅保留消息输入框右下、与 Model 选择器同一行且位于最右侧的一处统一入口；同时将文件浏览 panel 与审查 panel 的默认宽度小幅上调，并为旧的默认持久化宽度补迁移，避免升级后仍停留在过窄值。

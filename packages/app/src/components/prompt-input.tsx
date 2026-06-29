@@ -35,6 +35,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
+import { SessionTraceToggle } from "@/components/session/session-trace-toggle"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
@@ -1603,6 +1604,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         </TooltipKeybind>
                       </div>
                     </Show>
+                    <div
+                      data-component="prompt-trace-control"
+                      class="ml-auto"
+                      style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
+                    >
+                      <SessionTraceToggle
+                        class="min-w-[96px] h-7 px-2.5 box-border gap-1.5 border text-13-regular"
+                        style={control()}
+                      />
+                    </div>
                   </Show>
                 </Show>
               </div>

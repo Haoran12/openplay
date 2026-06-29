@@ -15,8 +15,8 @@ import { createPathHelpers } from "./file/path"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 const DEFAULT_SIDEBAR_WIDTH = 344
-const DEFAULT_FILE_TREE_WIDTH = 200
-const DEFAULT_SESSION_WIDTH = 600
+const DEFAULT_FILE_TREE_WIDTH = 240
+const DEFAULT_SESSION_WIDTH = 660
 const DEFAULT_TERMINAL_HEIGHT = 280
 export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
 
@@ -168,8 +168,19 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         return {
           ...fileTree,
           opened: true,
-          width: width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
+          width: width === 200 || width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
           tab: "changes",
+        }
+      })()
+
+      const migratedSession = (() => {
+        const session = value.session
+        if (!isRecord(session)) return session
+        const width = typeof session.width === "number" ? session.width : DEFAULT_SESSION_WIDTH
+        if (width !== 600) return session
+        return {
+          ...session,
+          width: DEFAULT_SESSION_WIDTH,
         }
       })()
 
@@ -213,7 +224,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         migratedSidebar === sidebar &&
         migratedReview === review &&
         migratedFileTree === fileTree &&
-        migratedSessionTabs === sessionTabs
+        migratedSessionTabs === sessionTabs &&
+        migratedSession === value.session
       ) {
         return value
       }
@@ -223,6 +235,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         sidebar: migratedSidebar,
         review: migratedReview,
         fileTree: migratedFileTree,
+        session: migratedSession,
         sessionTabs: migratedSessionTabs,
       }
     }

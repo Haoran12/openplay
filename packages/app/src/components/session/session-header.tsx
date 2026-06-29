@@ -8,12 +8,10 @@ import { Spinner } from "@openplay-ai/ui/spinner"
 import { showToast } from "@openplay-ai/ui/toast"
 import { Tooltip, TooltipKeybind } from "@openplay-ai/ui/tooltip"
 import { getFilename } from "@openplay-ai/core/util/path"
-import { useNavigate } from "@solidjs/router"
 import { createEffect, createMemo, createResource, createSignal, For, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import { useCommand } from "@/context/command"
-import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
@@ -22,12 +20,10 @@ import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
 import { useSDK } from "@/context/sdk"
-import { useLocal } from "@/context/local"
 import { focusTerminalById } from "@/pages/session/helpers"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { messageAgentColor } from "@/utils/agent"
 import { decode64 } from "@/utils/base64"
-import { ensureSession, upsertSession } from "@/utils/ensure-session"
 import { isRoleplayMode } from "@/utils/roleplay"
 import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover } from "../status-popover"
@@ -140,7 +136,6 @@ const showRequestError = (language: ReturnType<typeof useLanguage>, err: unknown
 export function SessionHeader() {
   const layout = useLayout()
   const command = useCommand()
-  const globalSync = useGlobalSync()
   const server = useServer()
   const platform = usePlatform()
   const language = useLanguage()
@@ -148,9 +143,7 @@ export function SessionHeader() {
   const sync = useSync()
   const terminal = useTerminal()
   const sdk = useSDK()
-  const local = useLocal()
   const dialog = useDialog()
-  const navigate = useNavigate()
   const { params, view } = useSessionLayout()
 
   const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
@@ -245,9 +238,7 @@ export function SessionHeader() {
     messageAgentColor(params.id ? sync.data.message[params.id] : undefined, sync.data.agent),
   )
   const roleplaySession = createMemo(() => isRoleplayMode(sync.data.path.world) && !!params.id)
-  const currentSession = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
-  const traceEnabled = createMemo(() => currentSession()?.trace?.enabled === true)
-  const [traceMeta, { refetch: refetchTraceMeta }] = createResource(
+  const [traceMeta] = createResource(
     () => params.id,
     async (sessionID) => {
       if (!sessionID) return undefined
@@ -259,85 +250,12 @@ export function SessionHeader() {
       return response.data?.meta
     },
   )
-  const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
-  const traceToggleVisible = createMemo(() => settings.trace.showSessionToggle() && !!params.dir)
   const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
-  const traceTooltip = createMemo(() => {
-    if (traceEnabled() && !traceAvailable()) return language.t("trace.header.unavailable")
-    if (!traceAvailable()) return language.t("trace.header.enableGlobal")
-    return traceEnabled() ? language.t("trace.header.disable") : language.t("trace.header.enable")
-  })
 
   const openTraceDialog = () => {
     const sessionID = params.id
     if (!sessionID) return
     dialog.show(() => <SessionTraceDialog sessionID={sessionID} />)
-  }
-
-  const ensureCurrentSession = async () => {
-    const directory = projectDirectory()
-    if (!directory) return
-    return ensureSession({
-      currentSessionID: params.id,
-      directory,
-      createSession: async () => {
-        const response = await sdk.client.session.create()
-        return response.data ?? undefined
-      },
-      onCreated: (session) => {
-        const [, setStore] = globalSync.child(directory)
-        setStore("session", (list) => upsertSession(list, session))
-      },
-      promoteSession: (dir, sessionID) => {
-        local.session.promote(dir, sessionID)
-      },
-      handoffTabs: (directorySlug, sessionID) => {
-        layout.handoff.setTabs(directorySlug, sessionID)
-      },
-      navigate,
-    })
-  }
-
-  const toggleTrace = async () => {
-    const sessionID = await ensureCurrentSession()
-    if (!sessionID) return
-    const nextEnabled = !traceEnabled()
-    try {
-      if (nextEnabled && !traceAvailable()) {
-        await sdk.client.config.update({
-          config: {
-            ...sync.data.config,
-            server: {
-              ...(sync.data.config.server ?? {}),
-              trace: {
-                ...sync.data.config.server?.trace,
-                enabled: true,
-              },
-            },
-          },
-        })
-      }
-      await sdk.client.session.update({
-        sessionID,
-        trace: { enabled: nextEnabled },
-      })
-      const response = await sdk.client.session.trace({
-        sessionID,
-        includeSubagents: false,
-        limit: 1,
-      })
-      void refetchTraceMeta()
-      await sync.session.sync(sessionID, { force: true })
-      if (response.data?.meta.available === false) {
-        showToast({
-          variant: "error",
-          title: language.t("trace.header.globalStillOff"),
-          description: language.t("trace.header.globalStillOffDescription"),
-        })
-      }
-    } catch (err: unknown) {
-      showRequestError(language, err)
-    }
   }
 
   const selectApp = (app: OpenApp) => {
@@ -556,39 +474,6 @@ export function SessionHeader() {
                     </Button>
                   </TooltipKeybind>
                 </Show>
-
-              <div class="flex items-center gap-1 shrink-0">
-                <Show when={traceToggleVisible()}>
-                  <Tooltip placement="bottom" value={traceTooltip()}>
-                    <Button
-                      variant="ghost"
-                      class="titlebar-icon min-w-[96px] h-6 px-2.5 box-border gap-1.5 border"
-                      classList={{
-                        "border-[var(--color-success)]/30 bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] text-text-strong":
-                          traceEnabled() && traceAvailable(),
-                        "border-[var(--syntax-warning)]/35 bg-[color:color-mix(in_srgb,var(--syntax-warning)_14%,transparent)] text-text-strong":
-                          traceEnabled() && !traceAvailable(),
-                        "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled(),
-                      }}
-                      onClick={() => void toggleTrace()}
-                      aria-pressed={traceEnabled()}
-                      aria-label={traceTooltip()}
-                    >
-                      <span
-                        class="inline-block w-2 h-2 rounded-full shadow-[0_0_0_2px_var(--background-base)]"
-                        classList={{
-                          "bg-[var(--color-success)]": traceEnabled(),
-                          "bg-[var(--syntax-warning)]": traceEnabled() && !traceAvailable(),
-                          "bg-border-strong": !traceEnabled(),
-                        }}
-                      />
-                      <span class="text-11-medium">
-                        {traceEnabled() ? language.t("trace.status.on") : language.t("trace.status.off")}
-                      </span>
-                    </Button>
-                  </Tooltip>
-                </Show>
-
                 <Show when={params.id}>
                   <Tooltip
                     placement="bottom"
@@ -607,7 +492,6 @@ export function SessionHeader() {
                     </Button>
                   </Tooltip>
                 </Show>
-              </div>
 
               <div class="hidden md:flex items-center gap-1 shrink-0">
                   <TooltipKeybind
