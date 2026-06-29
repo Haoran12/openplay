@@ -133,8 +133,8 @@ export const SessionTraceDialog: Component<{
       class="h-full min-h-0 overflow-hidden"
     >
       <div class="grid h-full min-h-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <div class="min-h-0 overflow-hidden rounded-xl border border-border-weaker-base bg-surface-panel">
-          <div class="border-b border-border-weaker-base px-4 py-3 space-y-3">
+        <div class="flex flex-col min-h-0 overflow-hidden rounded-xl border border-border-weaker-base bg-surface-panel">
+          <div class="flex-shrink-0 border-b border-border-weaker-base px-4 py-3 space-y-3">
             <div class="flex items-center justify-between gap-3">
               <div class="text-12-medium uppercase tracking-wider text-text-weak">{language.t("trace.dialog.entries")}</div>
               <Button
@@ -173,7 +173,7 @@ export const SessionTraceDialog: Component<{
               />
             </div>
           </div>
-          <div class="h-full min-h-0 overflow-y-auto p-3">
+          <div class="flex-1 min-h-0 overflow-y-auto p-3">
             <Show when={items().length > 0} fallback={<div class="px-2 py-4 text-13-regular text-text-weak">{language.t("trace.empty")}</div>}>
               <div class="flex flex-col gap-3">
                 <For each={items()}>
