@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError } from "ai"
 import { MessageV2 } from "../../src/session/message-v2"
-import { isRoleplayDirectorTurnComplete } from "../../src/session/prompt"
+import { isRoleplayDirectorTurnComplete, shouldExitPromptLoop } from "../../src/session/prompt"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "../../src/provider/schema"
@@ -1760,6 +1760,87 @@ describe("session.message-v2.latest", () => {
         world: { rootPath: "/tmp/world" },
         agent: { isDirector: true },
         parts,
+      }),
+    ).toBe(true)
+  })
+
+  test("prompt loop stays alive for provider-executed director tool calls until the turn is narratively complete", () => {
+    const parts: MessageV2.Part[] = [
+      {
+        ...basePart("msg_assistant_roleplay_4", "prt_embody_4"),
+        type: "tool",
+        callID: "call_embody_4",
+        tool: "embody",
+        metadata: { providerExecuted: true },
+        state: {
+          status: "completed",
+          input: { character: "孟缘" },
+          output: "{}",
+          title: "Embody: 孟缘",
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      },
+    ]
+
+    expect(
+      shouldExitPromptLoop({
+        world: { rootPath: "/tmp/world" },
+        agent: { isDirector: true },
+        lastUserID: MessageID.make("msg_user_roleplay_4"),
+        lastAssistant: {
+          id: MessageID.make("msg_z_assistant_roleplay_4"),
+          finish: "stop",
+        },
+        lastAssistantParts: parts,
+      }),
+    ).toBe(false)
+  })
+
+  test("prompt loop can exit after provider-executed director tools once narrate completes the turn", () => {
+    const parts: MessageV2.Part[] = [
+      {
+        ...basePart("msg_assistant_roleplay_5", "prt_embody_5"),
+        type: "tool",
+        callID: "call_embody_5",
+        tool: "embody",
+        metadata: { providerExecuted: true },
+        state: {
+          status: "completed",
+          input: { character: "孟缘" },
+          output: "{}",
+          title: "Embody: 孟缘",
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      },
+      {
+        ...basePart("msg_assistant_roleplay_5", "prt_narrate_5"),
+        type: "tool",
+        callID: "call_narrate_5",
+        tool: "narrate",
+        metadata: { providerExecuted: true },
+        state: {
+          status: "completed",
+          input: { content: "夜色落定。" },
+          output: "夜色落定。",
+          title: "Narrate",
+          metadata: {},
+          time: { start: 3, end: 4 },
+        },
+      },
+    ]
+
+    expect(
+      shouldExitPromptLoop({
+        world: { rootPath: "/tmp/world" },
+        agent: { isDirector: true },
+        lastUserID: MessageID.make("msg_user_roleplay_5"),
+        lastAssistant: {
+          id: MessageID.make("msg_z_assistant_roleplay_5"),
+          finish: "stop",
+        },
+        lastAssistantParts: parts,
       }),
     ).toBe(true)
   })

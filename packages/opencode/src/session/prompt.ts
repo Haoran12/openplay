@@ -144,6 +144,29 @@ export function isRoleplayDirectorTurnComplete(input: {
   return hasNarrate || hasQuestion
 }
 
+export function shouldExitPromptLoop(input: {
+  world: unknown
+  agent: Pick<Agent.Info, "isDirector">
+  lastUserID: MessageID
+  lastAssistant: Pick<MessageV2.Assistant, "id" | "finish"> | undefined
+  lastAssistantParts: readonly MessageV2.Part[]
+}) {
+  const hasPendingToolLoop =
+    input.lastAssistantParts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ||
+    !isRoleplayDirectorTurnComplete({
+      world: input.world,
+      agent: input.agent,
+      parts: input.lastAssistantParts,
+    })
+
+  return Boolean(
+    input.lastAssistant?.finish &&
+      !["tool-calls"].includes(input.lastAssistant.finish) &&
+      !hasPendingToolLoop &&
+      input.lastUserID < input.lastAssistant.id,
+  )
+}
+
 function referencePromptMetadata(input: unknown): ReferencePromptMetadata | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return
   const record = input as Record<string, unknown>
@@ -1746,21 +1769,26 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
           if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
 
+          const agent = yield* agents.get(lastUser.agent)
+          if (!agent) {
+            const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
+            const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
+            const error = new NamedError.Unknown({ message: `Agent not found: "${lastUser.agent}".${hint}` })
+            yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+            throw error
+          }
+
           const lastAssistantMsg = msgs.findLast(
             (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistant?.id,
           )
-          // Some providers return "stop" even when the assistant message contains tool calls.
-          // Keep the loop running so tool results can be sent back to the model.
-          // Skip provider-executed tool parts — those were fully handled within the
-          // provider's stream (e.g. DWS Agent Platform) and don't need a re-loop.
-          const hasToolCalls =
-            lastAssistantMsg?.parts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ?? false
-
           if (
-            lastAssistant?.finish &&
-            !["tool-calls"].includes(lastAssistant.finish) &&
-            !hasToolCalls &&
-            lastUser.id < lastAssistant.id
+            shouldExitPromptLoop({
+              world: ctx.world,
+              agent,
+              lastUserID: lastUser.id,
+              lastAssistant,
+              lastAssistantParts: lastAssistantMsg?.parts ?? [],
+            })
           ) {
             yield* slog.info("exiting loop")
             break
@@ -1804,14 +1832,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             continue
           }
 
-          const agent = yield* agents.get(lastUser.agent)
-          if (!agent) {
-            const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-            const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-            const error = new NamedError.Unknown({ message: `Agent not found: "${lastUser.agent}".${hint}` })
-            yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-            throw error
-          }
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
           msgs = yield* insertReminders({ messages: msgs, agent, session })

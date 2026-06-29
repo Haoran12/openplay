@@ -99,9 +99,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器 PAYLOAD 消息智能解析：未知 trace kind 的 payload 现自动识别常见结构（role/content 字段、messages 数组、request/response 结构），转义字符（\n/\"/\\t 等）还原为可读形式，最终以 `{ROLE}> {可读内容}` 格式展示。
 - [x] `openplay-ui` Trace 阅读器完整改进：新增 payload.type 字段作为 ROLE 提取、session.compose 专用解析、tools 完整显示、移除内容截断限制，所有消息在可读视图下显示完整内容。
 - [x] `openplay-ui` Trace 阅读器代码块转义字符统一处理：tool-call input 与 tool-result output 现统一调用 `unescapeString` / `unescapedStrings`，确保 `\n`/`\t`/`\"` 等转义序列在所有场景下正确渲染为可读形式。
+- [x] Director workflow 提前退出修复：provider-executed 工具调用后，若仅完成人物采样而尚未 `narrate` / `question` 收束，本轮会继续 prompt loop 而不会被误判为完成。
 
 ## Changelog
 
+- 2026-06-29: 修复 Director 在 workflow/provider-executed 工具调用后的提前退出：`session.prompt` 主循环新增显式退出判定，只有在非 provider 工具调用已处理完且 Roleplay Director 回合已完成叙事收束时才退出；避免 Astron / workflow 模型执行 `embody` 等工具后因为 `finish=stop` 被误判结束。补充回归测试覆盖“provider-executed + 仅 embody 不应退出”和“provider-executed + narrate 后允许退出”两条路径。
 - 2026-06-29: 修复 `openplay-ui` / Roleplay 历史会话中的坏 `tool.state.input` 兼容问题：`MessageV2` 与 `Session` 读取/写入边界现统一把字符串、数组或其他非对象工具输入归一化为对象（优先解析 JSON，失败则保留为 `{ raw: ... }`），避免旧 `narrate` 记录在页面加载、消息接口和后续模型历史重放时触发 `Expected object`；补充分页读取回归测试覆盖该类历史脏数据。
 - 2026-06-29: 修复 `narrate` 结构化入参过严导致的 tool-call 解码失败：`scene` 与 `characterSamples` 现同时接受标准 JSON 结构、单对象以及 YAML 风格文本块，并在 `narrate` 内部统一解析归一化；补充回归测试覆盖 Director 产出 `time: ...` / `- name: ...` 这类半结构化嵌套参数的场景。
 - 2026-06-29: 完成 P2-2 Director / narrate 职责拆分：`roleplay` 新增 `narrateModel` 配置；`narrate` 改为支持结构化 `scene` / `characterSamples` / `outcomes` 输入并在内部调用 LLM 生成正文，支持 POV 约束、失败回退到 `content`、专用 prompt 模板；Director 提示词同步改为只负责组织结构化叙事输入，并补充 `narrate` 工具回归测试。
