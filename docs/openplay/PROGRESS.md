@@ -86,6 +86,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director 场景切换判定收紧：短时/短距导致的 `date/location` 变化不再自动切场；只有显式 `# openplay: scene_transition=switch` 才会轮换内部 scene key。
 - [x] Director 会话边界接入场景边界：新建 Director 会话会自动轮换内部 scene key，不再复用旧会话的场景连续性。
 - [x] Embody 显式注入场景时间地点：Character 子代理每轮固定收到从 `runtime.yaml` 抽取的当前时间/地点锚点，降低连续子会话中的日期地点幻觉。
+- [x] `openplay-ui` 新会话 Trace 开关可达性修复：无 `sessionID` 的新会话页也显示会话级 Trace 开关，首次点击时先创建空会话再开启采集。
 
 ## Changelog
 
@@ -152,3 +153,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 修复 `openplay-ui` 会话 header Trace 开关初始化顺序错误：`traceToggleVisible` 不再先于 `traceAvailable` 建立 memo，避免 Vite 开发页加载时触发 `ReferenceError: can't access lexical declaration 'traceAvailable' before initialization`。
 - 2026-06-29: 调整 `openplay-ui` 右上角会话 Trace 开关语义：即使全局 Trace 服务尚未开启也始终显示并可点击；点击开启当前会话 Trace 时会先自动打开全局 OpenPlay Trace 服务，再写入会话级 `trace.enabled`；点击关闭时只关闭当前会话采集，不连带关闭全局服务。
 - 2026-06-29: 修复 `openplay-ui` Trace 阅读器空白问题的服务端根因：`SessionTrace.write()` 现统一按真实根会话归档 JSONL，避免多层子会话把记录写进错误分桶后导致 `/session/:id/trace` 查不到；同时父会话切换 `trace.enabled` 时会同步到既有子会话，避免角色/子代理复用旧会话后继续处于未采集状态。新增 HTTP API 回归测试覆盖“父会话开启 Trace 后，孙级子会话写入的 LLM 记录可被 Trace 阅读器读到”。
+- 2026-06-29: 修复 `openplay-ui` 新会话页的会话级 Trace 开关缺失：此前 `/session` 草稿页因尚未分配 `sessionID`，header 与 Roleplay 侧栏都会把 Trace 开关整体隐藏。现改为只要位于会话目录路由就显示开关；首次点击时前端会先创建空会话、同步本地会话列表与 handoff 状态，再立即写入 `trace.enabled`。同时将 header 的 Trace 控件从 `md` 响应式隐藏组中拆出，避免窄窗口下入口再次消失。

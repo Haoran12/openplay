@@ -2,15 +2,23 @@ import { createResource, createMemo, createSignal, For, Show, type Component } f
 import type { Agent, Message, Part, ToolPart, UserMessage, WorldInfo } from "@openplay-ai/sdk/v2/client"
 import { Dialog } from "@openplay-ai/ui/dialog"
 import { Markdown } from "@openplay-ai/ui/markdown"
+import { Button } from "@openplay-ai/ui/button"
+import { Tooltip } from "@openplay-ai/ui/tooltip"
+import { showToast } from "@openplay-ai/ui/toast"
+import { useNavigate } from "@solidjs/router"
+import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { useSync } from "@/context/sync"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useLayout } from "@/context/layout"
+import { useLocal } from "@/context/local"
+import { useSettings } from "@/context/settings"
 import { useDialog } from "@openplay-ai/ui/context/dialog"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { agentDisplayName } from "@/utils/roleplay"
 import { agentColor } from "@/utils/agent"
+import { ensureSession, upsertSession } from "@/utils/ensure-session"
 import { SessionTraceDialog } from "@/components/session/session-trace-dialog"
 
 type RuntimeCharacter = NonNullable<WorldInfo["presentCharacters"]>[number]
@@ -388,12 +396,16 @@ const CharacterWithRuntimeCard: Component<{
 }
 
 export const SessionRoleplayPanel: Component = () => {
+  const globalSync = useGlobalSync()
   const language = useLanguage()
+  const local = useLocal()
   const sync = useSync()
   const sdk = useSDK()
   const file = useFile()
   const layout = useLayout()
+  const settings = useSettings()
   const dialog = useDialog()
+  const navigate = useNavigate()
   const { params, tabs, view } = useSessionLayout()
 
   const world = () => sync.data.path.world
@@ -406,6 +418,21 @@ export const SessionRoleplayPanel: Component = () => {
     return id ? sync.session.get(id) : undefined
   })
   const traceEnabled = createMemo(() => session()?.trace?.enabled === true)
+  const [traceMeta, { refetch: refetchTraceMeta }] = createResource(
+    sessionID,
+    async (id) => {
+      if (!id) return undefined
+      const response = await sdk.client.session.trace({
+        sessionID: id,
+        includeSubagents: false,
+        limit: 1,
+      })
+      return response.data?.meta
+    },
+  )
+  const traceAvailable = createMemo(() => traceMeta()?.available ?? true)
+  const traceRetentionDays = createMemo(() => traceMeta()?.retentionDays ?? 7)
+  const traceToggleVisible = createMemo(() => settings.trace.showSessionToggle() && !!params.dir)
   const worldRoot = createMemo(() => world()?.rootPath)
   const worldConfigPath = createMemo(() => world()?.configPath)
 
@@ -455,6 +482,86 @@ export const SessionRoleplayPanel: Component = () => {
         />
       ))
     })()
+  }
+
+  const traceTooltip = createMemo(() => {
+    if (traceEnabled() && !traceAvailable()) return language.t("trace.header.unavailable")
+    if (!traceAvailable()) return language.t("trace.header.enableGlobal")
+    return traceEnabled() ? language.t("trace.header.disable") : language.t("trace.header.enable")
+  })
+
+  const showRequestError = (err: unknown) => {
+    showToast({
+      variant: "error",
+      title: language.t("common.requestFailed"),
+      description: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  const ensureCurrentSession = async () => {
+    const directory = sdk.directory
+    if (!directory) return
+    return ensureSession({
+      currentSessionID: sessionID(),
+      directory,
+      createSession: async () => {
+        const response = await sdk.client.session.create()
+        return response.data ?? undefined
+      },
+      onCreated: (session) => {
+        const [, setStore] = globalSync.child(directory)
+        setStore("session", (list) => upsertSession(list, session))
+      },
+      promoteSession: (dir, id) => {
+        local.session.promote(dir, id)
+      },
+      handoffTabs: (directorySlug, id) => {
+        layout.handoff.setTabs(directorySlug, id)
+      },
+      navigate,
+    })
+  }
+
+  const toggleTrace = async () => {
+    const id = await ensureCurrentSession()
+    if (!id) return
+    const nextEnabled = !traceEnabled()
+    try {
+      if (nextEnabled && !traceAvailable()) {
+        await sdk.client.config.update({
+          config: {
+            ...sync.data.config,
+            server: {
+              ...(sync.data.config.server ?? {}),
+              trace: {
+                ...sync.data.config.server?.trace,
+                enabled: true,
+              },
+            },
+          },
+        })
+      }
+      await sdk.client.session.update({
+        sessionID: id,
+        trace: { enabled: nextEnabled },
+      })
+      const response = await sdk.client.session.trace({
+        sessionID: id,
+        includeSubagents: false,
+        limit: 1,
+      })
+      void refetchTraceMeta()
+      await sync.session.sync(id, { force: true })
+      if (response.data?.meta.available === false) {
+        showToast({
+          variant: "error",
+          title: language.t("trace.header.globalStillOff"),
+          description: language.t("trace.header.globalStillOffDescription"),
+        })
+      }
+    } catch (err: unknown) {
+      showRequestError(err)
+    }
   }
 
   const sceneRows = createMemo(() => {
@@ -599,6 +706,36 @@ export const SessionRoleplayPanel: Component = () => {
               </span>
             </div>
             <div class="flex items-center gap-3">
+              <Show when={traceToggleVisible()}>
+                <Tooltip placement="bottom" value={traceTooltip()}>
+                  <Button
+                    variant="ghost"
+                    class="min-w-[96px] h-7 px-2.5 box-border gap-1.5 border"
+                    classList={{
+                      "border-[var(--color-success)]/30 bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] text-text-strong":
+                        traceEnabled() && traceAvailable(),
+                      "border-[var(--syntax-warning)]/35 bg-[color:color-mix(in_srgb,var(--syntax-warning)_14%,transparent)] text-text-strong":
+                        traceEnabled() && !traceAvailable(),
+                      "border-border-weak-base bg-surface-panel text-text-weak": !traceEnabled(),
+                    }}
+                    onClick={() => void toggleTrace()}
+                    aria-pressed={traceEnabled()}
+                    aria-label={traceTooltip()}
+                  >
+                    <span
+                      class="inline-block h-2 w-2 rounded-full"
+                      classList={{
+                        "bg-[var(--color-success)]": traceEnabled(),
+                        "bg-[var(--syntax-warning)]": traceEnabled() && !traceAvailable(),
+                        "bg-border-strong": !traceEnabled(),
+                      }}
+                    />
+                    <span class="text-11-medium">
+                      {traceEnabled() ? language.t("trace.status.on") : language.t("trace.status.off")}
+                    </span>
+                  </Button>
+                </Tooltip>
+              </Show>
               <Show when={sessionID()}>
                 <button
                   class="text-12-medium text-text-interactive-base hover:text-text-interactive-hover transition-colors"
