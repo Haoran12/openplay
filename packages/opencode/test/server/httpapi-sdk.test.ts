@@ -133,6 +133,17 @@ function providerConfig(url: string) {
   }
 }
 
+function providerConfigWithTrace(url: string) {
+  return {
+    ...providerConfig(url),
+    server: {
+      trace: {
+        enabled: true,
+      },
+    },
+  }
+}
+
 function call<T>(request: () => Promise<T>) {
   return Effect.promise(request)
 }
@@ -800,6 +811,82 @@ describe("HttpApi SDK", () => {
         }
       }),
     ),
+  )
+
+  serverPathParity("keeps promptAsync working when session trace is enabled", (serverPath) =>
+    Effect.gen(function* () {
+      const llm = yield* TestLLMServer
+      return yield* withProject(
+        serverPath,
+        {
+          config: providerConfigWithTrace(llm.url),
+        },
+        ({ sdk }) =>
+          Effect.gen(function* () {
+            yield* llm.text("async trace world", { usage: { input: 13, output: 9 } })
+            const session = yield* capture(() =>
+              sdk.session.create({
+                title: "prompt async trace",
+                permission: [{ permission: "*", pattern: "*", action: "allow" }],
+                trace: { enabled: true },
+              }),
+            )
+            const sessionID = String(record(session.data).id)
+            const asyncPrompt = yield* capture(() =>
+              sdk.session.promptAsync({
+                sessionID,
+                agent: "build",
+                model: { providerID: "test", modelID: "test-model" },
+                noReply: true,
+                parts: [{ type: "text", text: "async trace hello" }],
+              }),
+            )
+
+            const messages = yield* call(async () => {
+              for (let attempt = 0; attempt < 20; attempt++) {
+                const result = await sdk.session.messages({ sessionID })
+                const body = array(result.data)
+                if (JSON.stringify(body).includes("async trace hello")) return result
+                await Bun.sleep(50)
+              }
+              return await sdk.session.messages({ sessionID })
+            })
+
+            const trace = yield* capture(() =>
+              sdk.session.trace({
+                sessionID,
+                includeSubagents: true,
+              }),
+            )
+
+            return {
+              statuses: statuses({
+                session,
+                asyncPrompt,
+                messages: {
+                  status: messages.response.status,
+                  data: messages.data,
+                  error: messages.error,
+                },
+                trace,
+              }),
+              messageTexts: array(messages.data)
+                .flatMap((item) => array(record(item).parts))
+                .map((part) => record(part).text)
+                .filter((text): text is string => typeof text === "string")
+                .sort(),
+            }
+          }).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                expect(result.statuses.asyncPrompt).toBe(204)
+                expect(result.statuses.trace).toBe(200)
+                expect(result.messageTexts).toContain("async trace hello")
+              }),
+            ),
+          ),
+      )
+    }).pipe(Effect.provide(TestLLMServer.layer)),
   )
 
   serverPathParity("matches generated SDK prompt streaming through fake LLM", (serverPath) =>

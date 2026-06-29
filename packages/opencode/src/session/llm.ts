@@ -80,9 +80,9 @@ const live: Layer.Layer<
     const plugin = yield* Plugin.Service
     const perm = yield* Permission.Service
     const flags = yield* RuntimeFlags.Service
-    const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
+      const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
       const l = log
         .clone()
         .tag("providerID", input.model.providerID)

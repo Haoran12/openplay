@@ -88,6 +88,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director 会话边界接入场景边界：新建 Director 会话会自动轮换内部 scene key，不再复用旧会话的场景连续性。
 - [x] Embody 显式注入场景时间地点：Character 子代理每轮固定收到从 `runtime.yaml` 抽取的当前时间/地点锚点，降低连续子会话中的日期地点幻觉。
 - [x] `openplay-ui` 新会话 Trace 开关可达性修复：无 `sessionID` 的新会话页也显示会话级 Trace 开关，首次点击时先创建空会话再开启采集。
+- [x] `openplay-ui` 发送消息 `InstanceRef not provided` 修复：避免 Trace 服务在 `promptAsync`/时间线链路中提前按无实例上下文初始化，恢复消息发送与时间线正常显示。
 
 ## Changelog
 
@@ -158,3 +159,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 调整 `openplay-ui` Trace 开关布局并微调右侧面板宽度：移除会话 TopBar 与 Roleplay 状态面板中的 Trace 开关，仅保留消息输入框右下、与 Model 选择器同一行且位于最右侧的一处统一入口；同时将文件浏览 panel 与审查 panel 的默认宽度小幅上调，并为旧的默认持久化宽度补迁移，避免升级后仍停留在过窄值。
 - 2026-06-29: 继续收口 `openplay-ui` Trace 入口语义：移除 roleplay 右侧面板上的“阅读器”按钮；消息输入框右下的 Trace 开关保留 `Trace` 标签，但不再显示“开启/关闭”文案，改为用“状态点 + Trace”表达当前会话状态，绿色表示开启，灰色表示关闭。
 - 2026-06-29: 最终收口 `openplay-ui` 输入区 Trace 状态点可见性：放弃按钮整体染色与主题变量绿点方案，改为中性按钮底板 + 固定高对比状态圆点；开启态使用亮绿色实心点并带浅色托底/外圈，关闭态使用灰色实心点，避免在当前主题下继续“看不出绿色”。
+- 2026-06-29: 修复 `openplay-ui` 发送消息后时间线报 `InstanceRef not provided`：`SessionPrompt` 与 `LLM` 不再在无实例请求上下文的服务初始化阶段提前解析 `SessionTrace.Service`，改为仅在具体会话执行时懒取 Trace 服务；补充 `promptAsync + trace enabled` HTTP API 回归测试，覆盖消息发送成功、消息落库与 Trace 记录可读。

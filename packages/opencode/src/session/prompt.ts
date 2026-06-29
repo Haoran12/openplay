@@ -249,7 +249,6 @@ export const layer = Layer.effect(
     const summary = yield* SessionSummary.Service
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
-    const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
     const references = yield* Reference.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
@@ -1963,6 +1962,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+            const trace = Option.getOrUndefined(yield* Effect.serviceOption(SessionTrace.Service))
             if (trace) {
               yield* trace.write({
                 sessionID,
