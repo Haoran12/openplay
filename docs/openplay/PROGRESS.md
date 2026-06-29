@@ -202,3 +202,5 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-29: 清理废弃文件：删除未被引用的 `session/prompt/director.txt`，实际使用的是 `agent/prompt/director.txt`。
 - 2026-06-29: 修复 Director `narrate` 未知错误与嵌套 prompt 冲突：`narrate` 的 LLM 生成改为使用独立子会话（类似 `embody` 的 Character 子会话模式），避免在 Director 已运行的 prompt loop 内部嵌套调用同一 session 的 prompt 导致状态冲突；错误消息提取改用 `Cause.pretty(cause)` 兜底，确保 defect 类型错误也能输出可读信息而非泛化的 "unknown error"。
 - 2026-06-30: 修复 `narrate` TimeoutError（硬编码 30 秒 → 可配置 `roleplay.narrateTimeoutSeconds`，默认 90 秒）；角色模型配置新增 `roleplay.characterModel` 统一回退字段；前端新增子代理模型选择对话框 (`DialogSubagentModels`)，支持 Director/Character/GM/Narrate 各槽位独立选模型及添加新 Provider；按钮入口位于消息输入区 ModelSelectorPopover 旁。
+- 2026-06-30: 修复"子智能体模型"按钮与"选择模型"按钮布局错位：`prompt-model-control` 容器改为 `flex items-center gap-1`，确保两个按钮在同一行、同一高度正常排列。
+- 2026-06-30: GM/Director 提示词补全世界目录结构地图：`gm.txt` 新增"世界目录结构"章节，将"地区设定/人物档案/势力动态/事件记录"映射到具体路径（`location_and_faction/`、`characters/`、`social/`、`records/`），并描述人物目录内部 `knowledge/` 契约；`director.txt` 新增"World Directory Layout"章节并改进 GM 调用示例，补充搜索路径提示。解决 GM 子代理不理解 rp 目录结构的问题。
