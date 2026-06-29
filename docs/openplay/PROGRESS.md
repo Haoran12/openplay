@@ -94,9 +94,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器流式回复收口：舍弃逐 chunk 的 `llm.stream.event` 列表项，一次回复只保留一条聚合完成记录，`可读` 标签直接展示完整段落。
 - [x] `openplay-ui` Trace 阅读器排序与日期筛选：左侧卡片改为按时间从新到旧排序；类型筛选"全部"改为"全部类型"；新增日期筛选器（全部/1小时内/今日内）。
 - [x] `openplay-ui` Trace 阅读器 PAYLOAD 消息智能解析：未知 trace kind 的 payload 现自动识别常见结构（role/content 字段、messages 数组、request/response 结构），转义字符（\n/\"/\\t 等）还原为可读形式，最终以 `{ROLE}> {可读内容}` 格式展示。
+- [x] `openplay-ui` Trace 阅读器完整改进：新增 payload.type 字段作为 ROLE 提取、session.compose 专用解析、tools 完整显示、移除内容截断限制，所有消息在可读视图下显示完整内容。
 
 ## Changelog
 
+- 2026-06-29: `openplay-ui` Trace 阅读器完整改进：新增 `readableSessionComposeBlocks` 专门解析 `session.compose`；新增 `formatToolsDisplay` 完整显示工具定义（含 description）；`readablePayloadBlocks` 现优先检查 `payload.type` 作为 ROLE；移除可读视图的 800 字符截断限制，完整显示所有内容；新增 6 组测试覆盖 type 字段、session.compose、tools 显示、无截断等场景。
 - 2026-06-29: `openplay-ui` Trace 阅读器 PAYLOAD 智能解析：新增 `readablePayloadBlocks` 函数，对未知 kind 的 payload 执行结构识别与转义字符还原；支持直接 role 字段、messages 数组、text/content 字段、request/response 结构等多种格式；转义字符（\n/\r/\t/\"/\'/\\）自动还原，提升可读性。
 - 2026-06-29: `openplay-ui` Trace 阅读器排序与日期筛选：左侧卡片改为按时间从新到旧排序；类型筛选"全部"改为"全部类型"；新增日期筛选器（全部/1小时内/今日内）。
 - 2026-06-29: 为 `openplay-ui` 补齐会话级高保真 Trace 链路：Session 现持久化 `trace.enabled` 并在 Character/子代理会话创建时自动继承；模型 Trace 独立写入 `~/.local/share/openplay/log/model-trace/`，按会话+日期分段 JSONL 存储，写入最近索引并仅对该目录执行 7 天保留清理。新增 `PATCH /session/:id` Trace 控制与 `GET /session/:id/trace` 阅读接口，返回原始事件与可用性/保留期元信息；WebUI 设置页新增 Trace 阅读偏好，Session header 与 Roleplay 右侧面板新增显式状态/入口，统一接入新的 Trace 阅读器，可在 Readable/Raw 间切换并复制原始记录。

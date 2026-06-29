@@ -76,6 +76,20 @@ function formatReadableJson(value: unknown): string {
   }
 }
 
+function formatToolsDisplay(tools: Record<string, unknown>): string {
+  const names = Object.keys(tools)
+  if (names.length === 0) return ""
+  const lines = names.map((name) => {
+    const tool = tools[name] as Record<string, unknown> | undefined
+    const desc =
+      typeof tool?.description === "string"
+        ? `: ${tool.description}`
+        : ""
+    return `- **${name}**${desc}`
+  })
+  return `**Tools (${names.length})**\n${lines.join("\n")}`
+}
+
 function formatMessagePart(part: unknown) {
   const item = asRecord(part)
   if (!item) return String(part)
@@ -124,14 +138,14 @@ function pushBlock(blocks: TraceBlock[], role: string, text: unknown) {
 
 function readableInteractionBlocks(payload: Record<string, unknown>) {
   const blocks: TraceBlock[] = []
-  
+
   const request = payload.request as Record<string, unknown> | undefined
   if (request) {
     const system = request.system
     if (Array.isArray(system)) {
       for (const item of system) pushBlock(blocks, "SYSTEM", item)
     }
-    
+
     const messages = Array.isArray(request.messages) ? request.messages : []
     for (const message of messages) {
       const item = asRecord(message)
@@ -141,8 +155,12 @@ function readableInteractionBlocks(payload: Record<string, unknown>) {
       }
       pushBlock(blocks, roleName(item.role), formatMessageContent(item.content))
     }
+
+    if (request.tools && typeof request.tools === "object") {
+      pushBlock(blocks, "TOOLS", formatToolsDisplay(request.tools as Record<string, unknown>))
+    }
   }
-  
+
   const response = payload.response as Record<string, unknown> | undefined
   if (response) {
     if (typeof response.readable === "string" && response.readable.trim()) {
@@ -152,7 +170,7 @@ function readableInteractionBlocks(payload: Record<string, unknown>) {
       pushBlock(blocks, "REASONING", response.reasoning)
     }
   }
-  
+
   return blocks
 }
 
@@ -171,6 +189,10 @@ function readableRequestBlocks(payload: Record<string, unknown>) {
       continue
     }
     pushBlock(blocks, roleName(item.role), formatMessageContent(item.content))
+  }
+
+  if (payload.tools && typeof payload.tools === "object") {
+    pushBlock(blocks, "TOOLS", formatToolsDisplay(payload.tools as Record<string, unknown>))
   }
   return blocks
 }
@@ -191,8 +213,47 @@ function readableStreamEventBlocks(payload: Record<string, unknown>) {
   return blocks
 }
 
+function readableSessionComposeBlocks(payload: Record<string, unknown>): TraceBlock[] {
+  const blocks: TraceBlock[] = []
+
+  if (payload.roleplay === true) {
+    pushBlock(blocks, "META", "Roleplay session")
+  }
+  if (payload.userMessageID) {
+    pushBlock(blocks, "META", `User message: ${payload.userMessageID}`)
+  }
+
+  const system = payload.system
+  if (Array.isArray(system)) {
+    for (const item of system) pushBlock(blocks, "SYSTEM", item)
+  }
+
+  const messages = Array.isArray(payload.modelMessages) ? payload.modelMessages : []
+  for (const message of messages) {
+    const item = asRecord(message)
+    if (!item) continue
+    pushBlock(blocks, roleName(item.role), formatMessageContent(item.content))
+  }
+
+  if (payload.format) {
+    pushBlock(blocks, "FORMAT", formatReadableJson(payload.format))
+  }
+
+  if (payload.tools && typeof payload.tools === "object") {
+    pushBlock(blocks, "TOOLS", formatToolsDisplay(payload.tools as Record<string, unknown>))
+  }
+
+  return blocks
+}
+
 function readablePayloadBlocks(payload: Record<string, unknown>): TraceBlock[] {
   const blocks: TraceBlock[] = []
+
+  if (typeof payload.type === "string" && typeof payload.role !== "string") {
+    const content = payload.content ?? payload.text ?? payload.message ?? payload.data
+    pushBlock(blocks, roleName(payload.type), formatPayloadContent(content))
+    return blocks
+  }
 
   if (typeof payload.role === "string") {
     const content = payload.content ?? payload.text ?? payload.message
@@ -233,6 +294,8 @@ export function traceReadableBlocks(entry: SessionTraceEntry) {
       return readableResponseBlocks(payload)
     case "llm.stream.event":
       return readableStreamEventBlocks(payload)
+    case "session.compose":
+      return readableSessionComposeBlocks(payload)
     default:
       return readablePayloadBlocks(payload)
   }
@@ -242,11 +305,5 @@ export function traceDetailMarkdown(entry: SessionTraceEntry, view: "readable" |
   if (view === "raw") return ["```json", traceSafeJson(entry), "```"].join("\n")
   const blocks = traceReadableBlocks(entry)
   if (blocks.length === 0) return ["```json", traceSafeJson(entry.payload), "```"].join("\n")
-  return blocks
-    .map((block) =>
-      expandedSections
-        ? `\`${block.role}>\`\n${block.text}`
-        : `\`${block.role}>\`\n${block.text.slice(0, 800)}${block.text.length > 800 ? "\n\n[truncated in readable view]" : ""}`,
-    )
-    .join("\n\n")
+  return blocks.map((block) => `\`${block.role}>\`\n${block.text}`).join("\n\n")
 }
