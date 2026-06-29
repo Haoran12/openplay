@@ -211,6 +211,37 @@ describe("tool.narrate", () => {
     expect(result.metadata.source).toBe("fallback")
   })
 
+  test("accepts yaml-like scene and characterSamples blocks from director tool calls", async () => {
+    const tool = await Effect.runPromise(buildTool())
+
+    let seen: SessionPrompt.PromptInput | undefined
+    const result = await Effect.runPromise(
+      tool.execute(
+        {
+          scene: `time: 1003-07-14 申时（约15:45）
+location: 襄陵县城西北-吴宅主宅内院厅堂
+environment: 盛夏午后，日光斜照入堂，院外蝉鸣阵阵。室内较凉爽，有草药气息和淡淡檀香。吴家护卫守卫宅院。`,
+          characterSamples: `- name: 吴执
+  speech: 好了，都去准备吧。
+  outwardAction: 缓缓站起身，手按在腰间铁令上。
+- name: 吴钺
+  speech: 是。三日之内，两处渡口阵法加固完毕。
+  outwardAction: 起身抱拳行礼，随即垂首告退`,
+          outcomes: "厅堂内的会面结束，各方开始各自行动。",
+          perspective: "第三人称客观",
+          style: "沉稳凝练，收尾氛围",
+        },
+        ctx(promptOps({ onPrompt: (value) => (seen = value), text: "众人领命散去，厅中余香未散。" })),
+      ),
+    )
+
+    expect(result.output).toBe("众人领命散去，厅中余香未散。")
+    expect(seen?.system).toContain("- 时间: 1003-07-14 申时（约15:45）")
+    expect(seen?.system).toContain("人物: 吴执")
+    expect(seen?.system).toContain("人物: 吴钺")
+    expect(seen?.system).toContain("说话: 好了，都去准备吧。")
+  })
+
   test("rejects missing input", async () => {
     const tool = await Effect.runPromise(buildTool())
     await expect(Effect.runPromise(tool.execute({} as never, ctx()))).rejects.toThrow(

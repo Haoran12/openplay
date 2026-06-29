@@ -1,6 +1,7 @@
 export * as Narrate from "./narrate"
 
 import { Effect, Schema } from "effect"
+import { parse as parseYaml } from "yaml"
 import {
   TOOL_PRESENTATION_PRIMARY_OUTPUT,
   TOOL_PRESENTATION_VARIANT_NARRATIVE,
@@ -53,11 +54,18 @@ export const PerspectiveSchema = Schema.Literals([
   description: "叙事视角",
 })
 
+const RawSceneSchema = Schema.Union([SceneSchema, Schema.String])
+const RawCharacterSamplesSchema = Schema.Union([
+  Schema.Array(CharacterSampleSchema),
+  CharacterSampleSchema,
+  Schema.String,
+])
+
 const Parameters = Schema.Struct({
-  scene: Schema.optional(SceneSchema).annotate({
+  scene: Schema.optional(RawSceneSchema).annotate({
     description: "当前场景信息",
   }),
-  characterSamples: Schema.optional(Schema.Array(CharacterSampleSchema)).annotate({
+  characterSamples: Schema.optional(RawCharacterSamplesSchema).annotate({
     description: "角色言行样本",
   }),
   outcomes: Schema.optional(Schema.String).annotate({
@@ -91,6 +99,12 @@ const DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514"
 
 type NarrateParameters = Schema.Schema.Type<typeof Parameters>
 type Perspective = Schema.Schema.Type<typeof PerspectiveSchema>
+type Scene = Schema.Schema.Type<typeof SceneSchema>
+type CharacterSample = Schema.Schema.Type<typeof CharacterSampleSchema>
+type NormalizedNarrateParameters = Omit<NarrateParameters, "scene" | "characterSamples"> & {
+  scene?: Scene
+  characterSamples?: CharacterSample[]
+}
 
 function parseModelString(modelStr: string): { modelID: string; providerID: string } | undefined {
   const parts = modelStr.split("/")
@@ -111,7 +125,42 @@ function optionalSection(title: string, content?: string): string {
   return `${title}\n${trimmed}`
 }
 
-function summarizeScene(scene?: Schema.Schema.Type<typeof SceneSchema>): string {
+function decodeYamlBlock<T>(raw: string, schema: Schema.Schema<T>): T | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+  try {
+    const decoded = parseYaml(trimmed)
+    return Schema.decodeUnknownSync(schema)(decoded)
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeScene(scene?: NarrateParameters["scene"]): Scene | undefined {
+  if (!scene) return undefined
+  if (typeof scene !== "string") return scene
+  return decodeYamlBlock(scene, SceneSchema)
+}
+
+function normalizeCharacterSamples(samples?: NarrateParameters["characterSamples"]): CharacterSample[] | undefined {
+  if (!samples) return undefined
+  if (typeof samples === "string") {
+    const single = decodeYamlBlock(samples, CharacterSampleSchema)
+    if (single) return [single]
+    return decodeYamlBlock(samples, Schema.Array(CharacterSampleSchema))
+  }
+  return Array.isArray(samples) ? samples : [samples]
+}
+
+function normalizeNarrateParameters(params: NarrateParameters): NormalizedNarrateParameters {
+  return {
+    ...params,
+    scene: normalizeScene(params.scene),
+    characterSamples: normalizeCharacterSamples(params.characterSamples),
+  }
+}
+
+function summarizeScene(scene?: Scene): string {
   if (!scene) return "（未提供）"
   const lines = [`- 时间: ${scene.time}`, `- 地点: ${scene.location}`]
   if (scene.environment?.trim()) lines.push(`- 环境: ${scene.environment.trim()}`)
@@ -119,7 +168,7 @@ function summarizeScene(scene?: Schema.Schema.Type<typeof SceneSchema>): string 
 }
 
 export function formatCharacterSamplesSection(
-  samples: readonly Schema.Schema.Type<typeof CharacterSampleSchema>[] = [],
+  samples: readonly CharacterSample[] = [],
   perspective: Perspective = DEFAULT_PERSPECTIVE,
   povCharacter?: string,
 ): string {
@@ -159,7 +208,7 @@ export function getPerspectiveInstruction(perspective: Perspective = DEFAULT_PER
   }
 }
 
-export function buildNarrateSystemPrompt(params: NarrateParameters): string {
+export function buildNarrateSystemPrompt(params: NormalizedNarrateParameters): string {
   return renderPromptTemplate(PROMPT_TEMPLATE, {
     scene_section: summarizeScene(params.scene),
     character_samples_section: formatCharacterSamplesSection(
@@ -178,7 +227,7 @@ function resolveFallbackContent(params: NarrateParameters) {
   return params.content?.trim() ?? ""
 }
 
-export function emitDirectly(params: NarrateParameters): Tool.ExecuteResult<NarrateMetadata> {
+export function emitDirectly(params: NormalizedNarrateParameters): Tool.ExecuteResult<NarrateMetadata> {
   const content = resolveFallbackContent(params)
   const perspective = params.perspective ?? DEFAULT_PERSPECTIVE
   return {
@@ -195,7 +244,7 @@ export function emitDirectly(params: NarrateParameters): Tool.ExecuteResult<Narr
 }
 
 function generateNarrative(
-  params: NarrateParameters,
+  params: NormalizedNarrateParameters,
   ctx: Tool.Context<NarrateMetadata>,
   deps: {
     sessions: Session.Interface
@@ -287,9 +336,12 @@ export const NarrateTool = Tool.define(
       parameters: Parameters,
       execute: (params: NarrateParameters, ctx: Tool.Context<NarrateMetadata>) =>
         Effect.gen(function* () {
+          const normalized = normalizeNarrateParameters(params)
           const hasStructuredInput =
-            params.scene !== undefined || (params.characterSamples?.length ?? 0) > 0 || Boolean(params.outcomes?.trim())
-          const hasFallbackContent = Boolean(resolveFallbackContent(params))
+            normalized.scene !== undefined ||
+            (normalized.characterSamples?.length ?? 0) > 0 ||
+            Boolean(normalized.outcomes?.trim())
+          const hasFallbackContent = Boolean(resolveFallbackContent(normalized))
           if (!hasStructuredInput && !hasFallbackContent) {
             return yield* Effect.fail(
               new Error("narrate requires at least one of scene, characterSamples, outcomes, or content"),
@@ -302,10 +354,10 @@ export const NarrateTool = Tool.define(
           }
 
           if (hasStructuredInput) {
-            return yield* generateNarrative(params, ctx, { sessions, agents, config })
+            return yield* generateNarrative(normalized, ctx, { sessions, agents, config })
           }
 
-          return emitDirectly(params)
+          return emitDirectly(normalized)
         }),
     }
   }),

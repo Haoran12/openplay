@@ -6,7 +6,7 @@
 
 ### 主路径（推荐）
 
-传入结构化数据，由工具内部调用 LLM 生成正文：
+传入结构化数据，由工具内部调用 LLM 生成正文。`scene` 与 `characterSamples` 既可传标准 JSON 结构，也可传 YAML 风格文本块，工具会在内部归一化：
 
 - `scene`：场景信息，包含 `time`、`location`，可选 `environment`
 - `characterSamples`：人物言行数组，字段包括 `name`、`speech`、`outwardAction`、`innerThought`
