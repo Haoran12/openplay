@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { describe, test, expect } from "bun:test"
 import os from "os"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { Bus } from "../../src/bus"
@@ -1156,3 +1156,36 @@ it.instance(
     }),
   { git: true },
 )
+
+describe("isLegacyPromptToolsDenyAll", () => {
+  test("returns true for single deny-all rule", () => {
+    const permission: Permission.Ruleset = [{ permission: "*", action: "deny", pattern: "*" }]
+    expect(Permission.isLegacyPromptToolsDenyAll(permission)).toBe(true)
+  })
+
+  test("returns false for undefined", () => {
+    expect(Permission.isLegacyPromptToolsDenyAll(undefined)).toBe(false)
+  })
+
+  test("returns false for empty array", () => {
+    expect(Permission.isLegacyPromptToolsDenyAll([])).toBe(false)
+  })
+
+  test("returns false for multiple rules", () => {
+    const permission: Permission.Ruleset = [
+      { permission: "*", action: "allow", pattern: "*" },
+      { permission: "*", action: "deny", pattern: "*" },
+    ]
+    expect(Permission.isLegacyPromptToolsDenyAll(permission)).toBe(false)
+  })
+
+  test("returns false for single allow rule", () => {
+    const permission: Permission.Ruleset = [{ permission: "*", action: "allow", pattern: "*" }]
+    expect(Permission.isLegacyPromptToolsDenyAll(permission)).toBe(false)
+  })
+
+  test("returns false for specific deny rule", () => {
+    const permission: Permission.Ruleset = [{ permission: "bash", action: "deny", pattern: "*" }]
+    expect(Permission.isLegacyPromptToolsDenyAll(permission)).toBe(false)
+  })
+})

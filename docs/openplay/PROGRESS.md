@@ -106,6 +106,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
 - [x] Director `narrate` 子调用权限隔离修复：`narrate` 内部为“本次生成禁用工具”设置的临时 `tools: {"*": false}` 不再持久化污染父 session 的 `permission`，避免后续 Director 回合工具列表被清空后再次中断。
 - [x] Director 历史污染会话自愈修复：旧版 `narrate` 已写坏为 `permission = * deny *` 的 roleplay Director 会话，在下一次真实玩家 prompt 进入 loop 时会自动清除该遗留权限污染，恢复真实工具供给。
+- [x] GM/Character 子代理遗留权限污染通用修复：`isLegacyPromptToolsDenyAll` 提升为 `Permission` 模块导出；`session.ts:fromRow()` 在加载时自动清除遗留 deny-all 权限，覆盖所有 agent 类型（不仅限 Director）；Director 专用自愈改用共享函数。
 - [x] `narrate` 可配置超时 (`roleplay.narrateTimeoutSeconds`, 默认 90s)
 - [x] `roleplay.characterModel` 统一角色模型回退字段
 - [x] SDK types.gen.ts `ConfigRoleplay` 同步更新
@@ -115,6 +116,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-30: 修复 GM/Character 子代理继承遗留 `permission=[* deny *]` 导致 dice_roll 等工具被拒绝的问题：`isLegacyPromptToolsDenyAll` 提升为 `Permission` 模块导出；`session.ts:fromRow()` 在加载时自动清除遗留 deny-all 权限（无需等待 Director 自愈触发）；Director 专用自愈逻辑改用共享函数；补充 6 组 `isLegacyPromptToolsDenyAll` 单元测试覆盖各种边界情况。
 - 2026-06-30: `openplay-ui` Trace 阅读器 tool-result 对象格式支持：新增 `extractTextFromBody` 辅助函数，支持从对象格式 `{type:"text",value:"..."}` 和 JSON 字符串中提取文本内容；tool-result 代码块优先渲染提取的文本，而非原始 JSON；路径显示改为行内代码格式；新增 4 组测试覆盖对象和 JSON 字符串格式的 tool-result。
 - 2026-06-30: `openplay-ui` Trace 阅读器工具调用路径提取优化：`formatMessagePart` 新增 `extractToolPath` / `extractToolResultPath` 辅助函数，read/edit/write/lsp 的 `filePath`、glob/grep 的 `path`+`pattern`+`include`、bash 的 `workdir` 现直接显示在 `Tool call:` 行内联；tool-result 同样提取摘要信息（read 输出文件路径、glob 文件数量、grep 匹配数量、edit/write 成功状态、bash 退出码）；新增 11 组回归测试覆盖所有工具类型。
 - 2026-06-30: 修复 pre-push husky typecheck 失败（10 个 TypeScript 类型错误，纯类型级修复，无运行时行为变更）：`narrate.ts` — `Schema.decodeUnknownSync` 参数强转为 `Decoder<unknown, never>`、`Schema.Array` 结果展开为可变数组、union 类型断言、`Part` filter 改用 `as MessageV2.TextPart` 替代不兼容的 type predicate、`execute` 函数体用 `Effect.orDie` 包裹使 error channel 为 `never`（与 `ReadTool` 一致）；`read.ts` — `Effect.catch` handler 返回值用 `Effect.succeed` 包裹（Effect v4 要求 handler 返回 Effect 而非普通对象）；`prompt.test.ts` — `InstanceRef` spread 改为显式非空提取 `directory`/`worktree`/`project`。

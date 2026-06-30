@@ -93,12 +93,11 @@ export const KnowledgeUpdateTool = Tool.define(
           }
 
           const manifest = yield* readManifest({ fs, info }).pipe(Effect.orDie)
-          const manifestPath = path.join("knowledge", knowledgePath)
-          if (!shouldCreate && !manifest.includes(manifestPath)) {
+          if (!shouldCreate && !manifest.includes(knowledgePath)) {
             return {
               title: `knowledge_update: ${character} (blocked)`,
               output: "path must already exist in your current manifest when create=false.",
-              metadata: { path: manifestPath, created: false, size: 0 },
+              metadata: { path: knowledgePath, created: false, size: 0 },
             }
           }
 

@@ -167,14 +167,6 @@ export function shouldExitPromptLoop(input: {
   )
 }
 
-function isLegacyPromptToolsDenyAll(permission: Permission.Ruleset | undefined) {
-  return (
-    permission?.length === 1 &&
-    permission[0].permission === "*" &&
-    permission[0].action === "deny" &&
-    permission[0].pattern === "*"
-  )
-}
 
 function referencePromptMetadata(input: unknown): ReferencePromptMetadata | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return
@@ -1787,7 +1779,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             throw error
           }
 
-          if (ctx.world && agent.isDirector && !lastUser.tools && isLegacyPromptToolsDenyAll(session.permission)) {
+          if (ctx.world && agent.isDirector && !lastUser.tools && Permission.isLegacyPromptToolsDenyAll(session.permission)) {
             session.permission = []
             yield* sessions.setPermission({ sessionID: session.id, permission: [] })
             yield* slog.warn("healed legacy deny-all tool permission on roleplay director session")

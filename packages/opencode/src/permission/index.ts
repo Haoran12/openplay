@@ -288,6 +288,15 @@ export function merge(...rulesets: Ruleset[]): Ruleset {
   return rulesets.flat()
 }
 
+export function isLegacyPromptToolsDenyAll(permission: Ruleset | undefined) {
+  return (
+    permission?.length === 1 &&
+    permission[0].permission === "*" &&
+    permission[0].action === "deny" &&
+    permission[0].pattern === "*"
+  )
+}
+
 const EDIT_TOOLS = ["edit", "write", "apply_patch"]
 
 export function disabled(tools: string[], ruleset: Ruleset): Set<string> {

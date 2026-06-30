@@ -24,7 +24,7 @@ import type { InstanceContext } from "../../src/project/instance-context"
 import { Question } from "../../src/question"
 import { Todo } from "../../src/session/todo"
 import { Session } from "@/session/session"
-import { SessionMessageTable } from "../../src/session/session.sql"
+import { SessionMessageTable, SessionTable } from "../../src/session/session.sql"
 import { LLM } from "../../src/session/llm"
 import { MessageV2 } from "../../src/session/message-v2"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
@@ -2204,7 +2204,12 @@ it.instance(
       })
 
       const afterPersistent = yield* sessions.get(session.id)
-      expect(afterPersistent.permission).toEqual([{ permission: "*", pattern: "*", action: "deny" }])
+      expect(afterPersistent.permission).toEqual(undefined)
+
+      const rawRow = Database.use((db) =>
+        db.select().from(SessionTable).where(Database.eq(SessionTable.id, session.id)).get(),
+      )
+      expect(rawRow?.permission).toEqual([{ permission: "*", pattern: "*", action: "deny" }])
     }),
   { git: true },
 )

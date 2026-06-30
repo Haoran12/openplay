@@ -104,7 +104,7 @@ export function fromRow(row: SessionRow): Info {
     },
     share,
     revert,
-    permission: row.permission ?? undefined,
+    permission: Permission.isLegacyPromptToolsDenyAll(row.permission ?? undefined) ? undefined : row.permission ?? undefined,
     worldID: row.world_id ?? undefined,
     worldPath: row.world_path ?? undefined,
     roleplayCharacter: row.roleplay_character ?? undefined,

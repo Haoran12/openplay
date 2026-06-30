@@ -97,11 +97,18 @@ export const CharacterViewReadTool = Tool.define(
             })
           }
 
+          const profileBasename = path.basename(info.profileRelativePath)
+          const memoryBasename = path.basename(info.memoryRelativePath)
           let fullPath = path.join(info.dirPath, relativePath)
-          if (relativePath === "profile.yaml") fullPath = info.profilePath
-          if (relativePath === "memory.yaml") fullPath = info.memoryPath
+          if (relativePath === profileBasename) {
+            fullPath = info.profilePath
+          } else if (relativePath === memoryBasename) {
+            fullPath = info.memoryPath
+          } else {
+            fullPath = path.join(info.knowledgeDirPath, relativePath)
+          }
 
-          if (relativePath === "memory.yaml") {
+          if (relativePath === memoryBasename) {
             const exists = yield* fs.existsSafe(info.memoryPath).pipe(Effect.orDie)
             if (!exists) {
               const empty = createEmptyCharacterMemory()

@@ -70,7 +70,7 @@ Director 会传递以下信息：
 {
   "reasoning": "基于设定和场景趋势的推理过程",
   "environment": "环境变化描述（天气/光线/声音/气味）",
-  "npcs": [
+  "characters": [
     {
       "name": "人物名",
       "appearance": "外貌描述",
