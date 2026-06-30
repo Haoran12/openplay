@@ -48,26 +48,43 @@ export const ReadTool = Tool.define(
     const miss = Effect.fn("ReadTool.miss")(function* (filepath: string) {
       const dir = path.dirname(filepath)
       const base = path.basename(filepath)
-      const items = yield* fs.readDirectory(dir).pipe(
-        Effect.map((items) =>
-          items
-            .filter(
-              (item) =>
-                item.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(item.toLowerCase()),
-            )
-            .map((item) => path.join(dir, item))
-            .slice(0, 3),
+
+      type DirReadResult = { items: string[]; error?: { tag: string; message: string } }
+      const result: DirReadResult = yield* fs.readDirectory(dir).pipe(
+        Effect.map(
+          (items): DirReadResult => ({
+            items: items
+              .filter(
+                (item) =>
+                  item.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(item.toLowerCase()),
+              )
+              .map((item) => path.join(dir, item))
+              .slice(0, 3),
+          }),
         ),
-        Effect.catch(() => Effect.succeed([] as string[])),
+        Effect.catch(
+          (err): DirReadResult => ({
+            items: [],
+            error: {
+              tag: "reason" in err && err.reason && typeof err.reason === "object" && "_tag" in err.reason
+                ? String(err.reason._tag)
+                : "Unknown",
+              message: err instanceof Error ? err.message : String(err),
+            },
+          }),
+        ),
       )
 
-      if (items.length > 0) {
+      if (result.items.length > 0) {
         return yield* Effect.fail(
-          new Error(`File not found: ${filepath}\n\nDid you mean one of these?\n${items.join("\n")}`),
+          new Error(`File not found: ${filepath}\n\nDid you mean one of these?\n${result.items.join("\n")}`),
         )
       }
 
-      return yield* Effect.fail(new Error(`File not found: ${filepath}`))
+      const hint = result.error
+        ? `\n\nNote: Could not read parent directory "${dir}" (${result.error.tag}: ${result.error.message})`
+        : ""
+      return yield* Effect.fail(new Error(`File not found: ${filepath}${hint}`))
     })
 
     const list = Effect.fn("ReadTool.list")(function* (filepath: string) {
