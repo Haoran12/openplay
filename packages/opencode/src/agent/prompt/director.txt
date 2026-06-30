@@ -34,8 +34,8 @@ task(
   prompt="当前场景: {location}, 时间: {date}。
   搜索建议:
   - 地区与势力: glob location_and_faction/*{关键词}* 定位对应文件
-  - 在场人物: glob characters/*{名字}*/*.yaml 定位角色目录下的 profile 文件
-  - 近期事件: records/session-{date}.yaml
+  - 在场人物: glob characters/{char_dir}/*.yaml 定位角色目录下的 profile 文件
+  - 近期事件: records/session-{index}.yaml
   - 社会文化: social/*.yaml（如相关）
 
   依据当前 environment、recent_events、人物身心状态、言行与目标，构思即将出现的人物/景象/事件"
