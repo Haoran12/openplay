@@ -500,7 +500,7 @@ export function inferCharacterBindingsFromFiles(
     const result = new Map<string, { binding: CharacterBindingInfo; score: number }>()
     for (const file of files) {
         const basename = path.basename(file.relativePath)
-        if (basename !== "profile.yaml") continue
+        if (!basename.endsWith(".yaml")) continue
         try {
             const parsed = parse(file.content)
             const root = readObject(parsed)
@@ -519,9 +519,10 @@ export function inferCharacterBindingsFromFiles(
             const score = isHiddenCharacterStatePath(file.relativePath) ? -1000 : 0
             const previous = result.get(character)
             if (previous && previous.score >= score) continue
+            const cognitionDir = `${character}-cognition`
             result.set(character, {
                 binding: {
-                    memoryPath: path.join(relativeDir, "memory.yaml"),
+                    memoryPath: path.join(relativeDir, cognitionDir, "memory.yaml"),
                 },
                 score,
             })
@@ -905,17 +906,16 @@ function readCharacterMemory(input: {
     forbiddenSet?: ForbiddenSet
 }) {
     return Effect.gen(function* () {
-        let fullPath = input.memoryPath
-            ? path.join(input.worldPath, input.memoryPath)
-            : characterMemoryPath(input.worldPath, input.character)
         const resolved = yield* resolveForCharacter({
             fs: input.fs,
             worldPath: input.worldPath,
             character: input.character,
         })
-        if (resolved.info) {
-            fullPath = resolved.info.memoryPath
-        }
+        const fullPath = resolved.info
+            ? resolved.info.memoryPath
+            : input.memoryPath
+                ? path.join(input.worldPath, input.memoryPath)
+                : characterMemoryPath(input.worldPath, input.character)
         const exists = yield* input.fs.existsSafe(fullPath).pipe(Effect.orDie)
         if (!exists) {
             const empty = `${createEmptyCharacterMemory()}\n`

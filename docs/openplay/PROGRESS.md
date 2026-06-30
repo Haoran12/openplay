@@ -109,8 +109,11 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] SDK types.gen.ts `ConfigRoleplay` 同步更新
 - [x] 前端 `DialogSubagentModels` 子代理模型选择对话框
 - [x] 前端消息输入区 `+` 按钮入口
+- [x] 角色目录结构调整：profile 文件名改为 `{name}.yaml`，memory/knowledge 移至 `{name}-cognition/` 目录；更新 `scanIndex`、`readManifest`、`inferCharacterBindingsFromFiles` 等函数支持新结构；废弃 `characterMemoryPath` 函数
 
 ## Changelog
+
+- 2026-06-30: 角色目录结构重构：`scanIndex` 现扫描 `characters/{dir}/*.yaml` 作为 profile 文件（而非固定的 `profile.yaml`），memory/knowledge 路径改为 `characters/{dir}/{name}-cognition/`；`readManifest` 返回动态 profile 文件名和 cognition 目录下的资源列表；`inferCharacterBindingsFromFiles` 改为识别任意 `.yaml` profile 文件；`characterMemoryPath` 标记为 deprecated；同步更新相关测试。
 
 - 2026-06-29: 修复旧 Director 会话在代码已更新后仍继续中断的问题：进一步核对本机实际运行态，确认生效 provider/model 来自 `~/.config/openplay/openplay.json`，实际为 `AstronCodingPlan/astron-code-latest`，world 与 `/home/refzhu/airp/opencode.json` 均无模型覆盖。最新 trace 显示 `session.compose` 已拿到完整 Director 工具集，但旧会话数据库仍残留 `permission=[{"permission":"*","action":"deny","pattern":"*"}]`，导致真正发给 LLM 的 `request.tools` 为空，Astron 只能输出伪 `<tool_call>` 文本。现为 roleplay Director 增加旧会话运行时自愈：检测到这种历史遗留的 `* deny *` 且当前玩家 prompt 未显式设置工具覆盖时，自动清空该污染权限并持久化修复；同时将另一个内部 `tools: {"*": false}` 调用点也改为非持久化，避免同类问题在其他流程复现。补充回归测试覆盖“新污染不再写回”和“旧 Director 会话会自动修复”两条路径。
 - 2026-06-29: 修复 Director 模式 Agent 工作流再次中断的核心权限污染问题：trace 与 session DB 显示 `narrate` 的一次内部生成调用会携带 `tools: {"*": false}`，而 `session.prompt` 之前会把这类临时工具覆盖直接写回 `session.permission`，导致父 Director 会话后续真实可用工具集被永久降成 `* deny *`，模型只能输出伪 `<tool_call>` 文本并在下一轮被误判结束。现为 `SessionPrompt.PromptInput` 增加非持久化工具覆盖开关，`narrate` 内部 prompt 显式使用该开关，并补充 session/narrate 回归测试锁住该路径。

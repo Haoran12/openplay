@@ -35,9 +35,7 @@ export type CharacterDirectoryIndex = {
   warnings: string[]
 }
 
-const PROFILE_BASENAME = "profile.yaml"
-const MEMORY_BASENAME = "memory.yaml"
-const KNOWLEDGE_DIRNAME = "knowledge"
+const COGNITION_MEMORY_BASENAME = "memory.yaml"
 const GM_NOTES_BASENAME = "gm_notes.yaml"
 const GM_NOTES_DIRNAME = "gm_notes"
 
@@ -333,63 +331,83 @@ export const scanIndex = Effect.fn("CharacterDirectory.scanIndex")(function* (in
 
   for (const directory of directories) {
     const relativeDir = path.join("characters", directory)
-    const profileRelativePath = path.join(relativeDir, PROFILE_BASENAME)
-    const profilePath = path.join(input.worldPath, profileRelativePath)
-    const hasProfile = yield* input.fs.existsSafe(profilePath).pipe(Effect.orDie)
-    if (!hasProfile) {
-      warnings.push(`Ignored ${relativeDir}: missing ${PROFILE_BASENAME}`)
+    const dirPath = path.join(input.worldPath, relativeDir)
+
+    const dirEntries = yield* input.fs.readDirectoryEntries(dirPath).pipe(Effect.orDie)
+    const yamlFiles = dirEntries
+      .filter((entry) => entry.type === "file" && entry.name.endsWith(".yaml"))
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))
+
+    if (yamlFiles.length === 0) {
+      warnings.push(`Ignored ${relativeDir}: no .yaml profile file found`)
       continue
     }
 
-    const profileContent = yield* input.fs.readFileStringSafe(profilePath).pipe(Effect.orDie)
-    if (!profileContent) {
-      warnings.push(`Ignored ${relativeDir}: empty ${PROFILE_BASENAME}`)
+    let foundCharacter: string | undefined
+    let foundProfileRelativePath: string | undefined
+    let foundProfilePath: string | undefined
+
+    for (const yamlFile of yamlFiles) {
+      const profilePathCandidate = path.join(dirPath, yamlFile)
+      const profileContent = yield* input.fs.readFileStringSafe(profilePathCandidate).pipe(Effect.orDie)
+      if (!profileContent) continue
+
+      const characterCandidate = parseCharacterNameFromProfileContent(profileContent)
+      if (characterCandidate) {
+        foundCharacter = characterCandidate
+        foundProfileRelativePath = path.join(relativeDir, yamlFile)
+        foundProfilePath = profilePathCandidate
+        break
+      }
+    }
+
+    if (!foundCharacter) {
+      warnings.push(`Ignored ${relativeDir}: could not parse character name from any .yaml file`)
       continue
     }
 
-    const character = parseCharacterNameFromProfileContent(profileContent)
-    if (!character) {
-      warnings.push(`Ignored ${relativeDir}: could not parse character name from ${PROFILE_BASENAME}`)
-      continue
-    }
+    const cognitionDirName = `${foundCharacter}-cognition`
+    const cognitionRelativeDir = path.join(relativeDir, cognitionDirName)
+    const cognitionDirPath = path.join(dirPath, cognitionDirName)
 
     const info: CharacterDirectoryInfo = {
-      character,
+      character: foundCharacter,
       relativeDir,
-      dirPath: path.join(input.worldPath, relativeDir),
-      profileRelativePath,
-      profilePath,
-      memoryRelativePath: path.join(relativeDir, MEMORY_BASENAME),
-      memoryPath: path.join(input.worldPath, relativeDir, MEMORY_BASENAME),
-      knowledgeRelativeDir: path.join(relativeDir, KNOWLEDGE_DIRNAME),
-      knowledgeDirPath: path.join(input.worldPath, relativeDir, KNOWLEDGE_DIRNAME),
+      dirPath,
+      profileRelativePath: foundProfileRelativePath!,
+      profilePath: foundProfilePath!,
+      memoryRelativePath: path.join(cognitionRelativeDir, COGNITION_MEMORY_BASENAME),
+      memoryPath: path.join(cognitionDirPath, COGNITION_MEMORY_BASENAME),
+      knowledgeRelativeDir: cognitionRelativeDir,
+      knowledgeDirPath: cognitionDirPath,
     }
 
-    const gmNotesPath = path.join(input.worldPath, relativeDir, GM_NOTES_BASENAME)
+    const gmNotesPath = path.join(dirPath, GM_NOTES_BASENAME)
     if (yield* input.fs.existsSafe(gmNotesPath).pipe(Effect.orDie)) {
       info.gmNotesRelativePath = path.join(relativeDir, GM_NOTES_BASENAME)
       info.gmNotesPath = gmNotesPath
     }
-    const gmNotesDirPath = path.join(input.worldPath, relativeDir, GM_NOTES_DIRNAME)
+    const gmNotesDirPath = path.join(dirPath, GM_NOTES_DIRNAME)
     if (yield* input.fs.existsSafe(gmNotesDirPath).pipe(Effect.orDie)) {
       info.gmNotesRelativeDir = path.join(relativeDir, GM_NOTES_DIRNAME)
       info.gmNotesDirPath = gmNotesDirPath
     }
 
     ordered.push(info)
-    const existing = byCharacter.get(character)
+    const existing = byCharacter.get(foundCharacter)
     if (!existing) {
-      byCharacter.set(character, info)
+      byCharacter.set(foundCharacter, info)
       continue
     }
 
     conflicts.push({
-      character,
+      character: foundCharacter,
       primaryRelativeDir: existing.relativeDir,
       duplicateRelativeDir: info.relativeDir,
     })
     warnings.push(
-      `Duplicate character name "${character}" found in ${info.relativeDir}; using ${existing.relativeDir} by directory order`,
+      `Duplicate character name "${foundCharacter}" found in ${info.relativeDir}; using ${existing.relativeDir} by directory order`,
     )
   }
 
@@ -426,10 +444,14 @@ export const readManifest = Effect.fn("CharacterDirectory.readManifest")(functio
   }
 
   const visible: string[] = []
-  visible.push("profile.yaml")
+  const profileBasename = path.basename(input.info.profileRelativePath)
+  visible.push(profileBasename)
 
   const memoryExists = yield* input.fs.existsSafe(input.info.memoryPath).pipe(Effect.orDie)
-  if (memoryExists) visible.push("memory.yaml")
+  if (memoryExists) {
+    const memoryBasename = path.basename(input.info.memoryRelativePath)
+    visible.push(memoryBasename)
+  }
 
   const knowledgeExists = yield* input.fs.existsSafe(input.info.knowledgeDirPath).pipe(Effect.orDie)
   if (knowledgeExists) {
@@ -440,7 +462,7 @@ export const readManifest = Effect.fn("CharacterDirectory.readManifest")(functio
     }).pipe(Effect.orDie)
     for (const entry of entries.toSorted((a, b) => a.localeCompare(b))) {
       if (!isTextLikeCharacterResource(entry)) continue
-      visible.push(path.join("knowledge", entry))
+      visible.push(entry)
     }
   }
 

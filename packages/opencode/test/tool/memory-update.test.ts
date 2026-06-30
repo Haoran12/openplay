@@ -73,11 +73,13 @@ describe("tool.memory_update", () => {
     Effect.gen(function* () {
       const dir = yield* Effect.promise(() => tmpdir())
       yield* Effect.addFinalizer(() => Effect.promise(() => dir[Symbol.asyncDispose]()))
-      const fullPath = path.join(dir.path, "characters", "云梦泽-孟缘", "memory.yaml")
-      yield* Effect.promise(() => fs.mkdir(path.join(dir.path, "characters", "云梦泽-孟缘"), { recursive: true }))
+      const charDir = path.join(dir.path, "characters", "云梦泽-孟缘")
+      const cognitionDir = path.join(charDir, "孟缘-cognition")
+      const fullPath = path.join(cognitionDir, "memory.yaml")
+      yield* Effect.promise(() => fs.mkdir(charDir, { recursive: true }))
       yield* Effect.promise(() =>
         fs.writeFile(
-          path.join(dir.path, "characters", "云梦泽-孟缘", "profile.yaml"),
+          path.join(charDir, "孟缘.yaml"),
           ["name: 孟缘", "role: 云梦泽的大妖长老", ""].join("\n"),
         ),
       )
@@ -123,11 +125,13 @@ entries:
     Effect.gen(function* () {
       const dir = yield* Effect.promise(() => tmpdir())
       yield* Effect.addFinalizer(() => Effect.promise(() => dir[Symbol.asyncDispose]()))
-      const fullPath = path.join(dir.path, "characters", "云梦泽-孟缘", "memory.yaml")
-      yield* Effect.promise(() => fs.mkdir(path.join(dir.path, "characters", "云梦泽-孟缘"), { recursive: true }))
+      const charDir = path.join(dir.path, "characters", "云梦泽-孟缘")
+      const cognitionDir = path.join(charDir, "孟缘-cognition")
+      const fullPath = path.join(cognitionDir, "memory.yaml")
+      yield* Effect.promise(() => fs.mkdir(charDir, { recursive: true }))
       yield* Effect.promise(() =>
         fs.writeFile(
-          path.join(dir.path, "characters", "云梦泽-孟缘", "profile.yaml"),
+          path.join(charDir, "孟缘.yaml"),
           ["name: 孟缘", "role: 云梦泽的大妖长老", ""].join("\n"),
         ),
       )
@@ -135,7 +139,7 @@ entries:
       yield* run({
         content: `
 - 她在雨夜递给我一盏灯。
-- 我记得她说“回家再哭”。
+- 我记得她说"回家再哭"。
 `,
       }).pipe(
         Effect.provideService(InstanceRef, {
@@ -150,7 +154,7 @@ entries:
       const normalized = normalizeMemoryFile(written)
 
       expect(normalized.entries).toHaveLength(2)
-      expect(normalized.entries[0].summary).toContain("我记得她说“回家再哭”")
+      expect(normalized.entries[0].summary).toContain("我记得她说\"回家再哭\"")
       expect(normalized.entries[1].summary).toContain("她在雨夜递给我一盏灯")
       expect(written).toContain("compression_policy")
       expect(written).toContain("ordering: newest-first")

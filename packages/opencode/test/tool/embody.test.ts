@@ -415,8 +415,9 @@ sense_traits:
     await using dir = await tmpdir()
     const worldPath = dir.path
     const characterDir = path.join(worldPath, "characters", "孟缘")
+    const cognitionDir = path.join(characterDir, "孟缘-cognition")
     await fs.mkdir(characterDir, { recursive: true })
-    await fs.writeFile(path.join(characterDir, "profile.yaml"), "name: 孟缘\n")
+    await fs.writeFile(path.join(characterDir, "孟缘.yaml"), "name: 孟缘\n")
     const manifest = await Effect.runPromise(
       Effect.gen(function* () {
         const fsService = yield* AppFileSystem.Service
@@ -426,14 +427,14 @@ sense_traits:
       }).pipe(Effect.provide(AppFileSystem.defaultLayer)),
     )
 
-    expect(manifest).toContain("profile.yaml")
-    expect(manifest).toContain("knowledge/world_base.yaml")
-    expect(manifest).toContain("knowledge/social_and_world.md")
-    expect(manifest).toContain("knowledge/nature_and_body.md")
-    expect(await fs.readFile(path.join(characterDir, "knowledge", "world_base.yaml"), "utf-8")).toContain(
+    expect(manifest).toContain("孟缘.yaml")
+    expect(manifest).toContain("world_base.yaml")
+    expect(manifest).toContain("social_and_world.md")
+    expect(manifest).toContain("nature_and_body.md")
+    expect(await fs.readFile(path.join(cognitionDir, "world_base.yaml"), "utf-8")).toContain(
       "世界观基础",
     )
-    expect(await fs.readFile(path.join(characterDir, "knowledge", "social_and_world.md"), "utf-8")).toContain(
+    expect(await fs.readFile(path.join(cognitionDir, "social_and_world.md"), "utf-8")).toContain(
       "对社会与世道的长期认知",
     )
   })
@@ -464,7 +465,7 @@ sense_traits:
     ).toBeUndefined()
   })
 
-  test("uses fixed per-character memory path", () => {
+  test("uses fixed per-character memory path (deprecated)", () => {
     expect(characterMemoryPath("/world", "孟缘")).toBe("/world/characters/孟缘/memory.yaml")
   })
 
@@ -674,7 +675,7 @@ entries:
   test("infers character bindings from directory profile files", () => {
     const bindings = inferCharacterBindingsFromFiles([
       {
-        relativePath: "characters/云梦泽-孟缘/profile.yaml",
+        relativePath: "characters/云梦泽-孟缘/孟缘.yaml",
         content: `
 孟缘:
   name: 孟缘
@@ -682,14 +683,14 @@ entries:
 `,
       },
       {
-        relativePath: "characters/遐蝶-Hidden/profile.yaml",
+        relativePath: "characters/遐蝶-Hidden/遐蝶.yaml",
         content: `
 遐蝶:
   name: 遐蝶
 `,
       },
       {
-        relativePath: "characters/遐蝶/profile.yaml",
+        relativePath: "characters/遐蝶/遐蝶.yaml",
         content: `
 name: 遐蝶
 aliases: [小蝶]
@@ -698,21 +699,21 @@ aliases: [小蝶]
     ])
 
     expect(bindings["孟缘"]).toEqual({
-      memoryPath: "characters/云梦泽-孟缘/memory.yaml",
+      memoryPath: "characters/云梦泽-孟缘/孟缘-cognition/memory.yaml",
     })
     expect(bindings["遐蝶"]).toEqual({
-      memoryPath: "characters/遐蝶/memory.yaml",
+      memoryPath: "characters/遐蝶/遐蝶-cognition/memory.yaml",
     })
   })
 })
 
 describe("tool.embody bindings", () => {
-  test("resolves character directory binding from profile.yaml", async () => {
+  test("resolves character directory binding from profile yaml", async () => {
     const dir = await tmpdir()
     const worldPath = dir.path
     await fs.mkdir(path.join(worldPath, "characters", "云梦泽-孟缘"), { recursive: true })
     await fs.writeFile(
-      path.join(worldPath, "characters", "云梦泽-孟缘", "profile.yaml"),
+      path.join(worldPath, "characters", "云梦泽-孟缘", "孟缘.yaml"),
       `
 name: 孟缘
 role: 云梦泽的大妖长老
@@ -732,7 +733,7 @@ role: 云梦泽的大妖长老
     )
 
     expect(result.binding).toEqual({
-      memoryPath: "characters/云梦泽-孟缘/memory.yaml",
+      memoryPath: "characters/云梦泽-孟缘/孟缘-cognition/memory.yaml",
     })
 
     await dir[Symbol.asyncDispose]()

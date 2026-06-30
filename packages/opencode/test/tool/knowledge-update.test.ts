@@ -68,7 +68,7 @@ const run = Effect.fn("KnowledgeUpdateToolTest.run")(function* (
 })
 
 describe("tool.knowledge_update", () => {
-  it.effect("writes a character-owned knowledge file inside knowledge/", () =>
+  it.effect("writes a character-owned knowledge file inside cognition directory", () =>
     Effect.gen(function* () {
       const dir = yield* Effect.promise(() => tmpdir())
       yield* Effect.addFinalizer(() => Effect.promise(() => dir[Symbol.asyncDispose]()))
@@ -79,21 +79,22 @@ describe("tool.knowledge_update", () => {
         world: { rootPath: dir.path } as any,
       }
       const charDir = path.join(dir.path, "characters", "云梦泽-孟缘")
+      const cognitionDir = path.join(charDir, "孟缘-cognition")
       yield* Effect.promise(() => fs.mkdir(charDir, { recursive: true }))
-      yield* Effect.promise(() => fs.writeFile(path.join(charDir, "profile.yaml"), "name: 孟缘\nrole: 云梦泽的大妖长老\n"))
-      const fullPath = path.join(charDir, "knowledge", "people", "宋祈.md")
+      yield* Effect.promise(() => fs.writeFile(path.join(charDir, "孟缘.yaml"), "name: 孟缘\nrole: 云梦泽的大妖长老\n"))
+      const fullPath = path.join(cognitionDir, "宋祈.md")
 
       const updated = yield* onceBus(FileWatcher.Event.Updated).pipe(Effect.provideService(InstanceRef, instance))
       const result = yield* (
         run({
-          path: "people/宋祈.md",
+          path: "宋祈.md",
           content: "# 宋祈\n\n她在真正危险时反而会先压住声音。\n",
         }).pipe(Effect.provideService(InstanceRef, instance))
       )
 
       const written = yield* Effect.promise(() => fs.readFile(fullPath, "utf-8"))
       expect(result.metadata.created).toBe(true)
-      expect(result.metadata.path).toBe(path.join("characters", "云梦泽-孟缘", "knowledge", "people", "宋祈.md"))
+      expect(result.metadata.path).toBe(path.join("characters", "云梦泽-孟缘", "孟缘-cognition", "宋祈.md"))
       expect(written).toContain("真正危险时")
       expect(yield* Deferred.await(updated)).toEqual({
         file: fullPath,
@@ -114,7 +115,7 @@ describe("tool.knowledge_update", () => {
       }
       const charDir = path.join(dir.path, "characters", "云梦泽-孟缘")
       yield* Effect.promise(() => fs.mkdir(charDir, { recursive: true }))
-      yield* Effect.promise(() => fs.writeFile(path.join(charDir, "profile.yaml"), "name: 孟缘\n"))
+      yield* Effect.promise(() => fs.writeFile(path.join(charDir, "孟缘.yaml"), "name: 孟缘\n"))
 
       const result = yield* (
         run({

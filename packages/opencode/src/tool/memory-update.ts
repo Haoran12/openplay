@@ -27,6 +27,11 @@ type MemoryUpdateMetadata = {
   size: number
 }
 
+/**
+ * @deprecated Use `resolveForCharacter` + `getCharacterMemoryFilePath` instead.
+ * This function assumes the old directory structure (characters/{name}/memory.yaml)
+ * and does not support the new cognition directory structure.
+ */
 export function characterMemoryPath(worldRoot: string, character: string) {
   return path.join(worldRoot, "characters", character, "memory.yaml")
 }
