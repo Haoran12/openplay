@@ -99,6 +99,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器 PAYLOAD 消息智能解析：未知 trace kind 的 payload 现自动识别常见结构（role/content 字段、messages 数组、request/response 结构），转义字符（\n/\"/\\t 等）还原为可读形式，最终以 `{ROLE}> {可读内容}` 格式展示。
 - [x] `openplay-ui` Trace 阅读器完整改进：新增 payload.type 字段作为 ROLE 提取、session.compose 专用解析、tools 完整显示、移除内容截断限制，所有消息在可读视图下显示完整内容。
 - [x] `openplay-ui` Trace 阅读器代码块转义字符统一处理：tool-call input 与 tool-result output 现统一调用 `unescapeString` / `unescapedStrings`，确保 `\n`/`\t`/`\"` 等转义序列在所有场景下正确渲染为可读形式。
+- [x] `openplay-ui` Trace 阅读器工具调用路径提取优化：read/edit/write/lsp 工具的 `filePath`、glob/grep 的 `path`+`pattern`+`include`、bash 的 `workdir` 现提取显示在 `Tool call:` 行；tool-result 同样提取路径摘要（read 输出文件路径、glob 文件数量、grep 匹配数量、edit/write 成功状态、bash 退出码）。
 - [x] Director workflow 提前退出修复：provider-executed 工具调用后，若仅完成人物采样而尚未 `narrate` / `question` 收束，本轮会继续 prompt loop 而不会被误判为完成。
 - [x] Director `narrate` 失败诊断与 init 模型配置修复：`openplay init` 生成合法的 `provider/model` 字符串；`narrate` 在无 `content` 回退时保留底层 provider/model 失败原因，避免只看到泛化报错。
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
@@ -113,6 +114,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-30: `openplay-ui` Trace 阅读器工具调用路径提取优化：`formatMessagePart` 新增 `extractToolPath` / `extractToolResultPath` 辅助函数，read/edit/write/lsp 的 `filePath`、glob/grep 的 `path`+`pattern`+`include`、bash 的 `workdir` 现直接显示在 `Tool call:` 行内联；tool-result 同样提取摘要信息（read 输出文件路径、glob 文件数量、grep 匹配数量、edit/write 成功状态、bash 退出码）；新增 11 组回归测试覆盖所有工具类型。
 - 2026-06-30: 修复 pre-push husky typecheck 失败（10 个 TypeScript 类型错误，纯类型级修复，无运行时行为变更）：`narrate.ts` — `Schema.decodeUnknownSync` 参数强转为 `Decoder<unknown, never>`、`Schema.Array` 结果展开为可变数组、union 类型断言、`Part` filter 改用 `as MessageV2.TextPart` 替代不兼容的 type predicate、`execute` 函数体用 `Effect.orDie` 包裹使 error channel 为 `never`（与 `ReadTool` 一致）；`read.ts` — `Effect.catch` handler 返回值用 `Effect.succeed` 包裹（Effect v4 要求 handler 返回 Effect 而非普通对象）；`prompt.test.ts` — `InstanceRef` spread 改为显式非空提取 `directory`/`worktree`/`project`。
 
 - 2026-06-30: 角色目录结构重构：`scanIndex` 现扫描 `characters/{dir}/*.yaml` 作为 profile 文件（而非固定的 `profile.yaml`），memory/knowledge 路径改为 `characters/{dir}/{name}-cognition/`；`readManifest` 返回动态 profile 文件名和 cognition 目录下的资源列表；`inferCharacterBindingsFromFiles` 改为识别任意 `.yaml` profile 文件；`characterMemoryPath` 标记为 deprecated；同步更新相关测试。

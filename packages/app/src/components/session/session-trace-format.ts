@@ -96,6 +96,77 @@ function formatReadableJson(value: unknown): string {
   }
 }
 
+function extractToolPath(toolName: string, body: unknown): string | undefined {
+  const record = asRecord(body)
+  if (!record) return undefined
+
+  switch (toolName) {
+    case "read":
+    case "edit":
+    case "write":
+    case "lsp":
+      return typeof record.filePath === "string" ? record.filePath : undefined
+
+    case "glob":
+    case "grep": {
+      const path = typeof record.path === "string" ? record.path : ""
+      const pattern = typeof record.pattern === "string" ? record.pattern : ""
+      const include = typeof record.include === "string" ? record.include : ""
+      const parts = []
+      if (path) parts.push(path)
+      if (pattern) parts.push(pattern)
+      if (include) parts.push(`include=${include}`)
+      return parts.length > 0 ? parts.join(" ") : undefined
+    }
+
+    case "bash":
+      return typeof record.workdir === "string" ? record.workdir : undefined
+
+    default:
+      return undefined
+  }
+}
+
+function extractToolResultPath(toolName: string, body: unknown): string | undefined {
+  if (typeof body !== "string") return undefined
+
+  switch (toolName) {
+    case "read": {
+      const pathMatch = body.match(/<path>(.+?)<\/path>/)
+      if (pathMatch?.[1]) return pathMatch[1]
+      return undefined
+    }
+
+    case "glob": {
+      const lines = body.split("\n").filter((line) => line.trim())
+      if (lines.length > 0 && lines[0]!.startsWith("/")) return `${lines.length} files`
+      return undefined
+    }
+
+    case "grep": {
+      const match = body.match(/Found (\d+) matches?/)
+      if (match?.[1]) return `${match[1]} matches`
+      return undefined
+    }
+
+    case "edit":
+    case "write": {
+      if (body.includes("successfully")) return "success"
+      return undefined
+    }
+
+    case "bash": {
+      if (body.includes("Exit code: 0")) return "exit 0"
+      const exitMatch = body.match(/Exit code: (\d+)/)
+      if (exitMatch?.[1]) return `exit ${exitMatch[1]}`
+      return undefined
+    }
+
+    default:
+      return undefined
+  }
+}
+
 function formatToolsDisplay(tools: Record<string, unknown>): string {
   const names = Object.keys(tools)
   if (names.length === 0) return ""
@@ -119,15 +190,21 @@ function formatMessagePart(part: unknown) {
   }
 
   if (item.type === "tool-call") {
+    const toolName = typeof item.toolName === "string" ? item.toolName : "unknown"
     const body = item.input ?? item.args ?? item.arguments
+    const path = extractToolPath(toolName, body)
+    const pathDisplay = path ? ` \`${path}\`` : ""
     const detail = body === undefined ? "" : `\n\n\`\`\`json\n${formatStructuredValue(body)}\n\`\`\``
-    return `Tool call: ${typeof item.toolName === "string" ? item.toolName : "unknown"}${detail}`
+    return `Tool call: ${toolName}${pathDisplay}${detail}`
   }
 
   if (item.type === "tool-result") {
+    const toolName = typeof item.toolName === "string" ? item.toolName : "unknown"
     const body = item.output ?? item.result ?? item.content
+    const resultPath = extractToolResultPath(toolName, body)
+    const resultDisplay = resultPath ? ` (${resultPath})` : ""
     const detail = body === undefined ? "" : `\n\n\`\`\`\n${typeof body === "string" ? unescapeString(body) : formatStructuredValue(body)}\n\`\`\``
-    return `Tool result: ${typeof item.toolName === "string" ? item.toolName : "unknown"}${detail}`
+    return `Tool result: ${toolName}${resultDisplay}${detail}`
   }
 
   if (item.type === "reasoning" && typeof item.text === "string") return item.text

@@ -340,4 +340,326 @@ describe("session trace formatting", () => {
       expect(markdown).not.toContain("truncated")
     })
   })
+
+  describe("tool call formatting with path extraction", () => {
+    test("extracts filePath for read tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-1",
+                      toolName: "read",
+                      input: { filePath: "/home/user/project/src/index.ts" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: read `/home/user/project/src/index.ts`")
+      expect(assistantBlock!.text).toContain('"filePath": "/home/user/project/src/index.ts"')
+    })
+
+    test("extracts path and pattern for glob tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-2",
+                      toolName: "glob",
+                      input: { path: "/src", pattern: "**/*.ts" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: glob `/src **/*.ts`")
+    })
+
+    test("extracts path and pattern for grep tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-3",
+                      toolName: "grep",
+                      input: { path: "/src", pattern: "TODO", include: "*.ts" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: grep `/src TODO include=*.ts`")
+    })
+
+    test("extracts filePath for edit tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-4",
+                      toolName: "edit",
+                      input: { filePath: "/src/index.ts", oldString: "old", newString: "new" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: edit `/src/index.ts`")
+    })
+
+    test("extracts filePath for write tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-5",
+                      toolName: "write",
+                      input: { filePath: "/src/new-file.ts", content: "const x = 1;" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: write `/src/new-file.ts`")
+    })
+
+    test("extracts workdir for bash tool-call", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-call",
+                      toolCallId: "call-6",
+                      toolName: "bash",
+                      input: { command: "ls -la", workdir: "/home/user/project" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool call: bash `/home/user/project`")
+    })
+
+    test("extracts filePath for read tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-1",
+                      toolName: "read",
+                      output: "<path>/home/user/project/src/index.ts</path>\n<content>\n1: const x = 1;\n</content>",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: read (/home/user/project/src/index.ts)")
+    })
+
+    test("extracts file count for glob tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-2",
+                      toolName: "glob",
+                      output: "/src/file1.ts\n/src/file2.ts\n/src/file3.ts",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: glob (3 files)")
+    })
+
+    test("extracts match count for grep tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-3",
+                      toolName: "grep",
+                      output: "Found 5 matches\n/src/file1.ts:10: TODO fix this\n/src/file2.ts:20: TODO fix that",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: grep (5 matches)")
+    })
+
+    test("extracts success for edit tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-4",
+                      toolName: "edit",
+                      output: "Edit applied successfully.",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: edit (success)")
+    })
+
+    test("extracts exit code for bash tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-6",
+                      toolName: "bash",
+                      output: "total 48\ndrwxr-xr-x  6 user user 4096 Jun 30 10:00 .\nExit code: 0",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: bash (exit 0)")
+    })
+  })
 })
