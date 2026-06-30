@@ -81,7 +81,9 @@ function withRoleplayDirectorContext(directory: string) {
     Effect.gen(function* () {
       const base = yield* InstanceRef
       const ctx: InstanceContext = {
-        ...base,
+        directory: base!.directory,
+        worktree: base!.worktree,
+        project: base!.project,
         world: {
           id: WorldID.generate(),
           rootPath: directory,

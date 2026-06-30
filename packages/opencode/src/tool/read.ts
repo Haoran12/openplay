@@ -62,15 +62,16 @@ export const ReadTool = Tool.define(
           }),
         ),
         Effect.catch(
-          (err): DirReadResult => ({
-            items: [],
-            error: {
-              tag: "reason" in err && err.reason && typeof err.reason === "object" && "_tag" in err.reason
-                ? String(err.reason._tag)
-                : "Unknown",
-              message: err instanceof Error ? err.message : String(err),
-            },
-          }),
+          (err): Effect.Effect<DirReadResult> =>
+            Effect.succeed({
+              items: [],
+              error: {
+                tag: "reason" in err && err.reason && typeof err.reason === "object" && "_tag" in err.reason
+                  ? String(err.reason._tag)
+                  : "Unknown",
+                message: err instanceof Error ? err.message : String(err),
+              },
+            }),
         ),
       )
 

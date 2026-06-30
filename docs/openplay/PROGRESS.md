@@ -113,6 +113,8 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-30: 修复 pre-push husky typecheck 失败（10 个 TypeScript 类型错误，纯类型级修复，无运行时行为变更）：`narrate.ts` — `Schema.decodeUnknownSync` 参数强转为 `Decoder<unknown, never>`、`Schema.Array` 结果展开为可变数组、union 类型断言、`Part` filter 改用 `as MessageV2.TextPart` 替代不兼容的 type predicate、`execute` 函数体用 `Effect.orDie` 包裹使 error channel 为 `never`（与 `ReadTool` 一致）；`read.ts` — `Effect.catch` handler 返回值用 `Effect.succeed` 包裹（Effect v4 要求 handler 返回 Effect 而非普通对象）；`prompt.test.ts` — `InstanceRef` spread 改为显式非空提取 `directory`/`worktree`/`project`。
+
 - 2026-06-30: 角色目录结构重构：`scanIndex` 现扫描 `characters/{dir}/*.yaml` 作为 profile 文件（而非固定的 `profile.yaml`），memory/knowledge 路径改为 `characters/{dir}/{name}-cognition/`；`readManifest` 返回动态 profile 文件名和 cognition 目录下的资源列表；`inferCharacterBindingsFromFiles` 改为识别任意 `.yaml` profile 文件；`characterMemoryPath` 标记为 deprecated；同步更新相关测试。
 
 - 2026-06-29: 修复旧 Director 会话在代码已更新后仍继续中断的问题：进一步核对本机实际运行态，确认生效 provider/model 来自 `~/.config/openplay/openplay.json`，实际为 `AstronCodingPlan/astron-code-latest`，world 与 `/home/refzhu/airp/opencode.json` 均无模型覆盖。最新 trace 显示 `session.compose` 已拿到完整 Director 工具集，但旧会话数据库仍残留 `permission=[{"permission":"*","action":"deny","pattern":"*"}]`，导致真正发给 LLM 的 `request.tools` 为空，Astron 只能输出伪 `<tool_call>` 文本。现为 roleplay Director 增加旧会话运行时自愈：检测到这种历史遗留的 `* deny *` 且当前玩家 prompt 未显式设置工具覆盖时，自动清空该污染权限并持久化修复；同时将另一个内部 `tools: {"*": false}` 调用点也改为非持久化，避免同类问题在其他流程复现。补充回归测试覆盖“新污染不再写回”和“旧 Director 会话会自动修复”两条路径。

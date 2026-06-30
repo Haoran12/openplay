@@ -11,6 +11,7 @@ import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { Session } from "@/session/session"
 import { MessageID } from "@/session/schema"
+import type { MessageV2 } from "@/session/message-v2"
 import { ModelID, ProviderID } from "@/provider/schema"
 import type { TaskPromptOps } from "./task"
 import * as Tool from "./tool"
@@ -130,7 +131,7 @@ function decodeYamlBlock<T>(raw: string, schema: Schema.Schema<T>): T | undefine
   if (!trimmed) return undefined
   try {
     const decoded = parseYaml(trimmed)
-    return Schema.decodeUnknownSync(schema)(decoded)
+    return Schema.decodeUnknownSync(schema as Schema.Decoder<unknown, never>)(decoded) as T
   } catch {
     return undefined
   }
@@ -147,9 +148,10 @@ function normalizeCharacterSamples(samples?: NarrateParameters["characterSamples
   if (typeof samples === "string") {
     const single = decodeYamlBlock(samples, CharacterSampleSchema)
     if (single) return [single]
-    return decodeYamlBlock(samples, Schema.Array(CharacterSampleSchema))
+    const arr = decodeYamlBlock(samples, Schema.Array(CharacterSampleSchema))
+    return arr ? [...arr] : undefined
   }
-  return Array.isArray(samples) ? samples : [samples]
+  return (Array.isArray(samples) ? samples : [samples]) as CharacterSample[]
 }
 
 function normalizeNarrateParameters(params: NarrateParameters): NormalizedNarrateParameters {
@@ -313,8 +315,8 @@ function generateNarrative(
     if (!result) return emitDirectly(params)
 
     const narrativeText = result.parts
-      .filter((item): item is { type: "text"; text: string } => item.type === "text")
-      .map((item) => item.text)
+      .filter((item) => item.type === "text")
+      .map((item) => (item as MessageV2.TextPart).text)
       .join("\n")
       .trim()
 
@@ -371,7 +373,7 @@ export const NarrateTool = Tool.define(
           }
 
           return emitDirectly(normalized)
-        }),
+        }).pipe(Effect.orDie),
     }
   }),
 )
