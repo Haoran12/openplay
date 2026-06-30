@@ -543,7 +543,7 @@ describe("session trace formatting", () => {
 
       const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
       expect(assistantBlock).toBeDefined()
-      expect(assistantBlock!.text).toContain("Tool result: read (/home/user/project/src/index.ts)")
+      expect(assistantBlock!.text).toContain("Tool result: read `/home/user/project/src/index.ts`")
     })
 
     test("extracts file count for glob tool-result", () => {
@@ -572,7 +572,7 @@ describe("session trace formatting", () => {
 
       const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
       expect(assistantBlock).toBeDefined()
-      expect(assistantBlock!.text).toContain("Tool result: glob (3 files)")
+      expect(assistantBlock!.text).toContain("Tool result: glob `3 files`")
     })
 
     test("extracts match count for grep tool-result", () => {
@@ -601,7 +601,7 @@ describe("session trace formatting", () => {
 
       const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
       expect(assistantBlock).toBeDefined()
-      expect(assistantBlock!.text).toContain("Tool result: grep (5 matches)")
+      expect(assistantBlock!.text).toContain("Tool result: grep `5 matches`")
     })
 
     test("extracts success for edit tool-result", () => {
@@ -630,7 +630,7 @@ describe("session trace formatting", () => {
 
       const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
       expect(assistantBlock).toBeDefined()
-      expect(assistantBlock!.text).toContain("Tool result: edit (success)")
+      expect(assistantBlock!.text).toContain("Tool result: edit `success`")
     })
 
     test("extracts exit code for bash tool-result", () => {
@@ -659,7 +659,140 @@ describe("session trace formatting", () => {
 
       const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
       expect(assistantBlock).toBeDefined()
-      expect(assistantBlock!.text).toContain("Tool result: bash (exit 0)")
+      expect(assistantBlock!.text).toContain("Tool result: bash `exit 0`")
+    })
+
+    test("extracts path from object-format read tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-1",
+                      toolName: "read",
+                      output: {
+                        type: "text",
+                        value: "<path>/home/user/project/setting.yaml</path>\n<type>file</type>\n<content>\n1: key: value\n</content>",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: read `/home/user/project/setting.yaml`")
+      expect(assistantBlock!.text).toContain("<content>")
+      expect(assistantBlock!.text).toContain("1: key: value")
+    })
+
+    test("extracts path from JSON-string read tool-result", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-1",
+                      toolName: "read",
+                      output: JSON.stringify({
+                        type: "text",
+                        value: "<path>/home/user/project/config.yaml</path>\n<content>\n1: name: test\n</content>",
+                      }),
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: read `/home/user/project/config.yaml`")
+      expect(assistantBlock!.text).toContain("1: name: test")
+    })
+
+    test("renders object-format glob tool-result with file count", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-2",
+                      toolName: "glob",
+                      output: {
+                        type: "text",
+                        value: "/src/file1.ts\n/src/file2.ts\n/src/file3.ts",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: glob `3 files`")
+      expect(assistantBlock!.text).toContain("/src/file1.ts\n/src/file2.ts\n/src/file3.ts")
+    })
+
+    test("renders object-format tool-result with escaped newlines", () => {
+      const blocks = traceReadableBlocks(
+        entry({
+          kind: "llm.interaction",
+          payload: {
+            request: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: "call-3",
+                      toolName: "read",
+                      output: {
+                        type: "text",
+                        value: "<path>/test/file.txt</path>\n<content>\n1: line one\\n2: line two\\n</content>",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      )
+
+      const assistantBlock = blocks.find((b) => b.role === "ASSISTANT")
+      expect(assistantBlock).toBeDefined()
+      expect(assistantBlock!.text).toContain("Tool result: read `/test/file.txt`")
+      expect(assistantBlock!.text).toContain("1: line one\n2: line two")
     })
   })
 })

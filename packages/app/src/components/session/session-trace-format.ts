@@ -127,37 +127,63 @@ function extractToolPath(toolName: string, body: unknown): string | undefined {
   }
 }
 
+function extractTextFromBody(body: unknown): string | undefined {
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body)
+      if (parsed && typeof parsed === "object") {
+        if (typeof parsed.value === "string") return parsed.value
+        if (typeof parsed.text === "string") return parsed.text
+        if (typeof parsed.content === "string") return parsed.content
+      }
+    } catch {
+      // not JSON, return as-is
+    }
+    return body
+  }
+
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>
+    if (typeof record.value === "string") return record.value
+    if (typeof record.text === "string") return record.text
+    if (typeof record.content === "string") return record.content
+  }
+
+  return undefined
+}
+
 function extractToolResultPath(toolName: string, body: unknown): string | undefined {
-  if (typeof body !== "string") return undefined
+  const textBody = extractTextFromBody(body)
+  if (!textBody) return undefined
 
   switch (toolName) {
     case "read": {
-      const pathMatch = body.match(/<path>(.+?)<\/path>/)
+      const pathMatch = textBody.match(/<path>(.+?)<\/path>/)
       if (pathMatch?.[1]) return pathMatch[1]
       return undefined
     }
 
     case "glob": {
-      const lines = body.split("\n").filter((line) => line.trim())
+      const lines = textBody.split("\n").filter((line) => line.trim())
       if (lines.length > 0 && lines[0]!.startsWith("/")) return `${lines.length} files`
       return undefined
     }
 
     case "grep": {
-      const match = body.match(/Found (\d+) matches?/)
+      const match = textBody.match(/Found (\d+) matches?/)
       if (match?.[1]) return `${match[1]} matches`
       return undefined
     }
 
     case "edit":
     case "write": {
-      if (body.includes("successfully")) return "success"
+      if (textBody.includes("successfully")) return "success"
       return undefined
     }
 
     case "bash": {
-      if (body.includes("Exit code: 0")) return "exit 0"
-      const exitMatch = body.match(/Exit code: (\d+)/)
+      if (textBody.includes("Exit code: 0")) return "exit 0"
+      const exitMatch = textBody.match(/Exit code: (\d+)/)
       if (exitMatch?.[1]) return `exit ${exitMatch[1]}`
       return undefined
     }
@@ -201,9 +227,14 @@ function formatMessagePart(part: unknown) {
   if (item.type === "tool-result") {
     const toolName = typeof item.toolName === "string" ? item.toolName : "unknown"
     const body = item.output ?? item.result ?? item.content
+    const textBody = extractTextFromBody(body)
     const resultPath = extractToolResultPath(toolName, body)
-    const resultDisplay = resultPath ? ` (${resultPath})` : ""
-    const detail = body === undefined ? "" : `\n\n\`\`\`\n${typeof body === "string" ? unescapeString(body) : formatStructuredValue(body)}\n\`\`\``
+    const resultDisplay = resultPath ? ` \`${resultPath}\`` : ""
+    const detail = textBody
+      ? `\n\n\`\`\`\n${unescapeString(textBody)}\n\`\`\``
+      : body === undefined
+        ? ""
+        : `\n\n\`\`\`json\n${formatStructuredValue(body)}\n\`\`\``
     return `Tool result: ${toolName}${resultDisplay}${detail}`
   }
 

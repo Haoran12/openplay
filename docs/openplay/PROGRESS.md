@@ -100,6 +100,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - [x] `openplay-ui` Trace 阅读器完整改进：新增 payload.type 字段作为 ROLE 提取、session.compose 专用解析、tools 完整显示、移除内容截断限制，所有消息在可读视图下显示完整内容。
 - [x] `openplay-ui` Trace 阅读器代码块转义字符统一处理：tool-call input 与 tool-result output 现统一调用 `unescapeString` / `unescapedStrings`，确保 `\n`/`\t`/`\"` 等转义序列在所有场景下正确渲染为可读形式。
 - [x] `openplay-ui` Trace 阅读器工具调用路径提取优化：read/edit/write/lsp 工具的 `filePath`、glob/grep 的 `path`+`pattern`+`include`、bash 的 `workdir` 现提取显示在 `Tool call:` 行；tool-result 同样提取路径摘要（read 输出文件路径、glob 文件数量、grep 匹配数量、edit/write 成功状态、bash 退出码）。
+- [x] `openplay-ui` Trace 阅读器 tool-result 对象格式支持：新增 `extractTextFromBody` 辅助函数，支持从对象格式 `{type:"text",value:"..."}` 和 JSON 字符串中提取文本内容；tool-result 代码块优先渲染提取的文本，而非原始 JSON；路径显示改为行内代码格式。
 - [x] Director workflow 提前退出修复：provider-executed 工具调用后，若仅完成人物采样而尚未 `narrate` / `question` 收束，本轮会继续 prompt loop 而不会被误判为完成。
 - [x] Director `narrate` 失败诊断与 init 模型配置修复：`openplay init` 生成合法的 `provider/model` 字符串；`narrate` 在无 `content` 回退时保留底层 provider/model 失败原因，避免只看到泛化报错。
 - [x] Director roleplay 工具白名单修复：实际暴露给 Director 的工具集重新包含 `todowrite` 与 `task`，避免 prompt 要求与 runtime 可用工具不一致导致伪 tool-call 文本后回合提前退出。
@@ -114,6 +115,7 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 
 ## Changelog
 
+- 2026-06-30: `openplay-ui` Trace 阅读器 tool-result 对象格式支持：新增 `extractTextFromBody` 辅助函数，支持从对象格式 `{type:"text",value:"..."}` 和 JSON 字符串中提取文本内容；tool-result 代码块优先渲染提取的文本，而非原始 JSON；路径显示改为行内代码格式；新增 4 组测试覆盖对象和 JSON 字符串格式的 tool-result。
 - 2026-06-30: `openplay-ui` Trace 阅读器工具调用路径提取优化：`formatMessagePart` 新增 `extractToolPath` / `extractToolResultPath` 辅助函数，read/edit/write/lsp 的 `filePath`、glob/grep 的 `path`+`pattern`+`include`、bash 的 `workdir` 现直接显示在 `Tool call:` 行内联；tool-result 同样提取摘要信息（read 输出文件路径、glob 文件数量、grep 匹配数量、edit/write 成功状态、bash 退出码）；新增 11 组回归测试覆盖所有工具类型。
 - 2026-06-30: 修复 pre-push husky typecheck 失败（10 个 TypeScript 类型错误，纯类型级修复，无运行时行为变更）：`narrate.ts` — `Schema.decodeUnknownSync` 参数强转为 `Decoder<unknown, never>`、`Schema.Array` 结果展开为可变数组、union 类型断言、`Part` filter 改用 `as MessageV2.TextPart` 替代不兼容的 type predicate、`execute` 函数体用 `Effect.orDie` 包裹使 error channel 为 `never`（与 `ReadTool` 一致）；`read.ts` — `Effect.catch` handler 返回值用 `Effect.succeed` 包裹（Effect v4 要求 handler 返回 Effect 而非普通对象）；`prompt.test.ts` — `InstanceRef` spread 改为显式非空提取 `directory`/`worktree`/`project`。
 
@@ -214,3 +216,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-30: 修复 read 工具 `miss()` 静默吞掉父目录读取错误的问题：当文件不存在且父目录读取失败（如权限不足）时，现保留原始错误信息（错误类型 + message）并附加到 "File not found" 提示中，避免误导性的空白错误导致 agent 跳过正确文件或胡编乱造。
 - 2026-06-30: 移除读取工具的全部应用内权限限制：`read`/`glob`/`grep` 工具不再检查 `external_directory` 或 `read` 权限，只要系统允许读取就直接执行，避免 agent 在需要读取外部目录或 .env 文件时被权限弹窗打断或因权限规则被拒绝。
 - 2026-06-30: GM/Director 提示词适配角色目录结构重构：profile 文件名改为 `{name}.yaml`（动态）、memory/knowledge 路径改为 `{name}-cognition/` 目录；更新 `director.txt` 和 `gm.txt` 中所有路径引用和目录结构说明。
+- 2026-06-30: 修复 `character_view_read` 和 `knowledge_update` 工具路径解析错误：`character_view_read` 现在正确解析 knowledge 文件路径（使用 `info.knowledgeDirPath` 而非 `info.dirPath`），并支持动态 profile 文件名（如 `何英玲.yaml` 而非硬编码 `profile.yaml`）；`knowledge_update` 的 manifest 路径比较改为使用 bare filename，与 `readManifest` 返回格式一致。修复了 `memory_reflect` 和 `knowledge_reflect` 工具无法读取角色知识文件的问题。
