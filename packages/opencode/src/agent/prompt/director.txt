@@ -33,12 +33,12 @@ task(
   subagent_type="gm",
   prompt="当前场景: {location}, 时间: {date}。
   搜索建议:
-  - 地区设定: glob location_and_faction/*{关键词}* 定位对应文件
-  - 在场人物: glob characters/*{名字}*/profile.yaml 定位角色目录
+  - 地区与势力: glob location_and_faction/*{关键词}* 定位对应文件
+  - 在场人物: glob characters/*{名字}*/*.yaml 定位角色目录下的 profile 文件
   - 近期事件: records/session-{date}.yaml
   - 社会文化: social/*.yaml（如相关）
 
-  依据以上设定和环境上下文，构思即将出现的人物/景象/事件"
+  依据当前 environment、recent_events、人物身心状态、言行与目标，构思即将出现的人物/景象/事件"
 )
 ```
 
@@ -57,7 +57,7 @@ GM 会：
 |------|------|
 | `runtime.yaml` | 权威场景状态（时间/地点/环境/在场人物/近期事件） |
 | `worldview/` | 世界观设定：`world_base.yaml`（法则/种族/神明）、`Arguments.yaml`（数值参数）等 |
-| `characters/{affiliation}-{name}/` | 人物：`profile.yaml`（身份/属性/心智模型/经历）、`memory.yaml`（主观记忆）、`knowledge/`（认知） |
+| `characters/{dir}/` | 人物目录，内含 `{name}.yaml`（profile，身份/属性/心智模型/经历）、`{name}-cognition/memory.yaml`（主观记忆）、`{name}-cognition/`（认知文件） |
 | `social/` | 社会文化设定：政府结构、教育、节日、人妖关系等 |
 | `location_and_faction/{scope}-{entity}.yaml` | 地域与势力设定：前缀为国家/州/县/区域/势力 |
 | `records/` | 事件记录：按场次命名的 YAML 文件 |
@@ -66,7 +66,8 @@ GM 会：
 - `characters/`: `{所属地域或势力}-{名字}/`，前缀代表角色的归属
 - `location_and_faction/`: `{所属地域或势力}-{子地域或实体}.yaml`，前缀可为国家/州/区域/势力
 
-人物目录 `knowledge/` 内部结构：
+人物目录 `{name}-cognition/` 内部结构：
+- `memory.yaml`: 主观记忆
 - `world_base.yaml`: 宽泛世界观认知
 - `social_and_world.md`: 社会面貌与政治文化认知
 - `nature_and_body.md`: 自然环境与身体感官体验
@@ -149,16 +150,17 @@ Give characters information inside their perception space. Do not mention forbid
 
 ## Memory and Knowledge
 
-- `memory.yaml`: character-specific subjective memory, updated via `memory_reflect`
-- `knowledge/`: character-specific durable understanding, updated via `knowledge_reflect`
+- `{name}-cognition/memory.yaml`: character-specific subjective memory, updated via `memory_reflect`
+- `{name}-cognition/`: character-specific durable understanding, updated via `knowledge_reflect`
 - Never write character memory/knowledge via `scene_update`
-- Knowledge files follow a directory contract:
+- Cognition files follow a directory contract:
+  - `memory.yaml`: subjective memory entries (newest-first, 0-5 impression)
   - `world_base.yaml`: overall worldview and natural laws — broad, general rules
   - `social_and_world.md`: overall social landscape and political culture
   - `nature_and_body.md`: natural environment and body/sensory experience
   - `<name>.md`: knowledge about a specific person, region, faction, or social phenomenon
-  - `profile.yaml`: character's own attributes, abilities, experience, mindModel, role, appearance
-  - `knowledge/<name>.md`: knowledge about **others**
+  - `{name}.yaml` (profile): character's own attributes, abilities, experience, mindModel, role, appearance
+  - `<name>.md`: knowledge about **others**
   - Before creating a new knowledge file, check existing files to avoid duplicates
 - Memory entries: newest-first, 0-5 impression (5 = engraved, 4 = vivid, 2-3 = ordinary, 0-1 = fades fast)
 - Every 20 entries, compress older memories one level; impression 5 stays preserved

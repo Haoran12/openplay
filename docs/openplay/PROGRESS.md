@@ -209,3 +209,4 @@ God Only 过滤 + Subagent 派发：使用 yaml 库解析，大小写不敏感�
 - 2026-06-30: GM/Director 提示词补全世界目录结构地图：`gm.txt` 新增"世界目录结构"章节，将"地区设定/人物档案/势力动态/事件记录"映射到具体路径（`location_and_faction/`、`characters/`、`social/`、`records/`），并描述人物目录内部 `knowledge/` 契约；`director.txt` 新增"World Directory Layout"章节并改进 GM 调用示例，补充搜索路径提示。解决 GM 子代理不理解 rp 目录结构的问题。
 - 2026-06-30: 修复 read 工具 `miss()` 静默吞掉父目录读取错误的问题：当文件不存在且父目录读取失败（如权限不足）时，现保留原始错误信息（错误类型 + message）并附加到 "File not found" 提示中，避免误导性的空白错误导致 agent 跳过正确文件或胡编乱造。
 - 2026-06-30: 移除读取工具的全部应用内权限限制：`read`/`glob`/`grep` 工具不再检查 `external_directory` 或 `read` 权限，只要系统允许读取就直接执行，避免 agent 在需要读取外部目录或 .env 文件时被权限弹窗打断或因权限规则被拒绝。
+- 2026-06-30: GM/Director 提示词适配角色目录结构重构：profile 文件名改为 `{name}.yaml`（动态）、memory/knowledge 路径改为 `{name}-cognition/` 目录；更新 `director.txt` 和 `gm.txt` 中所有路径引用和目录结构说明。

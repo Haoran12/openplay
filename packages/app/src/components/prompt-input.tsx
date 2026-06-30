@@ -1504,6 +1504,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <Show when={store.mode !== "shell"}>
                     <div
                       data-component="prompt-model-control"
+                      class="flex items-center gap-1"
                       style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
                     >
                       <Show
