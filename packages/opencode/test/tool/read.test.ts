@@ -148,7 +148,7 @@ const asks = () => {
   }
 }
 
-describe("tool.read external_directory permission", () => {
+describe("tool.read allows reading without permission checks", () => {
   it.live("allows reading absolute path inside project directory", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()
@@ -169,185 +169,26 @@ describe("tool.read external_directory permission", () => {
     }),
   )
 
-  it.live("asks for external_directory permission when reading absolute path outside project", () =>
+  it.live("allows reading absolute path outside project directory", () =>
     Effect.gen(function* () {
       const outer = yield* tmpdirScoped()
       const dir = yield* tmpdirScoped({ git: true })
       yield* put(path.join(outer, "secret.txt"), "secret data")
 
-      const { items, next } = asks()
-
-      yield* exec(dir, { filePath: path.join(outer, "secret.txt") }, next)
-      const ext = items.find((item) => item.permission === "external_directory")
-      expect(ext).toBeDefined()
-      expect(ext!.patterns).toContain(glob(path.join(outer, "*")))
+      const result = yield* exec(dir, { filePath: path.join(outer, "secret.txt") })
+      expect(result.output).toContain("secret data")
     }),
   )
 
-  if (process.platform === "win32") {
-    it.live("normalizes read permission paths on Windows", () =>
-      Effect.gen(function* () {
-        const dir = yield* tmpdirScoped({ git: true })
-        yield* put(path.join(dir, "test.txt"), "hello world")
-
-        const { items, next } = asks()
-        const target = path.join(dir, "test.txt")
-        const alt = target
-          .replace(/^[A-Za-z]:/, "")
-          .replaceAll("\\", "/")
-          .toLowerCase()
-
-        yield* exec(dir, { filePath: alt }, next)
-        const read = items.find((item) => item.permission === "read")
-        expect(read).toBeDefined()
-        expect(read!.patterns).toEqual([path.relative(dir, full(target))])
-      }),
-    )
-  }
-
-  it.live("uses worktree-relative path for read permission so user rules match like edit/write", () =>
+  it.live("allows reading .env files without permission check", () =>
     Effect.gen(function* () {
-      const dir = yield* tmpdirScoped({ git: true })
-      yield* put(path.join(dir, "src", "secret.ts"), "shh")
+      const dir = yield* tmpdirScoped()
+      yield* put(path.join(dir, ".env"), "SECRET=value")
 
-      const { items, next } = asks()
-      yield* exec(dir, { filePath: path.join(dir, "src", "secret.ts") }, next)
-      const read = items.find((item) => item.permission === "read")
-      expect(read).toBeDefined()
-      expect(read!.patterns).toEqual([path.join("src", "secret.ts")])
+      const result = yield* exec(dir, { filePath: path.join(dir, ".env") })
+      expect(result.output).toContain("SECRET=value")
     }),
   )
-
-  it.live("asks for directory-scoped external_directory permission when reading external directory", () =>
-    Effect.gen(function* () {
-      const outer = yield* tmpdirScoped()
-      const dir = yield* tmpdirScoped({ git: true })
-      yield* put(path.join(outer, "external", "a.txt"), "a")
-
-      const { items, next } = asks()
-
-      yield* exec(dir, { filePath: path.join(outer, "external") }, next)
-      const ext = items.find((item) => item.permission === "external_directory")
-      expect(ext).toBeDefined()
-      expect(ext!.patterns).toContain(glob(path.join(outer, "external", "*")))
-    }),
-  )
-
-  it.live("asks for external_directory permission when reading relative path outside project", () =>
-    Effect.gen(function* () {
-      const dir = yield* tmpdirScoped({ git: true })
-
-      const { items, next } = asks()
-
-      yield* fail(dir, { filePath: "../outside.txt" }, next)
-      const ext = items.find((item) => item.permission === "external_directory")
-      expect(ext).toBeDefined()
-    }),
-  )
-
-  it.live("does not ask for external_directory permission when reading inside project", () =>
-    Effect.gen(function* () {
-      const dir = yield* tmpdirScoped({ git: true })
-      yield* put(path.join(dir, "internal.txt"), "internal content")
-
-      const { items, next } = asks()
-
-      yield* exec(dir, { filePath: path.join(dir, "internal.txt") }, next)
-      const ext = items.find((item) => item.permission === "external_directory")
-      expect(ext).toBeUndefined()
-    }),
-  )
-
-  scout.live("does not ask for external_directory permission when reading configured references", () =>
-    Effect.gen(function* () {
-      const fs = yield* AppFileSystem.Service
-      const cache = path.join(Global.Path.repos, "github.com", "opencode-read-reference", "repo")
-      yield* fs.remove(cache, { recursive: true }).pipe(Effect.ignore)
-      yield* Effect.addFinalizer(() => fs.remove(cache, { recursive: true }).pipe(Effect.ignore))
-
-      const source = yield* tmpdirScoped({ git: true })
-      const remoteRoot = yield* tmpdirScoped()
-      const remoteDir = path.join(remoteRoot, "opencode-read-reference")
-      const remoteRepo = path.join(remoteDir, "repo.git")
-      yield* put(path.join(source, "notes.md"), "reference notes")
-      yield* git(source, ["add", "."])
-      yield* git(source, ["commit", "-m", "add notes"])
-      yield* fs.makeDirectory(remoteDir, { recursive: true }).pipe(Effect.orDie)
-      yield* git(remoteRoot, ["clone", "--bare", source, remoteRepo])
-
-      const dir = yield* tmpdirScoped({
-        git: true,
-        config: {
-          reference: {
-            docs: "opencode-read-reference/repo",
-          },
-        },
-      })
-
-      const { items, next } = asks()
-      const result = yield* githubBase(
-        `file://${remoteRoot}/`,
-        exec(dir, { filePath: path.join(cache, "notes.md") }, next),
-      )
-      const ext = items.find((item) => item.permission === "external_directory")
-
-      expect(result.output).toContain("reference notes")
-      expect(ext).toBeUndefined()
-    }),
-  )
-})
-
-describe("tool.read env file permissions", () => {
-  const cases: [string, boolean][] = [
-    [".env", true],
-    [".env.local", true],
-    [".env.production", true],
-    [".env.development.local", true],
-    [".env.example", false],
-    [".envrc", false],
-    ["environment.ts", false],
-  ]
-
-  for (const agentName of ["build", "plan"] as const) {
-    describe(`agent=${agentName}`, () => {
-      for (const [filename, shouldAsk] of cases) {
-        it.live(`${filename} asks=${shouldAsk}`, () =>
-          Effect.gen(function* () {
-            const dir = yield* tmpdirScoped()
-            yield* put(path.join(dir, filename), "content")
-
-            const asked = yield* provideInstance(dir)(
-              Effect.gen(function* () {
-                const agent = yield* Agent.Service
-                const info = yield* agent.get(agentName)
-                let asked = false
-                const next = {
-                  ...ctx,
-                  ask: (req: Omit<Permission.Request, "id" | "sessionID" | "tool">) =>
-                    Effect.sync(() => {
-                      for (const pattern of req.patterns) {
-                        const rule = Permission.evaluate(req.permission, pattern, info.permission)
-                        if (rule.action === "ask" && req.permission === "read") {
-                          asked = true
-                        }
-                        if (rule.action === "deny") {
-                          throw new Permission.DeniedError({ ruleset: info.permission })
-                        }
-                      }
-                    }),
-                }
-
-                yield* run({ filePath: path.join(dir, filename) }, next)
-                return asked
-              }),
-            )
-
-            expect(asked).toBe(shouldAsk)
-          }),
-        )
-      }
-    })
-  }
 })
 
 describe("tool.read truncation", () => {

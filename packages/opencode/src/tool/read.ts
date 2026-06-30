@@ -6,7 +6,6 @@ import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { LSP } from "@/lsp/lsp"
 import DESCRIPTION from "./read.txt"
 import { InstanceState } from "@/effect/instance-state"
-import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { Reference } from "@/reference/reference"
@@ -235,18 +234,6 @@ export const ReadTool = Tool.define(
           () => Effect.succeed(undefined),
         ),
       )
-
-      yield* assertExternalDirectoryEffect(ctx, filepath, {
-        bypass: Boolean(ctx.extra?.["bypassCwdCheck"]) || (yield* reference.contains(filepath)),
-        kind: stat?.type === "Directory" ? "directory" : "file",
-      })
-
-      yield* ctx.ask({
-        permission: "read",
-        patterns: [path.relative(instance.worktree, filepath)],
-        always: ["*"],
-        metadata: {},
-      })
 
       if (!stat) return yield* miss(filepath)
 

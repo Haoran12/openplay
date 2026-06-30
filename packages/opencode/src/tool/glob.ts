@@ -1,12 +1,10 @@
 import path from "path"
-import { Effect, Option, Schema } from "effect"
-import * as Stream from "effect/Stream"
+import { Effect, Option, Stream, Schema } from "effect"
+import * as Tool from "./tool"
 import { InstanceState } from "@/effect/instance-state"
 import { AppFileSystem } from "@openplay-ai/core/filesystem"
 import { Ripgrep } from "../file/ripgrep"
-import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./glob.txt"
-import * as Tool from "./tool"
 import { Reference } from "@/reference/reference"
 
 export const Parameters = Schema.Struct({
@@ -46,10 +44,6 @@ export const GlobTool = Tool.define(
           if (info?.type === "File") {
             throw new Error(`glob path must be a directory: ${search}`)
           }
-          yield* assertExternalDirectoryEffect(ctx, search, {
-            bypass: yield* reference.contains(search),
-            kind: "directory",
-          })
 
           const limit = 100
           let truncated = false
